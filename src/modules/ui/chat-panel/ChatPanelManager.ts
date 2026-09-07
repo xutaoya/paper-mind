@@ -22,6 +22,7 @@ import { getAuthManager } from "../../auth";
 import { getProviderManager } from "../../providers";
 import { providerSupportsToolCalling } from "../../providers/provider-capabilities";
 import { getPref, setPref } from "../../../utils/prefs";
+import { deltaContainsMathMarkup } from "../../../utils/chatMathMarkdown";
 import {
   createNoteSummaryContext,
   type NoteSummarySourceItem,
@@ -244,10 +245,15 @@ function renderStreamingTextNow(
   const now = Date.now();
   const presentationArtifactSignature =
     getPresentationArtifactSignature(activeMessage);
+  const incrementalContent =
+    state.lastMarkdownContent && content.startsWith(state.lastMarkdownContent)
+      ? content.slice(state.lastMarkdownContent.length)
+      : content;
   const shouldRenderMarkdown =
     contentReplacedAfterMarkdownRender ||
     presentationArtifactSignature !== state.lastPresentationArtifactSignature ||
     shouldForceStreamingMarkdownRender(content, state) ||
+    deltaContainsMathMarkup(incrementalContent) ||
     now - state.lastMarkdownRenderAt >= STREAMING_MARKDOWN_RENDER_INTERVAL_MS;
 
   if (shouldRenderMarkdown) {

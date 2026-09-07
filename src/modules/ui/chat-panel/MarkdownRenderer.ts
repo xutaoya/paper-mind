@@ -3,6 +3,15 @@
  */
 
 import MarkdownIt from "markdown-it";
+import {
+  containsInlineMathDelimiters,
+  extractMathMLMarkup,
+  importKaTeXHtmlIntoDocument,
+  importMathMLIntoDocument,
+  normalizeBlockquoteListIndentation,
+  normalizeMathContent,
+  repairIncompleteInlineMath,
+} from "../../../utils/chatMathMarkdown";
 import hljs from "highlight.js";
 import katex from "katex";
 import { chatColors } from "../../../utils/colors";
@@ -1777,7 +1786,9 @@ function renderToolCallCards(
  */
 function preprocessMathDelimiters(content: string): string {
   const preserved: string[] = [];
-  let processed = content;
+  let processed = repairIncompleteInlineMath(
+    normalizeBlockquoteListIndentation(content),
+  );
 
   // Protect fenced code blocks
   processed = processed.replace(/```[\s\S]*?```/g, (match) => {
@@ -1818,34 +1829,50 @@ function renderMathToElement(
   content: string,
   displayMode: boolean,
 ): void {
+  const normalized = normalizeMathContent(content);
+
   try {
-    const html = katex.renderToString(content, {
+    const mathml = katex.renderToString(normalized, {
       displayMode,
       output: "mathml",
       throwOnError: false,
       strict: false,
     });
-
-    // Parse KaTeX output into XHTML-compatible DOM nodes
-    const parser = new DOMParser();
-    const wrapper = `<span xmlns="${HTML_NS}">${html}</span>`;
-    const mathDoc = parser.parseFromString(wrapper, "application/xhtml+xml");
-
-    if (mathDoc.querySelector("parsererror")) {
-      renderMathFallback(doc, parent, content, displayMode);
+    const mathMarkup = extractMathMLMarkup(mathml);
+    if (mathMarkup && importMathMLIntoDocument(doc, parent, mathMarkup)) {
       return;
     }
 
-    const sourceNode = mathDoc.documentElement;
-    const children = Array.from(sourceNode.childNodes);
-    for (const child of children) {
-      if (child) {
-        parent.appendChild(doc.importNode(child, true));
-      }
+    const html = katex.renderToString(normalized, {
+      displayMode,
+      output: "html",
+      throwOnError: false,
+      strict: false,
+    });
+    if (importKaTeXHtmlIntoDocument(doc, parent, HTML_NS, html)) {
+      return;
     }
   } catch {
-    renderMathFallback(doc, parent, content, displayMode);
+    // fall through to raw fallback
   }
+
+  renderMathFallback(doc, parent, normalized, displayMode);
+}
+
+function renderProseWithInlineMath(
+  doc: Document,
+  parent: HTMLElement,
+  content: string,
+  options: MarkdownRenderOptions = {},
+): void {
+  const paragraph = doc.createElementNS(HTML_NS, "p") as HTMLElement;
+  paragraph.style.margin = "4px 0";
+  const inlineTokens = md.parseInline(
+    preprocessMathDelimiters(content.trim()),
+    {},
+  );
+  renderInlineTokens(doc, paragraph, inlineTokens, options);
+  parent.appendChild(paragraph);
 }
 
 /**
@@ -2255,11 +2282,14 @@ export function buildDOMFromTokens(
 
       case "code_block":
       case "fence": {
+        const lang = token.info?.trim() || "";
+        if (!lang && containsInlineMathDelimiters(token.content)) {
+          renderProseWithInlineMath(doc, parent, token.content, options);
+          break;
+        }
+
         const pre = doc.createElementNS(HTML_NS, "pre") as HTMLElement;
         const code = doc.createElementNS(HTML_NS, "code") as HTMLElement;
-
-        // Get language from fence info (e.g., ```javascript)
-        const lang = token.info?.trim() || "";
 
         // Apply dark/light theme styles
         const dark = isDarkMode();

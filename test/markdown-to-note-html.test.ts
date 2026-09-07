@@ -2,6 +2,7 @@ import { assert } from "chai";
 import {
   formatNoteDateTime,
   markdownToNoteHtml,
+  stripNoteHeadingMarkers,
   withLeadingNoteHeading,
 } from "../src/utils/markdownToNoteHtml.ts";
 
@@ -43,6 +44,17 @@ describe("markdownToNoteHtml", function () {
     const html = markdownToNoteHtml("这是 *重要结论 * 的说明。");
     assert.include(html, "<em>重要结论</em>");
     assert.notInclude(html, "*重要结论 *");
+  });
+
+  it("does not merge blockquote list lines when normalizing bold markers", function () {
+    const html = markdownToNoteHtml(
+      "> 3. **while** $t < 100$ **do**\n> 4.   **if** $t < 20$ **then**",
+    );
+    assert.match(
+      html,
+      /<li><strong>while<\/strong>[\s\S]*<strong>do<\/strong><\/li>[\s\S]*<li><strong>if<\/strong>[\s\S]*<strong>then<\/strong><\/li>/,
+    );
+    assert.notInclude(html, "&gt; 4.");
   });
 
   it("emits Zotero inline math nodes with LaTeX preserved", function () {
@@ -116,6 +128,27 @@ describe("markdownToNoteHtml", function () {
     assert.notInclude(html, "<sup>");
   });
 
+  it("renders indented blockquote algorithm steps as list items instead of code blocks", function () {
+    const html = markdownToNoteHtml(
+      [
+        "> **Algorithm 1: 引导训练策略**",
+        "> - 输入：$\\Phi_V$ 和 $\\Phi_I$",
+        "> 3. **while** $t < 100$ **do**",
+        "> 4.   **if** $t < 20$ **then**",
+        "> 5.     用公式(13)计算 $\\Phi_F$ 与 $(\\Phi_V + \\Phi_I)/2$ 之间的损失",
+        "> 7.     用公式(12)计算 $D(\\Phi_F)$ 的损失",
+      ].join("\n"),
+    );
+
+    assert.notInclude(html, "<pre><code>");
+    assert.include(html, '<span class="math">$\\Phi_F$</span>');
+    assert.include(html, '<span class="math">$D(\\Phi_F)$</span>');
+    assert.match(
+      html,
+      /<li><strong>while<\/strong>[\s\S]*<strong>do<\/strong><\/li>[\s\S]*<li><strong>if<\/strong>[\s\S]*<strong>then<\/strong><\/li>/,
+    );
+  });
+
   it("formats note timestamps as MM/DD/YYYY, HH:mm:ss", function () {
     assert.equal(
       formatNoteDateTime(new Date(2026, 7, 20, 17, 20, 40)),
@@ -130,5 +163,54 @@ describe("markdownToNoteHtml", function () {
     );
     assert.equal(html, "<h1>08/21/2026, 15:21:00</h1>\n<p>body</p>");
     assert.notInclude(html, "PaperChat Notes");
+  });
+
+  it("always keeps the datetime heading at the top when appending", function () {
+    const existing = [
+      "<h2>Paper: Spatial-frequency enhanced mamba for multi-modal image fusion</h2>",
+      "<p>Existing summary body.</p>",
+      "<hr/>",
+      "<h1>Core section</h1>",
+      "<p>Appended body.</p>",
+    ].join("\n");
+    const html = withLeadingNoteHeading(existing, "09/07/2026, 17:42:28");
+    assert.equal(
+      html,
+      [
+        "<h1>09/07/2026, 17:42:28</h1>",
+        "<h2>Paper: Spatial-frequency enhanced mamba for multi-modal image fusion</h2>",
+        "<p>Existing summary body.</p>",
+        "<hr/>",
+        "<h1>Core section</h1>",
+        "<p>Appended body.</p>",
+      ].join("\n"),
+    );
+  });
+
+  it("moves a misplaced datetime heading back to the top", function () {
+    const existing = [
+      "<h2>Paper: Example</h2>",
+      "<p>Body text.</p>",
+      "<hr/>",
+      "<h1>09/07/2026, 17:42:28</h1>",
+    ].join("\n");
+    const html = withLeadingNoteHeading(existing, "09/08/2026, 10:15:00");
+    assert.equal(
+      html,
+      [
+        "<h1>09/08/2026, 10:15:00</h1>",
+        "<h2>Paper: Example</h2>",
+        "<p>Body text.</p>",
+        "<hr/>",
+      ].join("\n"),
+    );
+    assert.notInclude(html, "09/07/2026, 17:42:28");
+  });
+
+  it("strips only note heading markers", function () {
+    const html = stripNoteHeadingMarkers(
+      "<h1>08/21/2026, 15:21:00</h1>\n<h1>Real section</h1>\n<p>body</p>",
+    );
+    assert.equal(html, "<h1>Real section</h1>\n<p>body</p>");
   });
 });

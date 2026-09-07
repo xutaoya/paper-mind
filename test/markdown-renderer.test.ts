@@ -1730,3 +1730,44 @@ After`;
     );
   });
 });
+
+describe("markdown renderer math", function () {
+  const collectByTag = (root: FakeElement, tagName: string): FakeElement[] => {
+    const matches: FakeElement[] = [];
+    const walk = (node: FakeElement) => {
+      if (node.tagName.toLowerCase() === tagName.toLowerCase()) {
+        matches.push(node);
+      }
+      for (const child of node.children) {
+        walk(child);
+      }
+    };
+    walk(root);
+    return matches;
+  };
+
+  it("renders inline math in deeply indented blockquote algorithm steps", function () {
+    const originalZotero = (globalThis as { Zotero?: unknown }).Zotero;
+    (globalThis as { Zotero?: unknown }).Zotero = {
+      getMainWindow: () => null,
+    };
+    const doc = new FakeDocument();
+    const root = new FakeElement(doc, "div");
+    const algorithm = `> **Algorithm 1: 引导训练策略**
+> - 输入：$\\Phi_V$ 和 $\\Phi_I$
+> 3. **while** $t < 100$ **do**
+> 4.   **if** $t < 20$ **then**
+> 5.     用公式(13)计算 $\\Phi_F$ 与 $(\\Phi_V + \\Phi_I)/2$ 之间的损失
+> 7.     用公式(12)计算 $D(\\Phi_F)$ 的损失`;
+
+    try {
+      renderMarkdownToElement(root as unknown as HTMLElement, algorithm, "math-test");
+
+      assert.equal(collectByTag(root, "pre").length, 0);
+      assert.notInclude(root.textContent || "", "$D(\\Phi_F)$");
+      assert.notInclude(root.textContent || "", "$\\Phi_F$");
+    } finally {
+      (globalThis as { Zotero?: unknown }).Zotero = originalZotero;
+    }
+  });
+});

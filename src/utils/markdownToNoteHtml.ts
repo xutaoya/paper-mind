@@ -1,4 +1,5 @@
 import MarkdownIt from "markdown-it";
+import { normalizeBlockquoteListIndentation } from "./chatMathMarkdown";
 import {
   preserveEmphasisInMarkdownForNotes,
   renderMathInMarkdownForNotes,
@@ -31,13 +32,22 @@ export function formatNoteDateTime(date: Date = new Date()): string {
   return `${pad2(date.getMonth() + 1)}/${pad2(date.getDate())}/${date.getFullYear()}, ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
 }
 
+const NOTE_DATETIME_HEADING_REGEX =
+  /<h1\b[^>]*>[\s\S]*?\b\d{2}\/\d{2}\/\d{4},\s*\d{2}:\d{2}:\d{2}\b[\s\S]*?<\/h1>/gi;
+const PAPERCHAT_NOTES_HEADING_REGEX =
+  /<h1\b[^>]*>\s*PaperChat Notes\s*<\/h1>/gi;
+
+export function stripNoteHeadingMarkers(html: string): string {
+  return html
+    .replace(NOTE_DATETIME_HEADING_REGEX, "")
+    .replace(PAPERCHAT_NOTES_HEADING_REGEX, "")
+    .trim();
+}
+
 export function withLeadingNoteHeading(html: string, title: string): string {
   const heading = `<h1>${escapeHtml(title)}</h1>`;
-  if (/<h1\b[^>]*>[\s\S]*?<\/h1>/i.test(html)) {
-    return html.replace(/<h1\b[^>]*>[\s\S]*?<\/h1>/i, heading);
-  }
-  const trimmed = html.trim();
-  return trimmed ? `${heading}\n${trimmed}` : heading;
+  const body = stripNoteHeadingMarkers(html);
+  return body ? `${heading}\n${body}` : heading;
 }
 
 function isMathOnlyLine(line: string): boolean {
@@ -70,27 +80,27 @@ export function compactMathLineSpacing(markdown: string): string {
 
 function normalizeEmphasisDelimiters(markdown: string): string {
   let normalized = markdown.replace(
-    /\*\*([^*\n]+?)\s+\*\*/g,
+    /\*\*([^*\n]+?)[ \t]+\*\*/g,
     (_, text: string) => `**${text.trimEnd()}**`,
   );
   normalized = normalized.replace(
-    /\*\*\s+([^*\n]+?)\*\*/g,
+    /\*\*[ \t]+([^*\n]+?)\*\*/g,
     (_, text: string) => `**${text.trimStart()}**`,
   );
   normalized = normalized.replace(
-    /__([^_\n]+?)\s+__/g,
+    /__([^_\n]+?)[ \t]+__/g,
     (_, text: string) => `__${text.trimEnd()}__`,
   );
   normalized = normalized.replace(
-    /__\s+([^_\n]+?)__/g,
+    /__[ \t]+([^_\n]+?)__/g,
     (_, text: string) => `__${text.trimStart()}__`,
   );
   normalized = normalized.replace(
-    /(?<!\*)\*([^*\n]+?)\s+\*(?!\*)/g,
+    /(?<!\*)\*([^*\n]+?)[ \t]+\*(?!\*)/g,
     (_, text: string) => `*${text.trimEnd()}*`,
   );
   normalized = normalized.replace(
-    /(?<!\*)\*\s+([^*\n]+?)\*(?!\*)/g,
+    /(?<!\*)\*[ \t]+([^*\n]+?)\*(?!\*)/g,
     (_, text: string) => `*${text.trimStart()}*`,
   );
   return normalized;
@@ -102,7 +112,9 @@ export function normalizeMarkdownForNotes(markdown: string): string {
 
 export function markdownToNoteHtml(markdown: string): string {
   const trimmed = separateMathParagraphs(
-    normalizeMarkdownForNotes(markdown.trim()),
+    normalizeMarkdownForNotes(
+      normalizeBlockquoteListIndentation(markdown.trim()),
+    ),
   );
   if (!trimmed) {
     return "";
