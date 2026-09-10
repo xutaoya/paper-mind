@@ -151,7 +151,7 @@ export function prepareReaderAssistantContent(rawContent: string): string {
   return mergeDuplicateMarkdownHeadings(stripped);
 }
 
-function findPrecedingUserMessage(
+export function findPrecedingUserMessage(
   messages: ChatMessage[],
   assistantMessageId: string,
 ): ChatMessage | null {

@@ -1,6 +1,8 @@
 import type { ChatMessage } from "../../types/chat";
+import { extractEditableUserMessageContent } from "../chat/user-message-edit";
 import { sanitizeMessagePreview } from "../ui/chat-panel/HistoryDropdown";
 import { getString } from "../../utils/locale";
+import { findPrecedingUserMessage } from "./bookmarkTurnContent";
 import type {
   BookmarkExportPayload,
   BookmarkFilterType,
@@ -25,6 +27,25 @@ export function deriveBookmarkTitle(content: string): string {
     return getString("chat-bookmark-untitled");
   }
   return cleaned.length > 72 ? `${cleaned.slice(0, 69)}...` : cleaned;
+}
+
+export function deriveBookmarkTitleForAssistantReply(
+  messages: readonly ChatMessage[],
+  assistantMessageId: string,
+  fallbackContent = "",
+): string {
+  const user = findPrecedingUserMessage(
+    [...messages],
+    assistantMessageId,
+  );
+  if (user) {
+    const question =
+      extractEditableUserMessageContent(user) || user.content.trim();
+    if (question) {
+      return deriveBookmarkTitle(question);
+    }
+  }
+  return deriveBookmarkTitle(fallbackContent);
 }
 
 export class BookmarkService {

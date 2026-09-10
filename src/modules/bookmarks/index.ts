@@ -6,6 +6,7 @@ export {
   BookmarkService,
   canBookmarkAssistantReply,
   deriveBookmarkTitle,
+  deriveBookmarkTitleForAssistantReply,
   getBookmarkService,
 } from "./BookmarkService";
 export {

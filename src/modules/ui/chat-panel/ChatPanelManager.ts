@@ -29,7 +29,7 @@ import {
 } from "../../chat/note-summary-destination";
 import {
   canBookmarkAssistantReply,
-  deriveBookmarkTitle,
+  deriveBookmarkTitleForAssistantReply,
 } from "../../bookmarks";
 import type { BookmarkRecord } from "../../../types/bookmark";
 import {
@@ -955,7 +955,11 @@ async function saveBookmarkFromMessage(
     context.container.ownerDocument!,
     context.getTheme(),
     {
-      defaultTitle: deriveBookmarkTitle(content),
+      defaultTitle: deriveBookmarkTitleForAssistantReply(
+        session.messages,
+        message.id,
+        content,
+      ),
       content,
       sessionId: session.id,
       messageId: message.id,
@@ -2646,7 +2650,11 @@ function buildReaderBookmarksFromSession(
       libraryId: 0,
       folderId: null,
       type: "message" as const,
-      title: deriveBookmarkTitle(message.content),
+      title: deriveBookmarkTitleForAssistantReply(
+        session.messages,
+        message.id,
+        message.content,
+      ),
       content: message.content,
       sessionId: session.id,
       messageId: message.id,

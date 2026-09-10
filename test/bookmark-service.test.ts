@@ -2,6 +2,7 @@ import { assert } from "chai";
 import {
   BookmarkRepository,
   deriveBookmarkTitle,
+  deriveBookmarkTitleForAssistantReply,
 } from "../src/modules/bookmarks/index.ts";
 import {
   mergeAdjacentSourceGroups,
@@ -16,6 +17,29 @@ describe("bookmark service helpers", function () {
     );
     assert.isTrue(title.length <= 72);
     assert.include(title, "assistant reply");
+  });
+
+  it("prefers the preceding user question as the default bookmark title", function () {
+    const title = deriveBookmarkTitleForAssistantReply(
+      [
+        {
+          id: "user-1",
+          role: "user",
+          content: "What is the main contribution of this paper?",
+          timestamp: 1,
+        },
+        {
+          id: "assistant-1",
+          role: "assistant",
+          content: "The main contribution is a new architecture.",
+          timestamp: 2,
+        },
+      ],
+      "assistant-1",
+      "The main contribution is a new architecture.",
+    );
+    assert.include(title, "main contribution");
+    assert.notInclude(title, "new architecture");
   });
 });
 
