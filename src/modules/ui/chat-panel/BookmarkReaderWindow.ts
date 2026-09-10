@@ -268,10 +268,8 @@ function injectReaderStyles(doc: Document): void {
       background: #f8fafc;
     }
     .paperchat-reader-outline-item.is-active {
-      justify-content: center;
       background: #eff6ff;
       color: #2563eb;
-      text-align: center;
     }
     .paperchat-reader-outline-level {
       flex: 0 0 auto;
@@ -296,10 +294,8 @@ function injectReaderStyles(doc: Document): void {
       -webkit-box-orient: vertical;
     }
     .paperchat-reader-outline-item.is-active .paperchat-reader-outline-title {
-      flex: 0 1 auto;
       color: #2563eb;
       font-weight: 600;
-      text-align: center;
     }
   `;
   doc.head.appendChild(style);
