@@ -27,7 +27,21 @@ import { getPref, setPref } from "../../../utils/prefs";
 import {
   formatModelLabel,
 } from "../../preferences/ModelsFetcher";
-import { getChatManager, type PanelMode } from "./ChatPanelManager";
+import {
+  createBookmarkManagerPanel,
+  getBookmarkManagerPanel,
+  isBookmarkManagerVisible,
+  refreshBookmarkManagerPanel,
+  setBookmarkManagerVisible,
+} from "./BookmarkManagerPanel";
+import {
+  getChatManager,
+  navigateToQuotedMessage,
+  openBookmarkReaderForContext,
+  type PanelMode,
+} from "./ChatPanelManager";
+import type { BookmarkManagerActions } from "./BookmarkManagerPanel";
+import type { BookmarkRecord } from "../../../types/bookmark";
 import { startReaderFigureScreenshot } from "../ReaderFigureScreenshot";
 import {
   MentionSelector,
@@ -358,6 +372,12 @@ export function setupEventHandlers(context: ChatPanelContext): () => void {
   const historyBtn = container.querySelector(
     "#chat-history-btn",
   ) as HTMLButtonElement;
+  const bookmarksBtn = container.querySelector(
+    "#chat-bookmarks-btn",
+  ) as HTMLButtonElement;
+  const chatViewport = container.querySelector(
+    "#chat-viewport",
+  ) as HTMLElement | null;
   const summarizeConversationBtn = container.querySelector(
     "#chat-summarize-conversation-note",
   ) as HTMLButtonElement | null;
@@ -968,10 +988,68 @@ export function setupEventHandlers(context: ChatPanelContext): () => void {
     }
   });
 
+  const createBookmarkManagerActions = (): BookmarkManagerActions => ({
+    onOpenBookmark: (_bookmark, bookmarks, index) =>
+      openBookmarkReaderForContext(context, bookmarks, index),
+    onJumpToChat: async (bookmark: BookmarkRecord) => {
+      if (!bookmark.sessionId || !bookmark.messageId) {
+        context.appendError(getString("chat-bookmark-open-unavailable"));
+        return;
+      }
+      setBookmarkManagerVisible(container, false);
+      await navigateToQuotedMessage(context, {
+        sessionId: bookmark.sessionId,
+        messageId: bookmark.messageId,
+        role: "assistant",
+        preview: bookmark.title,
+        contentSnapshot: bookmark.content || bookmark.title,
+        timestamp: bookmark.createdAt,
+      });
+    },
+    onClose: () => {
+      setBookmarkManagerVisible(container, false);
+      if (historyDropdown) {
+        historyDropdown.style.display = "none";
+      }
+    },
+    onError: (message) => context.appendError(message),
+    onSuccess: (message) => context.appendSuccess(message),
+  });
+
+  let bookmarkPanel = getBookmarkManagerPanel(container);
+  if (!bookmarkPanel && chatViewport) {
+    bookmarkPanel = createBookmarkManagerPanel(
+      container.ownerDocument!,
+      getCurrentTheme(),
+      createBookmarkManagerActions(),
+    );
+    chatViewport.appendChild(bookmarkPanel);
+  }
+
+  bookmarksBtn?.addEventListener("click", async () => {
+    if (!bookmarkPanel) return;
+    const willShow = !isBookmarkManagerVisible(container);
+    setBookmarkManagerVisible(container, willShow);
+    if (willShow && historyDropdown) {
+      historyDropdown.style.display = "none";
+    }
+    if (willShow) {
+      await refreshBookmarkManagerPanel(
+        container,
+        getCurrentTheme(),
+        createBookmarkManagerActions(),
+      );
+    }
+  });
+
   // History button - toggle dropdown with pagination
   historyBtn?.addEventListener("click", async () => {
     ztoolkit.log("History button clicked");
     if (!historyDropdown) return;
+
+    if (isBookmarkManagerVisible(container)) {
+      setBookmarkManagerVisible(container, false);
+    }
 
     const isNowVisible = toggleHistoryDropdown(historyDropdown, historyBtn);
     if (!isNowVisible) return;

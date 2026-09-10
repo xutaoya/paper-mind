@@ -1156,6 +1156,18 @@ export class ChatManager {
     );
   }
 
+  async getSessionById(sessionId: string): Promise<ChatSession | null> {
+    await this.init();
+    if (this.currentSession?.id === sessionId) {
+      return this.currentSession;
+    }
+    const streamingSession = this.streamingSessions.get(sessionId);
+    if (streamingSession) {
+      return streamingSession;
+    }
+    return this.sessionStorage.loadSession(sessionId);
+  }
+
   private async switchSessionLocked(
     sessionId: string,
   ): Promise<ChatSession | null> {

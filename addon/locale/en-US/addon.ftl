@@ -458,3 +458,117 @@ paperchat-chat-presentation-progress-cancelling = Cancelling generation…
 paperchat-chat-presentation-progress-resuming = Regenerating…
 
 paperchat-chat-presentation-progress-resume-failed = Could not regenerate PPT
+
+paperchat-chat-bookmark = Bookmark
+
+paperchat-chat-bookmarks = Bookmarks
+
+paperchat-chat-bookmark-save-title = Save bookmark
+
+paperchat-chat-bookmark-field-title = Title
+
+paperchat-chat-bookmark-field-folder = Folder
+
+paperchat-chat-bookmark-save = Save
+
+paperchat-chat-bookmark-cancel = Cancel
+
+paperchat-chat-bookmark-new-folder = New folder
+
+paperchat-chat-bookmark-new-folder-prompt = Enter a folder name
+
+paperchat-chat-bookmark-no-folder-hint = No folders yet. Save to the root or create one with +.
+
+paperchat-chat-bookmark-saved = Saved bookmark "{ $title }"
+
+paperchat-chat-bookmark-save-failed = Failed to save bookmark
+
+paperchat-chat-bookmark-unavailable = This message cannot be bookmarked
+
+paperchat-chat-bookmark-untitled = Untitled bookmark
+
+paperchat-chat-bookmark-title-required = Enter a bookmark title
+
+paperchat-chat-bookmark-folder-name-required = Enter a folder name
+
+paperchat-chat-bookmark-search-placeholder = Search titles, content, or folders
+
+paperchat-chat-bookmark-search-no-results = No matching bookmarks
+
+paperchat-chat-bookmark-search-result-count = { $count } results
+
+paperchat-chat-bookmark-search-clear = Clear search
+
+paperchat-chat-bookmark-close = Close
+
+paperchat-chat-bookmark-filter-all = All
+
+paperchat-chat-bookmark-filter-page = Pages
+
+paperchat-chat-bookmark-filter-message = Messages
+
+paperchat-chat-bookmark-filter-page-empty = No page bookmarks yet (saved from web pages or the reader)
+
+paperchat-chat-bookmark-filter-message-empty = No message bookmarks yet
+
+paperchat-chat-bookmark-type-message = Message
+
+paperchat-chat-bookmark-type-page = Page
+
+paperchat-chat-bookmark-empty = No bookmarks yet
+
+paperchat-chat-bookmark-ungrouped = Ungrouped
+
+paperchat-chat-bookmark-edit = Edit
+
+paperchat-chat-bookmark-delete = Delete
+
+paperchat-chat-bookmark-delete-confirm = Delete this bookmark?
+
+paperchat-chat-bookmark-open-unavailable = Cannot jump to the original message
+
+paperchat-chat-bookmark-copied = Bookmark content copied
+
+paperchat-chat-bookmark-export = Export
+
+paperchat-chat-bookmark-import = Import
+
+paperchat-chat-bookmark-exported = Bookmarks exported
+
+paperchat-chat-bookmark-imported = Bookmarks imported
+
+paperchat-chat-bookmark-import-invalid = Invalid bookmark file
+
+paperchat-chat-bookmark-reader-title = Reader
+
+paperchat-chat-bookmark-reader-user-message = User message
+
+paperchat-chat-bookmark-reader-assistant-message = AI reply
+
+paperchat-chat-bookmark-reader-jump-to-chat = Jump to chat
+
+paperchat-chat-bookmark-reader-open-hint = Open in reader
+
+paperchat-chat-bookmark-reader-empty-content = No content available
+
+paperchat-chat-bookmark-reader-outline = Section navigation
+
+paperchat-chat-bookmark-reader-outline-empty = No headings available in this content
+
+paperchat-chat-bookmark-drag-hint = Drag to move
+
+paperchat-chat-bookmark-moved = Moved bookmark "{ $title }"
+
+paperchat-chat-bookmark-open-in-chat = Open in chat
+
+paperchat-chat-bookmark-create-subfolder = Create subfolder
+
+paperchat-chat-bookmark-folder-moved = Moved folder "{ $title }"
+
+paperchat-chat-bookmark-folder-reordered = Reordered folder "{ $title }"
+
+paperchat-chat-bookmark-folder-move-invalid = Cannot move into this folder
+
+paperchat-chat-bookmark-toggle-folder = Expand or collapse folder
+
+paperchat-chat-bookmark-delete-folder-confirm = Delete this folder? Bookmarks inside will move to the parent folder.

@@ -595,6 +595,15 @@ export function createChatContainer(
   });
   historyBtn.appendChild(historyIcon);
 
+  const bookmarksBtn = createElement(doc, "button", btnStyle, {
+    id: "chat-bookmarks-btn",
+    title: getString("chat-bookmarks"),
+  });
+  const bookmarksIcon = createElement(doc, "img", iconStyle, {
+    src: `chrome://${config.addonRef}/content/icons/bookmark.svg`,
+  });
+  bookmarksBtn.appendChild(bookmarksIcon);
+
   const panelModeBtn = createElement(doc, "button", btnStyle, {
     id: "chat-panel-mode-btn",
     title: getString("chat-toggle-panel-mode"),
@@ -636,6 +645,7 @@ export function createChatContainer(
   toolbarButtons.appendChild(newChatBtn);
   toolbarButtons.appendChild(uploadFileBtn);
   toolbarButtons.appendChild(historyBtn);
+  toolbarButtons.appendChild(bookmarksBtn);
   for (const btn of [
     panelModeBtn,
     newChatBtn,
@@ -686,15 +696,20 @@ export function createChatContainer(
   );
 
   // Input Area - unified AI composer card
-  const inputArea = createElement(doc, "div", {
-    display: "flex",
-    flexDirection: "column",
-    padding: "12px 14px 16px",
-    background: theme.containerBg,
-    borderTop: `1px solid ${theme.borderColor}`,
-    overflow: "visible",
-    flexShrink: "0",
-  });
+  const inputArea = createElement(
+    doc,
+    "div",
+    {
+      display: "flex",
+      flexDirection: "column",
+      padding: "12px 14px 16px",
+      background: theme.containerBg,
+      borderTop: `1px solid ${theme.borderColor}`,
+      overflow: "visible",
+      flexShrink: "0",
+    },
+    { id: "chat-input-area" },
+  );
 
   const turnQueue = createElement(
     doc,

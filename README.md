@@ -39,6 +39,37 @@
   </tr>
 </table>
 
+### 书签
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="doc/screenshots/bookmark-save-message.png" alt="从对话消息保存书签" width="420" /><br />
+      从对话消息保存书签
+    </td>
+    <td align="center" width="50%">
+      <img src="doc/screenshots/bookmark-save-reader.png" alt="从阅读器保存书签" width="420" /><br />
+      从阅读器保存书签
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="doc/screenshots/bookmark-manager.png" alt="书签管理" width="300" /><br />
+      书签管理与搜索
+    </td>
+    <td align="center" width="50%">
+      <img src="doc/screenshots/bookmark-reader.png" alt="阅读器查看书签" width="300" /><br />
+      阅读器查看书签
+    </td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <img src="doc/screenshots/bookmark-reader-outline.png" alt="书签章节导航" width="360" /><br />
+      书签章节导航
+    </td>
+  </tr>
+</table>
+
 ---
 
 ## 目录
@@ -101,6 +132,7 @@
 5. 点击输入框旁的 **背景信息窗口** 图标，查看 token 占用（已用 / 总量 / 剩余百分比）
 6. 框选图表区域可 **截图提问**，截图自动带入对话
 7. 底部快捷按钮可一键触发常用 prompt（论文讲解、文献标注、标签生成等）
+8. 点击消息或阅读器中的 **书签** 图标，保存重要问答；在书签面板中搜索、分文件夹管理，并用阅读器回看
 
 ---
 
@@ -115,6 +147,7 @@
 | 快捷操作 | 论文讲解、文献标注、标签生成等一键 prompt |
 | MinerU 解析 | 文本提取失败时自动/手动解析 PDF |
 | 会话管理 | 多会话历史、轮次导航、删除单轮对话 |
+| 书签 | 保存对话/阅读器内容，文件夹管理、搜索、阅读器回看与章节导航 |
 | Markdown / 公式 | 流式输出，笔记导出支持 LaTeX |
 
 **本 fork 额外改动：** 输出截断自动续写、笔记 LaTeX 公式、模型 API 测速；移除了阅读循环等用不上的功能。

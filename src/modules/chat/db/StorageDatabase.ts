@@ -11,7 +11,7 @@ import { getErrorMessage } from "../../../utils/common";
 
 const DB_DIR = "paper-chat";
 const DB_FILE = "storage";
-export const SCHEMA_VERSION = 16;
+export const SCHEMA_VERSION = 17;
 
 /** Build absolute DB path so Zotero.DBConnection doesn't parse subdirectory names */
 function getDBPath(): string {
@@ -415,6 +415,51 @@ export class StorageDatabase {
       CREATE INDEX IF NOT EXISTS idx_memories_library_created
       ON memories (library_id, created_at DESC)
     `);
+
+    await db.queryAsync(`
+      CREATE TABLE IF NOT EXISTS bookmark_folders (
+        id TEXT PRIMARY KEY,
+        library_id INTEGER NOT NULL,
+        name TEXT NOT NULL,
+        parent_id TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `);
+
+    await db.queryAsync(`
+      CREATE TABLE IF NOT EXISTS bookmarks (
+        id TEXT PRIMARY KEY,
+        library_id INTEGER NOT NULL,
+        folder_id TEXT,
+        type TEXT NOT NULL CHECK (type IN ('message', 'page')),
+        title TEXT NOT NULL,
+        content TEXT NOT NULL DEFAULT '',
+        session_id TEXT,
+        message_id TEXT,
+        item_key TEXT,
+        item_library_id INTEGER,
+        page_url TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    `);
+
+    await db.queryAsync(`
+      CREATE INDEX IF NOT EXISTS idx_bookmarks_library_created
+      ON bookmarks (library_id, created_at DESC)
+    `);
+
+    await db.queryAsync(`
+      CREATE INDEX IF NOT EXISTS idx_bookmarks_folder
+      ON bookmarks (folder_id, created_at DESC)
+    `);
+
+    await db.queryAsync(`
+      CREATE INDEX IF NOT EXISTS idx_bookmark_folders_library
+      ON bookmark_folders (library_id, sort_order ASC, name COLLATE NOCASE ASC)
+    `);
   }
 
   private async hasV9SearchColumns(db: ZoteroDBConnection): Promise<boolean> {
@@ -553,6 +598,10 @@ export class StorageDatabase {
         await this.upgradeToV16(db);
         currentVersion = 16;
       }
+      if (currentVersion < 17) {
+        await this.upgradeToV17(db);
+        currentVersion = 17;
+      }
       if (
         currentVersion === SCHEMA_VERSION &&
         !(await this.hasCurrentSchemaColumns(db))
@@ -566,6 +615,7 @@ export class StorageDatabase {
         await this.upgradeToV14(db);
         await this.upgradeToV15(db);
         await this.upgradeToV16(db);
+        await this.upgradeToV17(db);
       }
     }
   }
@@ -1439,6 +1489,72 @@ export class StorageDatabase {
       }
       ztoolkit.log(
         "[StorageDatabase] Failed to upgrade to v15:",
+        getErrorMessage(error),
+      );
+      throw error;
+    }
+  }
+
+  /** Upgrade schema v16 -> v17: add bookmark folders and bookmarks. */
+  private async upgradeToV17(db: ZoteroDBConnection): Promise<void> {
+    ztoolkit.log("[StorageDatabase] Upgrading schema v16 -> v17...");
+
+    await db.queryAsync("BEGIN TRANSACTION");
+    try {
+      await db.queryAsync(`
+        CREATE TABLE IF NOT EXISTS bookmark_folders (
+          id TEXT PRIMARY KEY,
+          library_id INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          parent_id TEXT,
+          sort_order INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      `);
+      await db.queryAsync(`
+        CREATE TABLE IF NOT EXISTS bookmarks (
+          id TEXT PRIMARY KEY,
+          library_id INTEGER NOT NULL,
+          folder_id TEXT,
+          type TEXT NOT NULL CHECK (type IN ('message', 'page')),
+          title TEXT NOT NULL,
+          content TEXT NOT NULL DEFAULT '',
+          session_id TEXT,
+          message_id TEXT,
+          item_key TEXT,
+          item_library_id INTEGER,
+          page_url TEXT,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        )
+      `);
+      await db.queryAsync(`
+        CREATE INDEX IF NOT EXISTS idx_bookmarks_library_created
+        ON bookmarks (library_id, created_at DESC)
+      `);
+      await db.queryAsync(`
+        CREATE INDEX IF NOT EXISTS idx_bookmarks_folder
+        ON bookmarks (folder_id, created_at DESC)
+      `);
+      await db.queryAsync(`
+        CREATE INDEX IF NOT EXISTS idx_bookmark_folders_library
+        ON bookmark_folders (library_id, sort_order ASC, name COLLATE NOCASE ASC)
+      `);
+      await db.queryAsync(
+        "UPDATE schema_version SET version = ?, updated_at = ? WHERE id = 1",
+        [17, Date.now()],
+      );
+      await db.queryAsync("COMMIT");
+      ztoolkit.log("[StorageDatabase] Schema upgraded to v17");
+    } catch (error) {
+      try {
+        await db.queryAsync("ROLLBACK");
+      } catch {
+        /* ignore */
+      }
+      ztoolkit.log(
+        "[StorageDatabase] Failed to upgrade to v17:",
         getErrorMessage(error),
       );
       throw error;

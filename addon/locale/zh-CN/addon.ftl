@@ -458,3 +458,117 @@ paperchat-chat-presentation-progress-cancelling = 正在取消制作…
 paperchat-chat-presentation-progress-resuming = 正在重新制作…
 
 paperchat-chat-presentation-progress-resume-failed = 无法重新制作 PPT
+
+paperchat-chat-bookmark = 书签
+
+paperchat-chat-bookmarks = 书签
+
+paperchat-chat-bookmark-save-title = 保存书签
+
+paperchat-chat-bookmark-field-title = 标题
+
+paperchat-chat-bookmark-field-folder = 文件夹
+
+paperchat-chat-bookmark-save = 保存
+
+paperchat-chat-bookmark-cancel = 取消
+
+paperchat-chat-bookmark-new-folder = 新建文件夹
+
+paperchat-chat-bookmark-new-folder-prompt = 输入文件夹名称
+
+paperchat-chat-bookmark-no-folder-hint = 还没有文件夹，可先保存到根目录，或点击 + 新建。
+
+paperchat-chat-bookmark-saved = 已保存书签「{ $title }」
+
+paperchat-chat-bookmark-save-failed = 保存书签失败
+
+paperchat-chat-bookmark-unavailable = 当前消息无法保存为书签
+
+paperchat-chat-bookmark-untitled = 未命名书签
+
+paperchat-chat-bookmark-title-required = 请填写书签标题
+
+paperchat-chat-bookmark-folder-name-required = 请填写文件夹名称
+
+paperchat-chat-bookmark-search-placeholder = 搜索书签标题、内容或文件夹
+
+paperchat-chat-bookmark-search-no-results = 没有匹配的书签
+
+paperchat-chat-bookmark-search-result-count = 找到 { $count } 条结果
+
+paperchat-chat-bookmark-search-clear = 清除搜索
+
+paperchat-chat-bookmark-close = 关闭
+
+paperchat-chat-bookmark-filter-all = 全部
+
+paperchat-chat-bookmark-filter-page = 页面
+
+paperchat-chat-bookmark-filter-message = 消息
+
+paperchat-chat-bookmark-filter-page-empty = 暂无页面书签（从网页或阅读器保存的内容）
+
+paperchat-chat-bookmark-filter-message-empty = 暂无消息书签
+
+paperchat-chat-bookmark-type-message = 消息
+
+paperchat-chat-bookmark-type-page = 页面
+
+paperchat-chat-bookmark-empty = 还没有书签
+
+paperchat-chat-bookmark-ungrouped = 未分组
+
+paperchat-chat-bookmark-edit = 编辑
+
+paperchat-chat-bookmark-delete = 删除
+
+paperchat-chat-bookmark-delete-confirm = 确定删除这个书签吗？
+
+paperchat-chat-bookmark-open-unavailable = 无法跳转到原消息
+
+paperchat-chat-bookmark-copied = 已复制书签内容
+
+paperchat-chat-bookmark-export = 导出
+
+paperchat-chat-bookmark-import = 导入
+
+paperchat-chat-bookmark-exported = 书签已导出
+
+paperchat-chat-bookmark-imported = 书签已导入
+
+paperchat-chat-bookmark-import-invalid = 书签文件无效
+
+paperchat-chat-bookmark-reader-title = 阅读器
+
+paperchat-chat-bookmark-reader-user-message = 用户消息
+
+paperchat-chat-bookmark-reader-assistant-message = AI 回复
+
+paperchat-chat-bookmark-reader-jump-to-chat = 跳转到对话
+
+paperchat-chat-bookmark-reader-open-hint = 在阅读器中查看
+
+paperchat-chat-bookmark-reader-empty-content = 暂无内容
+
+paperchat-chat-bookmark-reader-outline = 章节导航
+
+paperchat-chat-bookmark-reader-outline-empty = 当前内容没有可导航的标题
+
+paperchat-chat-bookmark-drag-hint = 拖动以移动
+
+paperchat-chat-bookmark-moved = 已移动书签「{ $title }」
+
+paperchat-chat-bookmark-open-in-chat = 在对话中打开
+
+paperchat-chat-bookmark-create-subfolder = 创建子文件夹
+
+paperchat-chat-bookmark-folder-moved = 已移动文件夹「{ $title }」
+
+paperchat-chat-bookmark-folder-reordered = 已调整文件夹「{ $title }」顺序
+
+paperchat-chat-bookmark-folder-move-invalid = 无法移动到该文件夹
+
+paperchat-chat-bookmark-toggle-folder = 展开或折叠文件夹
+
+paperchat-chat-bookmark-delete-folder-confirm = 确定删除这个文件夹吗？其中的书签会移到上级目录。

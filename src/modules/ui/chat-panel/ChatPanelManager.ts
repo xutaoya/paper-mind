@@ -27,7 +27,17 @@ import {
   createNoteSummaryContext,
   type NoteSummarySourceItem,
 } from "../../chat/note-summary-destination";
+import {
+  canBookmarkAssistantReply,
+  deriveBookmarkTitle,
+} from "../../bookmarks";
+import type { BookmarkRecord } from "../../../types/bookmark";
+import {
+  closeBookmarkReader,
+  openBookmarkReader,
+} from "./BookmarkReaderWindow";
 import { executeAppendToNote } from "../../chat/pdf-tools";
+import { openBookmarkSaveDialog } from "./BookmarkSaveDialog";
 import { normalizeSourceItemKeys } from "../../chat/note-source-provenance";
 import { isPathInsidePresentationRoot } from "../../presentation";
 import type { PresentationLaunchSettings } from "../../presentation/PresentationLaunchSettings";
@@ -646,6 +656,11 @@ interface ChatMessageRenderCallbacks {
     assistantMessageId: string,
   ) => string | void | Promise<string | void>;
   onSummarizeReplyError?: (error: Error) => void;
+  onBookmarkMessage?: (
+    assistantMessageId: string,
+  ) => string | void | Promise<string | void>;
+  onBookmarkMessageError?: (error: Error) => void;
+  onOpenMessageReader?: (assistantMessageId: string) => void | Promise<void>;
   onResumePresentation?: (
     assistantMessageId: string,
   ) => void | boolean | Promise<void | boolean>;
@@ -730,6 +745,9 @@ function renderMessageElementsWithMarkdownActions(
       onNavigateToQuotedMessage: callbacks.onNavigateToQuotedMessage,
       onSummarizeReply: callbacks.onSummarizeReply,
       onSummarizeReplyError: callbacks.onSummarizeReplyError,
+      onBookmarkMessage: callbacks.onBookmarkMessage,
+      onBookmarkMessageError: callbacks.onBookmarkMessageError,
+      onOpenMessageReader: callbacks.onOpenMessageReader,
       onEditUserMessage: callbacks.onEditUserMessage,
       editingUserMessageId: callbacks.editingUserMessageId,
       onRenderComplete: callbacks.onRenderComplete,
@@ -914,6 +932,44 @@ async function copyReplyToItemNote(
   return getString("chat-copy-reply-note-success", {
     args: { title: getItemTitleByKey(itemKey) },
   });
+}
+
+async function saveBookmarkFromMessage(
+  context: ChatPanelContext,
+  assistantMessageId: string,
+): Promise<string> {
+  const session = context.chatManager.getActiveSession();
+  const message = session?.messages.find(
+    (candidate) => candidate.id === assistantMessageId,
+  );
+  if (!session || !message || !canBookmarkAssistantReply(message)) {
+    throw new Error(getString("chat-bookmark-unavailable"));
+  }
+
+  const content =
+    formatMarkdownForMessageCopy(message.content, {
+      evidenceRecords: message.evidence,
+    }) || message.content;
+  const navigationItem = getQuoteNavigationItem(session, context.getCurrentItem());
+  const result = await openBookmarkSaveDialog(
+    context.container.ownerDocument!,
+    context.getTheme(),
+    {
+      defaultTitle: deriveBookmarkTitle(content),
+      content,
+      sessionId: session.id,
+      messageId: message.id,
+      itemKey: navigationItem?.key ?? session.lastActiveItemKey ?? null,
+      itemLibraryId:
+        navigationItem?.libraryID ??
+        session.lastActiveItemLibraryID ??
+        null,
+    },
+  );
+  if (!result) {
+    return "";
+  }
+  return getString("chat-bookmark-saved", { args: { title: result.title } });
 }
 
 function buildApprovalActionsForContainer(
@@ -1772,6 +1828,13 @@ function renderActiveSessionInContainer(
       onSummarizeReplyError: (error) => {
         refreshContext.appendError(error.message);
       },
+      onBookmarkMessage: (assistantMessageId) =>
+        saveBookmarkFromMessage(refreshContext, assistantMessageId),
+      onBookmarkMessageError: (error) => {
+        refreshContext.appendError(error.message);
+      },
+      onOpenMessageReader: (assistantMessageId) =>
+        openMessageTurnReader(refreshContext, assistantMessageId),
       onResumePresentation: (assistantMessageId) =>
         refreshContext.launchPresentation(assistantMessageId),
       onCancelPresentation: () =>
@@ -2571,7 +2634,65 @@ function clearPendingQuotedMessages(context: ChatPanelContext): void {
   context.updateAttachmentsPreview();
 }
 
-async function navigateToQuotedMessage(
+function buildReaderBookmarksFromSession(
+  session: ChatSession,
+): BookmarkRecord[] {
+  return session.messages
+    .filter(
+      (message) => message.role === "assistant" && !message.isSystemNotice,
+    )
+    .map((message) => ({
+      id: message.id,
+      libraryId: 0,
+      folderId: null,
+      type: "message" as const,
+      title: deriveBookmarkTitle(message.content),
+      content: message.content,
+      sessionId: session.id,
+      messageId: message.id,
+      itemKey: null,
+      itemLibraryId: null,
+      pageUrl: null,
+      createdAt: message.timestamp,
+      updatedAt: message.timestamp,
+    }));
+}
+
+export async function openBookmarkReaderForContext(
+  context: ChatPanelContext,
+  bookmarks: BookmarkRecord[],
+  startIndex: number,
+): Promise<void> {
+  await openBookmarkReader(bookmarks, startIndex, {
+    loadSession: (sessionId) => getChatManager().getSessionById(sessionId),
+    onJumpToChat: async (quote) => {
+      closeBookmarkReader();
+      await navigateToQuotedMessage(context, quote);
+    },
+    onClose: () => {},
+    onCopySuccess: (message) => context.appendSuccess(message),
+  });
+}
+
+export async function openMessageTurnReader(
+  context: ChatPanelContext,
+  assistantMessageId: string,
+): Promise<void> {
+  const session = context.chatManager.getActiveSession();
+  if (!session) {
+    return;
+  }
+  const bookmarks = buildReaderBookmarksFromSession(session);
+  const index = bookmarks.findIndex(
+    (bookmark) => bookmark.messageId === assistantMessageId,
+  );
+  if (index < 0) {
+    return;
+  }
+  await openBookmarkReaderForContext(context, bookmarks, index);
+}
+
+export async function navigateToQuotedMessage(
   context: ChatPanelContext,
   quote: QuotedMessageRef,
 ): Promise<void> {
@@ -2937,6 +3058,13 @@ function createContext(container: HTMLElement): ChatPanelContext {
               onSummarizeReplyError: (error) => {
                 context.appendError(error.message);
               },
+              onBookmarkMessage: (assistantMessageId) =>
+                saveBookmarkFromMessage(context, assistantMessageId),
+              onBookmarkMessageError: (error) => {
+                context.appendError(error.message);
+              },
+              onOpenMessageReader: (assistantMessageId) =>
+                openMessageTurnReader(context, assistantMessageId),
               onResumePresentation: (assistantMessageId) =>
                 context.launchPresentation(assistantMessageId),
               onResumePresentationError: (error) => {

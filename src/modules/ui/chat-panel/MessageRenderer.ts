@@ -39,6 +39,7 @@ import {
 import { isMaxIterationsNoticeContent } from "../../chat/agent-runtime/messages";
 import { isTerminalPresentationArtifact } from "../../chat/presentation-artifacts";
 import { selectChatMessagePresentations } from "../../chat/message-presentation";
+import { canBookmarkAssistantReply } from "../../bookmarks";
 import { canSummarizeAssistantReply } from "./NoteSummaryActions";
 import {
   createMessageTimeSeparatorElement,
@@ -63,11 +64,13 @@ const MESSAGE_ACTION_ICON_SIZE = "15px";
 const MESSAGE_HIGHLIGHT_DURATION_MS = 1050;
 const MESSAGE_HIGHLIGHT_OVERLAY_CLASS = "paperchat-message-highlight-overlay";
 type MessageActionIconName =
+  | "bookmark"
   | "change"
   | "copy"
   | "fork"
   | "quote"
   | "refresh"
+  | "right-bar"
   | "thinking"
   | "trash"
   | "write";
@@ -467,6 +470,11 @@ export interface MessageRenderOptions {
     assistantMessageId: string,
   ) => string | void | Promise<string | void>;
   onSummarizeReplyError?: (error: Error) => void;
+  onBookmarkMessage?: (
+    assistantMessageId: string,
+  ) => string | void | Promise<string | void>;
+  onBookmarkMessageError?: (error: Error) => void;
+  onOpenMessageReader?: (assistantMessageId: string) => void | Promise<void>;
   onEditUserMessage?: (userMessageId: string) => void;
   editingUserMessageId?: string | null;
   onRenderComplete?: () => void;
@@ -1041,6 +1049,34 @@ export function createMessageElement(
     );
   }
 
+  if (
+    msg.role === "assistant" &&
+    msg.streamingState === undefined &&
+    renderOptions.onOpenMessageReader
+  ) {
+    bubble.style.cursor = "pointer";
+    bubble.title = getString("chat-bookmark-reader-open-hint");
+    bubble.addEventListener("click", (event) => {
+      const target = event.target as Element | null;
+      if (
+        target?.closest(
+          "button, a, [data-quoted-message-id], .message-actions, .chat-source-group, .chat-tool-call-card",
+        )
+      ) {
+        return;
+      }
+      const selection = bubble.ownerDocument.getSelection();
+      if (selection && !selection.isCollapsed && selection.toString().trim()) {
+        return;
+      }
+      void Promise.resolve(
+        renderOptions.onOpenMessageReader?.(msg.id),
+      ).catch((error: unknown) => {
+        ztoolkit.log("[MessageRenderer] Open message reader failed:", error);
+      });
+    });
+  }
+
   if (msg.role === "user" && msg.streamingState === undefined && !msg.isSystemNotice) {
     bubble.dataset.editable = "true";
     bubble.title = getString("chat-edit-message-hint");
@@ -1085,6 +1121,9 @@ export function createMessageElement(
     renderOptions.onQuoteReply,
     renderOptions.onSummarizeReply,
     renderOptions.onSummarizeReplyError,
+    renderOptions.onBookmarkMessage,
+    renderOptions.onBookmarkMessageError,
+    renderOptions.onOpenMessageReader,
   );
   if (actions) {
     wrapper.appendChild(actions);
@@ -1250,6 +1289,28 @@ function createDeleteTurnButton(
   return btn;
 }
 
+function createOpenMessageReaderButton(
+  doc: Document,
+  theme: ThemeColors,
+  assistantMessageId: string,
+  onOpenMessageReader: (assistantMessageId: string) => void | Promise<void>,
+): HTMLElement {
+  const label = getString("chat-bookmark-reader-open-hint");
+  const btn = createMessageActionButton(doc, theme, label);
+  btn.setAttribute("class", "message-action-btn open-message-reader-btn");
+  setIconButtonImage(btn, "right-bar", "");
+  btn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    event.preventDefault();
+    void Promise.resolve(onOpenMessageReader(assistantMessageId)).catch(
+      (error: unknown) => {
+        ztoolkit.log("[MessageRenderer] Open message reader failed:", error);
+      },
+    );
+  });
+  return btn;
+}
+
 function createQuoteReplyButton(
   doc: Document,
   theme: ThemeColors,
@@ -1295,6 +1356,60 @@ function showInlineMessageActionSuccess(
     button.setAttribute("aria-label", restoreLabel);
     button.style.color = "";
   }, 1800);
+}
+
+function createBookmarkMessageButton(
+  doc: Document,
+  theme: ThemeColors,
+  assistantMessageId: string,
+  onBookmarkMessage: (
+    assistantMessageId: string,
+  ) => string | void | Promise<string | void>,
+  onError?: (error: Error) => void,
+): HTMLElement {
+  const label = getString("chat-bookmark");
+  const btn = createMessageActionButton(doc, theme, label);
+  btn.setAttribute("class", "message-action-btn bookmark-message-btn");
+  setIconButtonImage(btn, "bookmark", "");
+
+  btn.addEventListener("click", (event) => {
+    event.stopPropagation();
+    event.preventDefault();
+    if (btn.getAttribute("data-busy") === "true") {
+      return;
+    }
+
+    btn.setAttribute("data-busy", "true");
+    btn.setAttribute("aria-busy", "true");
+    (btn as HTMLButtonElement).disabled = true;
+    btn.style.cursor = "wait";
+    btn.style.opacity = "0.6";
+
+    void (async () => {
+      try {
+        const successMessage = await onBookmarkMessage(assistantMessageId);
+        if (typeof successMessage === "string" && successMessage.trim()) {
+          showInlineMessageActionSuccess(btn, successMessage, "bookmark", label);
+        }
+      } catch (error: unknown) {
+        const bookmarkError =
+          error instanceof Error ? error : new Error(String(error));
+        ztoolkit.log(
+          "[MessageRenderer] Bookmark message failed:",
+          bookmarkError,
+        );
+        onError?.(bookmarkError);
+      } finally {
+        btn.removeAttribute("data-busy");
+        btn.removeAttribute("aria-busy");
+        (btn as HTMLButtonElement).disabled = false;
+        btn.style.cursor = "pointer";
+        btn.style.opacity = "1";
+      }
+    })();
+  });
+
+  return btn;
 }
 
 function createSummarizeReplyButton(
@@ -1392,6 +1507,11 @@ function createMessageActions(
     assistantMessageId: string,
   ) => string | void | Promise<string | void>,
   onSummarizeReplyError?: (error: Error) => void,
+  onBookmarkMessage?: (
+    assistantMessageId: string,
+  ) => string | void | Promise<string | void>,
+  onBookmarkMessageError?: (error: Error) => void,
+  onOpenMessageReader?: (assistantMessageId: string) => void | Promise<void>,
 ): HTMLElement | null {
   const actions = createElement(
     doc,
@@ -1424,6 +1544,18 @@ function createMessageActions(
           evidenceRecords: msg.evidence,
         })
       : "";
+
+  if (canBookmarkAssistantReply(msg) && onBookmarkMessage) {
+    actions.appendChild(
+      createBookmarkMessageButton(
+        doc,
+        theme,
+        msg.id,
+        onBookmarkMessage,
+        onBookmarkMessageError,
+      ),
+    );
+  }
 
   actions.appendChild(createCopyButton(doc, theme, copyContent));
 
@@ -1489,6 +1621,17 @@ function createMessageActions(
         onDeleteTurn,
         onDeleteTurnError,
       ),
+    );
+  }
+
+  if (
+    msg.role === "assistant" &&
+    msg.streamingState === undefined &&
+    Boolean(msg.content.trim()) &&
+    onOpenMessageReader
+  ) {
+    actions.appendChild(
+      createOpenMessageReaderButton(doc, theme, msg.id, onOpenMessageReader),
     );
   }
 

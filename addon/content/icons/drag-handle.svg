@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .icon-fill { fill: #9ca3af; }
+    @media (prefers-color-scheme: dark) {
+      .icon-fill { fill: #9ca3af; }
+    }
+  </style>
+  <circle cx="18" cy="14" r="3" class="icon-fill"/>
+  <circle cx="30" cy="14" r="3" class="icon-fill"/>
+  <circle cx="18" cy="24" r="3" class="icon-fill"/>
+  <circle cx="30" cy="24" r="3" class="icon-fill"/>
+  <circle cx="18" cy="34" r="3" class="icon-fill"/>
+  <circle cx="30" cy="34" r="3" class="icon-fill"/>
+</svg>
