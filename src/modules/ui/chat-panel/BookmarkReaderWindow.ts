@@ -250,10 +250,9 @@ function injectReaderStyles(doc: Document): void {
       display: none;
     }
     .paperchat-reader-outline-item {
-      display: grid;
-      grid-template-columns: auto 1fr;
+      display: flex;
+      align-items: center;
       gap: 10px;
-      align-items: start;
       width: 100%;
       border: none;
       border-radius: 10px;
@@ -263,25 +262,30 @@ function injectReaderStyles(doc: Document): void {
       padding: 8px 10px;
       cursor: pointer;
       font: inherit;
+      box-sizing: border-box;
     }
     .paperchat-reader-outline-item:hover {
       background: #f8fafc;
     }
     .paperchat-reader-outline-item.is-active {
+      justify-content: center;
       background: #eff6ff;
       color: #2563eb;
+      text-align: center;
     }
     .paperchat-reader-outline-level {
+      flex: 0 0 auto;
       font-size: 11px;
       font-weight: 600;
       color: #94a3b8;
-      line-height: 1.4;
-      padding-top: 1px;
+      line-height: 1.2;
     }
     .paperchat-reader-outline-item.is-active .paperchat-reader-outline-level {
       color: #60a5fa;
     }
     .paperchat-reader-outline-title {
+      flex: 1 1 auto;
+      min-width: 0;
       font-size: 13px;
       line-height: 1.45;
       color: #334155;
@@ -292,8 +296,10 @@ function injectReaderStyles(doc: Document): void {
       -webkit-box-orient: vertical;
     }
     .paperchat-reader-outline-item.is-active .paperchat-reader-outline-title {
+      flex: 0 1 auto;
       color: #2563eb;
       font-weight: 600;
+      text-align: center;
     }
   `;
   doc.head.appendChild(style);
