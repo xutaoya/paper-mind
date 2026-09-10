@@ -89,21 +89,92 @@ let getActiveReaderItemFn: (() => Zotero.Item | null) | null = null;
 // Toggle panel mode function reference (set by ChatPanelManager)
 let togglePanelModeFn: (() => void) | null = null;
 
-const conversationSummaryRuns = new WeakMap<HTMLButtonElement, symbol>();
+const CONVERSATION_SUMMARY_TURN_PREFIX = "conversation-summary-";
 let queuedTurnSequence = 0;
 const MESSAGE_INPUT_MIN_HEIGHT = 60;
 const MESSAGE_INPUT_MAX_HEIGHT = 140;
 const CHAT_HISTORY_BOTTOM_STICKY_THRESHOLD = 24;
 
+function updateConversationSummaryButtonPresentation(
+  button: HTMLButtonElement,
+  isRunning: boolean,
+): void {
+  const icon = button.querySelector("img") as HTMLElement | null;
+  if (isRunning) {
+    button.setAttribute("aria-busy", "true");
+    button.title = getString("chat-stop-generating");
+    button.setAttribute("aria-label", button.title);
+    button.style.cursor = "pointer";
+    button.style.opacity = "1";
+    if (icon) {
+      icon.removeAttribute("src");
+      icon.style.display = "flex";
+      icon.style.alignItems = "center";
+      icon.style.justifyContent = "center";
+      icon.style.width = "12px";
+      icon.style.height = "12px";
+      icon.style.background = "currentColor";
+      icon.style.borderRadius = "2px";
+    }
+    return;
+  }
+
+  button.removeAttribute("aria-busy");
+  button.title = getString("chat-summarize-conversation-note");
+  button.setAttribute("aria-label", button.title);
+  button.style.cursor = "pointer";
+  button.style.opacity = "1";
+  if (icon) {
+    icon.setAttribute(
+      "src",
+      `chrome://${config.addonRef}/content/icons/write.svg`,
+    );
+    icon.style.display = "block";
+    icon.style.width = "16px";
+    icon.style.height = "16px";
+    icon.style.background = "";
+    icon.style.borderRadius = "";
+  }
+}
+
 function resetConversationSummaryButtonBusyState(
   button: HTMLButtonElement,
 ): void {
-  conversationSummaryRuns.delete(button);
-  button.disabled = false;
-  button.removeAttribute("aria-busy");
   button.removeAttribute("data-summary-session-id");
-  button.style.cursor = "pointer";
-  button.style.opacity = "1";
+  updateConversationSummaryButtonPresentation(button, false);
+}
+
+function isConversationSummaryRunning(sessionId: string): boolean {
+  const snapshot = sessionTurnQueue.snapshot(sessionId);
+  return (
+    snapshot.status === "running" &&
+    snapshot.activeTurnId?.startsWith(CONVERSATION_SUMMARY_TURN_PREFIX) === true
+  );
+}
+
+function hasQueuedConversationSummary(sessionId: string): boolean {
+  const snapshot = sessionTurnQueue.snapshot(sessionId);
+  return snapshot.queued.some((turn) =>
+    turn.id.startsWith(CONVERSATION_SUMMARY_TURN_PREFIX),
+  );
+}
+
+export function syncConversationSummaryButtonState(
+  container: HTMLElement,
+  chatManager: ChatPanelContext["chatManager"],
+): void {
+  const button = container.querySelector(
+    "#chat-summarize-conversation-note",
+  ) as HTMLButtonElement | null;
+  if (!button) {
+    return;
+  }
+  const session = chatManager.getActiveSession();
+  const isRunning = session
+    ? isConversationSummaryRunning(session.id) ||
+      hasQueuedConversationSummary(session.id)
+    : false;
+  updateConversationSummaryButtonPresentation(button, isRunning);
 }
 
 export function updateConversationNoteSummaryButton(
@@ -438,6 +509,7 @@ export function setupEventHandlers(context: ChatPanelContext): () => void {
       const session = chatManager.getActiveSession();
       if (session?.id !== sessionId) return;
       syncSendButtonState(sendButton, chatManager);
+      syncConversationSummaryButtonState(container, chatManager);
       context.renderMessages(session.messages);
     }),
   );
@@ -855,33 +927,85 @@ export function setupEventHandlers(context: ChatPanelContext): () => void {
   });
 
   summarizeConversationBtn?.addEventListener("click", async () => {
-    if (summarizeConversationBtn.disabled) {
+    const session = chatManager.getActiveSession();
+    if (!session) {
       return;
     }
-    const sessionId = chatManager.getActiveSession()?.id;
-    const runToken = Symbol(sessionId);
-    conversationSummaryRuns.set(summarizeConversationBtn, runToken);
-    summarizeConversationBtn.disabled = true;
-    summarizeConversationBtn.setAttribute("aria-busy", "true");
-    if (sessionId) {
-      summarizeConversationBtn.setAttribute(
-        "data-summary-session-id",
-        sessionId,
-      );
-    }
-    summarizeConversationBtn.style.cursor = "wait";
-    summarizeConversationBtn.style.opacity = "0.6";
-    try {
-      await context.summarizeConversationToNote();
-    } catch (error) {
-      context.appendError(
-        error instanceof Error ? error.message : String(error),
-      );
-    } finally {
-      if (conversationSummaryRuns.get(summarizeConversationBtn) === runToken) {
-        resetConversationSummaryButtonBusyState(summarizeConversationBtn);
+
+    if (
+      isConversationSummaryRunning(session.id) ||
+      hasQueuedConversationSummary(session.id)
+    ) {
+      await sessionTurnQueue.stop(session.id);
+      const snapshot = sessionTurnQueue.snapshot(session.id);
+      for (const turn of snapshot.queued) {
+        if (turn.id.startsWith(CONVERSATION_SUMMARY_TURN_PREFIX)) {
+          sessionTurnQueue.remove(session.id, turn.id);
+        }
       }
+      resetConversationSummaryButtonBusyState(summarizeConversationBtn);
+      syncConversationSummaryButtonState(container, chatManager);
+      syncSendButtonState(sendButton, chatManager);
+      return;
     }
+
+    if (sessionTurnQueue.snapshot(session.id).status === "running") {
+      return;
+    }
+
+    const summaryLabel = getString("chat-summarize-conversation-note");
+    const summaryRunner = createTurnRunner({
+      manager: chatManager,
+      resolveSession: () => chatManager.getActiveSession() || session,
+      send: async () => {
+        await context.summarizeConversationToNote();
+        return true;
+      },
+    });
+    const turn: QueuedTurn = {
+      id: `${CONVERSATION_SUMMARY_TURN_PREFIX}${Date.now()}-${++queuedTurnSequence}`,
+      content: summaryLabel,
+      draft: {
+        content: summaryLabel,
+        attachmentState: {
+          pendingImages: [],
+          pendingFiles: [],
+          pendingSelectedText: null,
+          pendingQuotedMessages: [],
+        },
+      },
+      run: async (): Promise<TurnRunResult> => {
+        summarizeConversationBtn.setAttribute(
+          "data-summary-session-id",
+          session.id,
+        );
+        syncConversationSummaryButtonState(container, chatManager);
+        syncSendButtonState(sendButton, chatManager);
+        try {
+          return await summaryRunner();
+        } finally {
+          resetConversationSummaryButtonBusyState(summarizeConversationBtn);
+          syncConversationSummaryButtonState(container, chatManager);
+          syncSendButtonState(sendButton, chatManager);
+        }
+      },
+      cancel: () => chatManager.cancelSessionTurn(session.id),
+      onError: (error) => {
+        if (chatManager.getActiveSession()?.id === session.id) {
+          context.appendError(
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      },
+    };
+
+    if (!sessionTurnQueue.enqueue(session.id, turn)) {
+      context.appendError(getString("chat-queue-full"));
+      return;
+    }
+
+    syncConversationSummaryButtonState(container, chatManager);
+    syncSendButtonState(sendButton, chatManager);
   });
 
   debugContextBtn?.addEventListener("click", async () => {

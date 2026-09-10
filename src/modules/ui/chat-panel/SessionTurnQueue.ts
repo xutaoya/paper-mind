@@ -24,6 +24,7 @@ export interface SessionTurnQueueSnapshot {
   status: "idle" | "running" | "paused";
   queued: readonly QueuedTurn[];
   failureErrorId?: string;
+  activeTurnId?: string;
 }
 
 interface FailureState {
@@ -62,6 +63,7 @@ export class SessionTurnQueue {
       status: state?.active ? "running" : state?.failure ? "paused" : "idle",
       queued: state ? [...state.queued] : [],
       failureErrorId: state?.failure?.errorId,
+      activeTurnId: state?.active?.id,
     };
   }
 
