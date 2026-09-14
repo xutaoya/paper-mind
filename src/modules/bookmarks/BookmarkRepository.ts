@@ -236,6 +236,26 @@ export class BookmarkRepository {
     return rows.map((row) => mapBookmarkRow(row as Record<string, unknown>));
   }
 
+  async findBookmarkByMessage(
+    sessionId: string,
+    messageId: string,
+  ): Promise<BookmarkRecord | null> {
+    const db = await getStorageDatabase().ensureInit();
+    const rows =
+      (await db.queryAsync(
+        `SELECT id, library_id, folder_id, type, title, content,
+                session_id, message_id, item_key, item_library_id, page_url,
+                created_at, updated_at
+         FROM bookmarks
+         WHERE library_id = ? AND session_id = ? AND message_id = ?
+         ORDER BY updated_at DESC
+         LIMIT 1`,
+        [this.libraryId, sessionId, messageId],
+      )) || [];
+    const row = rows[0] as Record<string, unknown> | undefined;
+    return row ? mapBookmarkRow(row) : null;
+  }
+
   async createBookmark(input: CreateBookmarkInput): Promise<BookmarkRecord> {
     const db = await getStorageDatabase().ensureInit();
     const now = Date.now();

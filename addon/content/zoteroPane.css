@@ -811,6 +811,20 @@
   appearance: none;
 }
 
+#chat-model-selector-btn {
+  -moz-appearance: none;
+  appearance: none;
+  font-family: inherit;
+}
+
+#chat-input-wrapper[data-theme="dark"] #chat-model-selector-btn {
+  color: #e0e0e0;
+}
+
+#chat-input-wrapper[data-theme="dark"] #chat-model-selector-text {
+  color: #e0e0e0;
+}
+
 #chat-context-item-banner,
 #chat-context-item-banner:focus,
 #chat-context-item-banner:focus-visible {

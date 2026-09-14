@@ -8,6 +8,7 @@ export {
   deriveBookmarkTitle,
   deriveBookmarkTitleForAssistantReply,
   getBookmarkService,
+  isPersistedBookmarkRecord,
 } from "./BookmarkService";
 export {
   resolveBookmarkTurnContent,

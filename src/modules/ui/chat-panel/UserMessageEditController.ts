@@ -64,18 +64,26 @@ export class UserMessageEditController {
     }
 
     const queueSnapshot = sessionTurnQueue.snapshot(session.id);
+    if (queueSnapshot.status === "running" || queueSnapshot.queued.length > 0) {
+      this.context.appendError(getString("chat-edit-message-busy"));
+      return false;
+    }
+
+    const hasInProgressAssistant = session.messages.some(
+      (message) =>
+        message.role === "assistant" &&
+        message.streamingState === "in_progress",
+    );
     if (
-      queueSnapshot.status !== "idle" ||
-      queueSnapshot.queued.length > 0 ||
-      queueSnapshot.failureErrorId
+      hasInProgressAssistant ||
+      this.context.chatManager.hasActiveSessionTurn(session.id)
     ) {
       this.context.appendError(getString("chat-edit-message-busy"));
       return false;
     }
 
-    if (this.context.chatManager.hasActiveSessionTurn(session.id)) {
-      this.context.appendError(getString("chat-edit-message-busy"));
-      return false;
+    if (queueSnapshot.failureErrorId) {
+      sessionTurnQueue.clear(session.id);
     }
 
     if (session.userInputRequestState?.pendingRequests.length) {

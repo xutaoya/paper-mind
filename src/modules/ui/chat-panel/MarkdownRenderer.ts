@@ -9,7 +9,9 @@ import {
   importKaTeXHtmlIntoDocument,
   importMathMLIntoDocument,
   normalizeBlockquoteListIndentation,
+  normalizeEmphasisDelimiters,
   normalizeMathContent,
+  preserveStrongEmphasisAsHtml,
   repairIncompleteInlineMath,
 } from "../../../utils/chatMathMarkdown";
 import hljs from "highlight.js";
@@ -1800,6 +1802,9 @@ function preprocessMathDelimiters(content: string): string {
     preserved.push(match);
     return `\x00PRESERVE_${preserved.length - 1}\x00`;
   });
+
+  processed = normalizeEmphasisDelimiters(processed);
+  processed = preserveStrongEmphasisAsHtml(processed);
 
   // Convert \[...\] to $$...$$ (block math)
   processed = processed.replace(

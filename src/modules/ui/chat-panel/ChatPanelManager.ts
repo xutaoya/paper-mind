@@ -30,7 +30,12 @@ import {
 import {
   canBookmarkAssistantReply,
   deriveBookmarkTitleForAssistantReply,
+  getBookmarkService,
 } from "../../bookmarks";
+import type {
+  BookmarkReaderDialogHost,
+  BookmarkReaderToggleResult,
+} from "./BookmarkReaderWindow";
 import type { BookmarkRecord } from "../../../types/bookmark";
 import {
   closeBookmarkReader,
@@ -974,6 +979,83 @@ async function saveBookmarkFromMessage(
     return "";
   }
   return getString("chat-bookmark-saved", { args: { title: result.title } });
+}
+
+async function toggleReaderBookmark(
+  context: ChatPanelContext,
+  record: BookmarkRecord,
+  readerHost?: BookmarkReaderDialogHost,
+): Promise<BookmarkReaderToggleResult> {
+  if (!record.sessionId || !record.messageId) {
+    throw new Error(getString("chat-bookmark-unavailable"));
+  }
+
+  const service = getBookmarkService();
+  const existing = await service.findBookmarkByMessage(
+    record.sessionId,
+    record.messageId,
+  );
+  if (existing) {
+    await service.deleteBookmark(existing.id);
+    return { status: "removed" };
+  }
+
+  const session = await context.chatManager.getSessionById(record.sessionId);
+  const message = session?.messages.find(
+    (candidate) => candidate.id === record.messageId,
+  );
+  let saveContent = record.content;
+  if (message?.role === "assistant") {
+    saveContent =
+      formatMarkdownForMessageCopy(message.content, {
+        evidenceRecords: message.evidence,
+      }) || message.content;
+  }
+
+  const navigationItem = session
+    ? getQuoteNavigationItem(session, context.getCurrentItem())
+    : null;
+  const dialogDoc =
+    readerHost?.document ?? context.container.ownerDocument!;
+  const dialogTheme = readerHost?.theme ?? context.getTheme();
+  readerHost?.present?.();
+  const dialogResult = await openBookmarkSaveDialog(
+    dialogDoc,
+    dialogTheme,
+    {
+      defaultTitle: deriveBookmarkTitleForAssistantReply(
+        session?.messages ?? [],
+        record.messageId,
+        saveContent,
+      ),
+      content: saveContent,
+      sessionId: record.sessionId,
+      messageId: record.messageId,
+      itemKey:
+        navigationItem?.key ??
+        record.itemKey ??
+        session?.lastActiveItemKey ??
+        null,
+      itemLibraryId:
+        navigationItem?.libraryID ??
+        record.itemLibraryId ??
+        session?.lastActiveItemLibraryID ??
+        null,
+    },
+    { onPresent: () => readerHost?.present?.() },
+  );
+  if (!dialogResult) {
+    return { status: "cancelled" };
+  }
+
+  const saved = await service.findBookmarkByMessage(
+    record.sessionId,
+    record.messageId,
+  );
+  if (!saved) {
+    throw new Error(getString("chat-bookmark-save-failed"));
+  }
+  return { status: "saved", bookmark: saved };
 }
 
 function buildApprovalActionsForContainer(
@@ -2679,6 +2761,19 @@ export async function openBookmarkReaderForContext(
     },
     onClose: () => {},
     onCopySuccess: (message) => context.appendSuccess(message),
+    onBookmarkError: (message) => context.appendError(message),
+    isBookmarkSaved: async (bookmark) => {
+      if (!bookmark.sessionId || !bookmark.messageId) {
+        return false;
+      }
+      const saved = await getBookmarkService().findBookmarkByMessage(
+        bookmark.sessionId,
+        bookmark.messageId,
+      );
+      return Boolean(saved);
+    },
+    onToggleBookmark: (bookmark, readerHost) =>
+      toggleReaderBookmark(context, bookmark, readerHost),
   });
 }
 

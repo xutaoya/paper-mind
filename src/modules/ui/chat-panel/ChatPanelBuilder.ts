@@ -8,6 +8,8 @@ import { getPref } from "../../../utils/prefs";
 import { MAX_SEARCH_QUERY_RAW_UTF16_LENGTH } from "../../chat/search/SearchQuery";
 import { createContextItemBanner } from "./ContextItemBanner";
 import { createContextWindowUsageIndicator } from "./contextWindowIndicatorDom";
+import { getCurrentTheme } from "./ChatPanelTheme";
+import { applyModelSelectorTheme } from "./ComposerTheme";
 import type { ThemeColors } from "./types";
 import { HTML_NS } from "./types";
 import { monitorChatPanelRoot } from "./chatUIFontScale";
@@ -1071,16 +1073,17 @@ export function createChatContainer(
       gap: "4px",
       padding: "5px 10px",
       background: theme.buttonBg,
-      border: "none",
+      border: `1px solid ${theme.borderColor}`,
       borderRadius: "999px",
       cursor: "pointer",
       fontSize: "12px",
-      color: theme.textSecondary,
+      color: theme.textPrimary,
       width: "max-content",
       maxWidth: "100%",
       minWidth: "0",
       overflow: "hidden",
-      transition: "background 0.15s ease",
+      appearance: "none",
+      transition: "background 0.15s ease, border-color 0.15s ease",
     },
     {
       id: "chat-model-selector-btn",
@@ -1089,10 +1092,11 @@ export function createChatContainer(
     },
   );
   modelSelectorBtn.addEventListener("mouseenter", () => {
-    modelSelectorBtn.style.background = theme.buttonHoverBg;
+    const activeTheme = getCurrentTheme();
+    modelSelectorBtn.style.background = activeTheme.buttonHoverBg;
   });
   modelSelectorBtn.addEventListener("mouseleave", () => {
-    modelSelectorBtn.style.background = theme.buttonBg;
+    applyModelSelectorTheme(container, getCurrentTheme());
   });
 
   const modelSelectorText = createElement(
@@ -1405,6 +1409,7 @@ export function createChatContainer(
   root.appendChild(mentionPopup);
   container.appendChild(root);
   monitorChatPanelRoot(root);
+  applyModelSelectorTheme(container, theme);
 
   doc.documentElement?.appendChild(container);
   return container;

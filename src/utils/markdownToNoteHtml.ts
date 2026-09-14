@@ -1,5 +1,8 @@
 import MarkdownIt from "markdown-it";
-import { normalizeBlockquoteListIndentation } from "./chatMathMarkdown";
+import {
+  normalizeBlockquoteListIndentation,
+  normalizeEmphasisDelimiters,
+} from "./chatMathMarkdown";
 import {
   preserveEmphasisInMarkdownForNotes,
   renderMathInMarkdownForNotes,
@@ -76,34 +79,6 @@ export function separateMathParagraphs(markdown: string): string {
 /** @deprecated Use separateMathParagraphs instead. */
 export function compactMathLineSpacing(markdown: string): string {
   return separateMathParagraphs(markdown);
-}
-
-function normalizeEmphasisDelimiters(markdown: string): string {
-  let normalized = markdown.replace(
-    /\*\*([^*\n]+?)[ \t]+\*\*/g,
-    (_, text: string) => `**${text.trimEnd()}**`,
-  );
-  normalized = normalized.replace(
-    /\*\*[ \t]+([^*\n]+?)\*\*/g,
-    (_, text: string) => `**${text.trimStart()}**`,
-  );
-  normalized = normalized.replace(
-    /__([^_\n]+?)[ \t]+__/g,
-    (_, text: string) => `__${text.trimEnd()}__`,
-  );
-  normalized = normalized.replace(
-    /__[ \t]+([^_\n]+?)__/g,
-    (_, text: string) => `__${text.trimStart()}__`,
-  );
-  normalized = normalized.replace(
-    /(?<!\*)\*([^*\n]+?)[ \t]+\*(?!\*)/g,
-    (_, text: string) => `*${text.trimEnd()}*`,
-  );
-  normalized = normalized.replace(
-    /(?<!\*)\*[ \t]+([^*\n]+?)\*(?!\*)/g,
-    (_, text: string) => `*${text.trimStart()}*`,
-  );
-  return normalized;
 }
 
 export function normalizeMarkdownForNotes(markdown: string): string {

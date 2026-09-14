@@ -545,6 +545,12 @@ paperchat-chat-bookmark-reader-user-message = 用户消息
 
 paperchat-chat-bookmark-reader-assistant-message = AI 回复
 
+paperchat-chat-bookmark-reader-toggle-save = 收藏
+
+paperchat-chat-bookmark-reader-toggle-remove = 取消收藏
+
+paperchat-chat-bookmark-removed = 已取消收藏
+
 paperchat-chat-bookmark-reader-jump-to-chat = 跳转到对话
 
 paperchat-chat-bookmark-reader-open-hint = 在阅读器中查看

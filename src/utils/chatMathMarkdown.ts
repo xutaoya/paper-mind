@@ -27,6 +27,65 @@ export function deltaContainsMathMarkup(delta: string): boolean {
   );
 }
 
+function escapeHtmlText(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+export function normalizeEmphasisDelimiters(markdown: string): string {
+  let normalized = markdown.replace(
+    /\*\*([^*\n]+?)[ \t]+\*\*/g,
+    (_, text: string) => `**${text.trimEnd()}**`,
+  );
+  normalized = normalized.replace(
+    /\*\*[ \t]+([^*\n]+?)\*\*/g,
+    (_, text: string) => `**${text.trimStart()}**`,
+  );
+  normalized = normalized.replace(
+    /__([^_\n]+?)[ \t]+__/g,
+    (_, text: string) => `__${text.trimEnd()}__`,
+  );
+  normalized = normalized.replace(
+    /__[ \t]+([^_\n]+?)__/g,
+    (_, text: string) => `__${text.trimStart()}__`,
+  );
+  normalized = normalized.replace(
+    /(?<!\*)\*([^*\n]+?)[ \t]+\*(?!\*)/g,
+    (_, text: string) => `*${text.trimEnd()}*`,
+  );
+  normalized = normalized.replace(
+    /(?<!\*)\*[ \t]+([^*\n]+?)\*(?!\*)/g,
+    (_, text: string) => `*${text.trimStart()}*`,
+  );
+  return normalized;
+}
+
+/**
+ * markdown-it can leave ** literals when bold text contains ASCII quotes and is
+ * immediately followed by CJK letters. Pre-convert matched spans to <strong>.
+ */
+export function preserveStrongEmphasisAsHtml(content: string): string {
+  let processed = content.replace(/\*\*([^*\n]+?)\*\*/g, (match, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return match;
+    }
+    return `<strong>${escapeHtmlText(trimmed)}</strong>`;
+  });
+  processed = processed.replace(/__([^_\n]+?)__/g, (match, text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return match;
+    }
+    return `<strong>${escapeHtmlText(trimmed)}</strong>`;
+  });
+  return processed;
+}
+
 export function repairIncompleteInlineMath(content: string): string {
   return content
     .split("\n")

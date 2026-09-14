@@ -53,6 +53,86 @@ export function applyQuickActionsTheme(
   });
 }
 
+export function applyModelSelectorTheme(
+  container: HTMLElement,
+  theme: ThemeColors,
+): void {
+  const isDark = isDarkTheme(theme);
+  const chipBackground = isDark ? theme.buttonBg : theme.inputBg;
+  const chipShadow = isDark ? "none" : "0 1px 2px rgba(0,0,0,0.04)";
+
+  const modelSelectorLabel = container.querySelector(
+    "#chat-model-selector-label",
+  ) as HTMLElement | null;
+  if (modelSelectorLabel) {
+    modelSelectorLabel.style.color = theme.textSecondary;
+  }
+
+  const modelSelectorHelp = container.querySelector(
+    "#chat-model-selector-help",
+  ) as HTMLElement | null;
+  if (modelSelectorHelp) {
+    modelSelectorHelp.style.borderColor = theme.inputBorderColor;
+    modelSelectorHelp.style.color = theme.textSecondary;
+    modelSelectorHelp.style.background = "transparent";
+  }
+
+  const modelSelectorTooltip = container.querySelector(
+    "#chat-model-selector-tooltip",
+  ) as HTMLElement | null;
+  if (modelSelectorTooltip) {
+    modelSelectorTooltip.style.background = theme.dropdownBg;
+    modelSelectorTooltip.style.borderColor = theme.borderColor;
+    modelSelectorTooltip.style.color = theme.textPrimary;
+    modelSelectorTooltip.style.boxShadow = isDark
+      ? "0 8px 22px rgba(0,0,0,0.45)"
+      : "0 6px 18px rgba(0,0,0,0.22)";
+  }
+
+  const modelSelectorBtn = container.querySelector(
+    "#chat-model-selector-btn",
+  ) as HTMLButtonElement | null;
+  if (modelSelectorBtn) {
+    modelSelectorBtn.style.appearance = "none";
+    modelSelectorBtn.style.setProperty("-moz-appearance", "none");
+    modelSelectorBtn.style.background = chipBackground;
+    modelSelectorBtn.style.border = `1px solid ${theme.borderColor}`;
+    modelSelectorBtn.style.color = theme.textPrimary;
+    modelSelectorBtn.style.boxShadow = chipShadow;
+  }
+
+  const modelSelectorText = container.querySelector(
+    "#chat-model-selector-text",
+  ) as HTMLElement | null;
+  if (modelSelectorText) {
+    modelSelectorText.style.color = theme.textPrimary;
+  }
+
+  const modelDropdown = container.querySelector(
+    "#chat-model-dropdown",
+  ) as HTMLElement | null;
+  if (modelDropdown) {
+    modelDropdown.style.background = theme.dropdownBg;
+    modelDropdown.style.borderColor = theme.borderColor;
+    modelDropdown.style.boxShadow = isDark
+      ? "0 10px 28px rgba(0,0,0,0.45)"
+      : "0 8px 24px rgba(0,0,0,0.16)";
+  }
+
+  container.querySelectorAll(".chat-model-dropdown-item").forEach((node) => {
+    const item = node as HTMLElement;
+    item.style.color = theme.textPrimary;
+    item.style.background = "transparent";
+  });
+  container
+    .querySelectorAll(".chat-model-dropdown-item.is-active")
+    .forEach((node) => {
+      const item = node as HTMLElement;
+      item.style.background = isDark ? theme.buttonHoverBg : theme.hoverBg;
+      item.style.color = theme.textPrimary;
+    });
+}
+
 export function applyComposerChromeTheme(
   container: HTMLElement,
   theme: ThemeColors,
@@ -65,7 +145,7 @@ export function applyComposerChromeTheme(
   ) as HTMLElement | null;
   if (inputWrapper?.parentElement) {
     const inputArea = inputWrapper.parentElement as HTMLElement;
-    inputArea.style.background = theme.containerBg;
+    inputArea.style.background = theme.inputAreaBg;
     inputArea.style.borderTopColor = theme.borderColor;
   }
 
@@ -105,6 +185,7 @@ export function applyComposerChromeTheme(
   }
 
   applyQuickActionsTheme(container, theme);
+  applyModelSelectorTheme(container, theme);
 }
 
 export function resolveQuickActionChipTheme(theme: ThemeColors): {

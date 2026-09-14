@@ -7,11 +7,12 @@ import type { EvidenceRecord } from "../../../types/evidence";
 import type { BookmarkRecord } from "../../../types/bookmark";
 import type { ChatSession } from "../../../types/chat";
 import type { QuotedMessageRef } from "../../../types/chat";
+import { isPersistedBookmarkRecord } from "../../bookmarks";
 import { getString } from "../../../utils/locale";
 import { isWindowAlive } from "../../../utils/window";
 import { createBookmarkDialogButton } from "./BookmarkUiPrompts";
 import { copyToClipboard, createElement } from "./ChatPanelBuilder";
-import { getCurrentTheme } from "./ChatPanelTheme";
+import { darkTheme, getCurrentTheme, isDarkMode } from "./ChatPanelTheme";
 import { renderMarkdownToElement } from "./MarkdownRenderer";
 import type { ThemeColors } from "./types";
 import { HTML_NS } from "./types";
@@ -21,6 +22,7 @@ const READER_HOST_ID = "bookmark-reader-root";
 const READER_BODY_WRAP_ID = "chat-bookmark-reader-body-wrap";
 const READER_OUTLINE_RAIL_ID = "chat-bookmark-reader-outline-rail";
 const READER_OUTLINE_PANEL_ID = "chat-bookmark-reader-outline-panel";
+const READER_BOOKMARK_BTN_ID = "chat-bookmark-reader-bookmark";
 
 interface ReaderHeading {
   level: number;
@@ -34,11 +36,29 @@ interface ReaderOutlineController {
 
 const readerOutlineControllers = new WeakMap<HTMLElement, ReaderOutlineController>();
 
+export type BookmarkReaderToggleResult =
+  | { status: "saved"; bookmark: BookmarkRecord }
+  | { status: "removed" }
+  | { status: "cancelled" };
+
+/** Host document for bookmark UI opened from the reader window. */
+export interface BookmarkReaderDialogHost {
+  document: Document;
+  theme: ThemeColors;
+  present?: () => void;
+}
+
 export interface BookmarkReaderActions {
   onJumpToChat: (quote: QuotedMessageRef) => void | Promise<void>;
   onClose: () => void;
   onCopySuccess?: (message: string) => void;
   loadSession?: (sessionId: string) => Promise<ChatSession | null>;
+  isBookmarkSaved?: (bookmark: BookmarkRecord) => Promise<boolean>;
+  onToggleBookmark?: (
+    bookmark: BookmarkRecord,
+    host: BookmarkReaderDialogHost,
+  ) => Promise<BookmarkReaderToggleResult>;
+  onBookmarkError?: (message: string) => void;
 }
 
 interface ReaderOpenState {
@@ -104,6 +124,9 @@ function createIconButton(
     height: "16px",
     display: "block",
     pointerEvents: "none",
+    filter: isDarkMode()
+      ? "brightness(0) invert(0.88)"
+      : "brightness(0) invert(0.35)",
   });
   button.appendChild(icon);
   button.addEventListener("click", (event) => {
@@ -111,6 +134,42 @@ function createIconButton(
     onClick();
   });
   return button;
+}
+
+function readerBookmarkIconUrl(filled: boolean): string {
+  const name = filled ? "bookmark-filled" : "bookmark";
+  return `chrome://${config.addonRef}/content/icons/${name}.svg`;
+}
+
+function readerBookmarkIconFilter(filled: boolean): string {
+  if (filled) {
+    return "none";
+  }
+  return isDarkMode()
+    ? "brightness(0) invert(0.88)"
+    : "brightness(0) invert(0.35)";
+}
+
+function setReaderBookmarkButtonState(
+  button: HTMLButtonElement | null,
+  isSaved: boolean,
+): void {
+  if (!button) {
+    return;
+  }
+  const saveLabel = getString("chat-bookmark-reader-toggle-save");
+  const removeLabel = getString("chat-bookmark-reader-toggle-remove");
+  button.classList.toggle("is-saved", isSaved);
+  button.title = isSaved ? removeLabel : saveLabel;
+  button.setAttribute("aria-label", button.title);
+  button.setAttribute("aria-pressed", isSaved ? "true" : "false");
+  const icon = button.querySelector("img");
+  if (icon) {
+    icon.src = readerBookmarkIconUrl(isSaved);
+    icon.style.filter = readerBookmarkIconFilter(isSaved);
+    icon.style.opacity = isSaved ? "1" : "0.72";
+    icon.style.transform = isSaved ? "scale(1.08)" : "scale(1)";
+  }
 }
 
 function injectReaderStyles(doc: Document): void {
@@ -160,6 +219,7 @@ function injectReaderStyles(doc: Document): void {
     .paperchat-reader-markdown h4 {
       margin: 1.1em 0 0.55em;
       line-height: 1.35;
+      scroll-margin-top: 16px;
     }
     .paperchat-reader-markdown p,
     .paperchat-reader-markdown ul,
@@ -297,6 +357,42 @@ function injectReaderStyles(doc: Document): void {
       color: #2563eb;
       font-weight: 600;
     }
+    .paperchat-reader-bookmark-btn img {
+      transition: transform 0.15s ease, opacity 0.15s ease;
+    }
+    .paperchat-reader-bookmark-btn.is-saved {
+      background: #fef3c7 !important;
+      border-color: #f59e0b !important;
+      box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.35);
+    }
+    .paperchat-reader-bookmark-btn.is-saved img {
+      opacity: 1 !important;
+      filter: none !important;
+    }
+    [data-theme="dark"] .paperchat-reader-outline-panel {
+      background: rgba(37, 37, 37, 0.98);
+      border-color: rgba(75, 85, 99, 0.65);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+      color: #e5e7eb;
+    }
+    [data-theme="dark"] .paperchat-reader-outline-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+    [data-theme="dark"] .paperchat-reader-outline-item.is-active {
+      background: rgba(59, 130, 246, 0.22);
+      color: #93c5fd;
+    }
+    [data-theme="dark"] .paperchat-reader-outline-title {
+      color: #d1d5db;
+    }
+    [data-theme="dark"] .paperchat-reader-outline-item.is-active .paperchat-reader-outline-title {
+      color: #93c5fd;
+    }
+    [data-theme="dark"] .paperchat-reader-bookmark-btn.is-saved {
+      background: rgba(245, 158, 11, 0.32) !important;
+      border-color: #fbbf24 !important;
+      box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.45);
+    }
   `;
   doc.head.appendChild(style);
 }
@@ -344,10 +440,21 @@ function scrollReaderToHeading(
   scrollContainer: HTMLElement,
   heading: ReaderHeading,
 ): void {
-  const containerTop = scrollContainer.getBoundingClientRect().top;
-  const headingTop = heading.element.getBoundingClientRect().top;
+  const paddingTop = 16;
+  const containerRect = scrollContainer.getBoundingClientRect();
+  const headingRect = heading.element.getBoundingClientRect();
+  const relativeTop =
+    scrollContainer.scrollTop + (headingRect.top - containerRect.top);
+  const maxScrollTop = Math.max(
+    0,
+    scrollContainer.scrollHeight - scrollContainer.clientHeight,
+  );
+  const targetScrollTop = Math.min(
+    Math.max(0, relativeTop - paddingTop),
+    maxScrollTop,
+  );
   scrollContainer.scrollTo({
-    top: scrollContainer.scrollTop + headingTop - containerTop - 16,
+    top: targetScrollTop,
     behavior: "smooth",
   });
 }
@@ -644,8 +751,22 @@ function updateReaderPosition(
   if (nextBtn) nextBtn.disabled = index >= bookmarks.length - 1;
 }
 
+function getReaderDialogHost(host: HTMLElement): BookmarkReaderDialogHost {
+  const win = readerHosts.get(host) ?? readerWindow;
+  return {
+    document: host.ownerDocument,
+    theme: getCurrentTheme(),
+    present: () => {
+      if (win && isWindowAlive(win)) {
+        bringReaderWindowToFront(win);
+      }
+    },
+  };
+}
+
 function buildReaderShell(host: HTMLElement, theme: ThemeColors): void {
   const doc = host.ownerDocument!;
+  host.dataset.theme = getCurrentTheme() === darkTheme ? "dark" : "light";
 
   Object.assign(host.style, {
     display: "flex",
@@ -705,6 +826,16 @@ function buildReaderShell(host: HTMLElement, theme: ThemeColors): void {
     gap: "6px",
     flexShrink: "0",
   });
+  const bookmarkBtn = createIconButton(
+    doc,
+    theme,
+    "bookmark",
+    getString("chat-bookmark-reader-toggle-save"),
+    () => undefined,
+  );
+  bookmarkBtn.id = READER_BOOKMARK_BTN_ID;
+  bookmarkBtn.classList.add("paperchat-reader-bookmark-btn");
+  bookmarkBtn.setAttribute("aria-pressed", "false");
   const jumpBtn = createIconButton(
     doc,
     theme,
@@ -729,6 +860,7 @@ function buildReaderShell(host: HTMLElement, theme: ThemeColors): void {
     () => undefined,
   );
   closeBtn.id = "chat-bookmark-reader-close";
+  headerActions.appendChild(bookmarkBtn);
   headerActions.appendChild(jumpBtn);
   headerActions.appendChild(copyBtn);
   headerActions.appendChild(closeBtn);
@@ -845,6 +977,35 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
   const bookmarks = state.bookmarks;
   let currentIndex = state.startIndex;
   const generation = renderGeneration;
+  const bookmarkBtn = host.querySelector(
+    `#${READER_BOOKMARK_BTN_ID}`,
+  ) as HTMLButtonElement | null;
+
+  const syncBookmarkButton = async (bookmark: BookmarkRecord) => {
+    if (
+      !state.actions.isBookmarkSaved ||
+      !state.actions.onToggleBookmark ||
+      !bookmark.sessionId ||
+      !bookmark.messageId
+    ) {
+      if (bookmarkBtn) {
+        bookmarkBtn.style.display = "none";
+      }
+      return;
+    }
+    if (bookmarkBtn) {
+      bookmarkBtn.style.display = "inline-flex";
+    }
+    try {
+      const isSaved = await state.actions.isBookmarkSaved(bookmark);
+      if (generation !== renderGeneration) {
+        return;
+      }
+      setReaderBookmarkButtonState(bookmarkBtn, isSaved);
+    } catch (error) {
+      ztoolkit.log("[BookmarkReader] Failed to resolve bookmark state:", error);
+    }
+  };
 
   const showBookmarkAt = async (index: number) => {
     if (index < 0 || index >= bookmarks.length) {
@@ -887,7 +1048,75 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
     } catch (error) {
       ztoolkit.log("[BookmarkReader] Failed to resolve turn content:", error);
     }
+
+    void syncBookmarkButton(bookmark);
   };
+
+  host
+    .querySelector(`#${READER_BOOKMARK_BTN_ID}`)
+    ?.addEventListener("click", () => {
+      if (
+        !bookmarkBtn ||
+        !state.actions.onToggleBookmark ||
+        bookmarkBtn.disabled
+      ) {
+        return;
+      }
+      const bookmark = bookmarks[currentIndex];
+      bookmarkBtn.disabled = true;
+      bookmarkBtn.style.cursor = "wait";
+      bookmarkBtn.style.opacity = "0.6";
+      void Promise.resolve(
+        state.actions.onToggleBookmark(bookmark, getReaderDialogHost(host)),
+      )
+        .then(async (result) => {
+          if (generation !== renderGeneration) {
+            return;
+          }
+          if (result.status === "cancelled") {
+            return;
+          }
+          if (result.status === "saved") {
+            bookmarks[currentIndex] = result.bookmark;
+            state.actions.onCopySuccess?.(
+              getString("chat-bookmark-saved", {
+                args: { title: result.bookmark.title },
+              }),
+            );
+            setReaderBookmarkButtonState(bookmarkBtn, true);
+            return;
+          }
+          state.actions.onCopySuccess?.(getString("chat-bookmark-removed"));
+          if (isPersistedBookmarkRecord(bookmark)) {
+            bookmarks.splice(currentIndex, 1);
+            if (!bookmarks.length) {
+              const win = readerHosts.get(host) ?? host.ownerDocument.defaultView;
+              closeBookmarkReader(win);
+              return;
+            }
+            const nextIndex = Math.min(currentIndex, bookmarks.length - 1);
+            await showBookmarkAt(nextIndex);
+            return;
+          }
+          setReaderBookmarkButtonState(bookmarkBtn, false);
+        })
+        .catch((error: unknown) => {
+          ztoolkit.log("[BookmarkReader] Toggle bookmark failed:", error);
+          state.actions.onBookmarkError?.(
+            error instanceof Error
+              ? error.message
+              : getString("chat-bookmark-save-failed"),
+          );
+        })
+        .finally(() => {
+          if (generation !== renderGeneration || !bookmarkBtn) {
+            return;
+          }
+          bookmarkBtn.disabled = false;
+          bookmarkBtn.style.cursor = "pointer";
+          bookmarkBtn.style.opacity = "1";
+        });
+    });
 
   host
     .querySelector("#chat-bookmark-reader-prev")

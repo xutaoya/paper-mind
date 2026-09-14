@@ -10,12 +10,12 @@ import type { ChatMessage } from "../../../types/chat";
 import { selectChatMessagePresentations } from "../../chat/message-presentation";
 import {
   findRenderedMessageElement,
-  scrollChatHistoryToBottom,
-  scrollMessageToViewportCenter,
+  scrollMessageToViewportStart,
 } from "./MessageRenderer";
 import { sanitizeMessagePreview } from "./HistoryDropdown";
 import { createElement } from "./ChatPanelBuilder";
 import { getString } from "../../../utils/locale";
+import { getCurrentTheme, isDarkMode } from "./ChatPanelTheme";
 import type { ThemeColors } from "./types";
 
 const NAV_ROOT_ID = "chat-conversation-nav";
@@ -288,7 +288,7 @@ export function resolveActiveTurnIndex(
 }
 
 export interface ConversationNavigatorController {
-  update(messages: ChatMessage[]): void;
+  update(messages: ChatMessage[], themeOverride?: ThemeColors): void;
   syncScroll(): void;
   dispose(): void;
 }
@@ -312,11 +312,34 @@ function haveSameRailItems(
   return previous.every((item, index) => item.id === next[index]?.id);
 }
 
+function resolveNavigatorTheme(theme?: ThemeColors): ThemeColors {
+  return theme ?? getCurrentTheme();
+}
+
+function applyPreviewTextTheme(preview: HTMLElement, theme: ThemeColors): void {
+  const title = preview.querySelector(
+    "[data-nav-preview='title']",
+  ) as HTMLElement | null;
+  const description = preview.querySelector(
+    "[data-nav-preview='description']",
+  ) as HTMLElement | null;
+  if (title) {
+    title.style.color = theme.textPrimary;
+  }
+  if (description) {
+    description.style.color = theme.textSecondary;
+  }
+}
+
 function applyNavigatorTheme(elements: NavigatorElements, theme: ThemeColors) {
   elements.root.style.color = theme.textMuted;
   elements.preview.style.background = theme.dropdownBg;
+  elements.preview.style.color = theme.textPrimary;
   elements.preview.style.borderColor = theme.borderColor;
-  elements.preview.style.boxShadow = "0 10px 28px rgba(15, 23, 42, 0.16)";
+  elements.preview.style.boxShadow = isDarkMode()
+    ? "0 12px 32px rgba(0, 0, 0, 0.5)"
+    : "0 10px 28px rgba(15, 23, 42, 0.16)";
+  applyPreviewTextTheme(elements.preview, theme);
 }
 
 function hidePreview(elements: NavigatorElements): void {
@@ -331,32 +354,42 @@ function renderPreviewCard(
   theme: ThemeColors,
 ): void {
   preview.replaceChildren();
-  const label = createElement(doc, "div", {
-    fontSize: "12px",
-    lineHeight: "18px",
-    fontWeight: "600",
-    color: theme.textPrimary,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  });
+  const label = createElement(
+    doc,
+    "div",
+    {
+      fontSize: "12px",
+      lineHeight: "18px",
+      fontWeight: "600",
+      color: theme.textPrimary,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+    },
+    { "data-nav-preview": "title" },
+  );
   label.textContent = item.label;
   label.title = item.label;
   preview.appendChild(label);
 
   if (item.description) {
-    const description = createElement(doc, "div", {
-      fontSize: "12px",
-      lineHeight: "18px",
-      fontWeight: "400",
-      color: theme.textSecondary,
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      display: "-webkit-box",
-      webkitBoxOrient: "vertical",
-      webkitLineClamp: "2",
-      whiteSpace: "normal",
-    });
+    const description = createElement(
+      doc,
+      "div",
+      {
+        fontSize: "12px",
+        lineHeight: "18px",
+        fontWeight: "400",
+        color: theme.textSecondary,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
+        display: "-webkit-box",
+        webkitBoxOrient: "vertical",
+        webkitLineClamp: "2",
+        whiteSpace: "normal",
+      },
+      { "data-nav-preview": "description" },
+    );
     description.textContent = item.description;
     description.title = item.description;
     preview.appendChild(description);
@@ -504,13 +537,7 @@ function scrollToRailItem(
   const item = items[index];
   if (!item) return;
 
-  const isLast = index === items.length - 1;
-  if (isLast) {
-    scrollChatHistoryToBottom(chatHistory);
-    return;
-  }
-
-  scrollMessageToViewportCenter(chatHistory, item.id);
+  scrollMessageToViewportStart(chatHistory, item.id);
 }
 
 export function attachConversationNavigator(
@@ -606,7 +633,7 @@ export function attachConversationNavigator(
   root.appendChild(rail);
 
   const elements: NavigatorElements = { root, rail, ticks, preview };
-  applyNavigatorTheme(elements, theme);
+  applyNavigatorTheme(elements, resolveNavigatorTheme(theme));
 
   const mount = () => {
     if (mounted) return;
@@ -665,7 +692,7 @@ export function attachConversationNavigator(
     updateRailTickVisuals(
       elements,
       items,
-      theme,
+      getCurrentTheme(),
       activeIndex,
       highlightedIndex,
       isRailEngaged,
@@ -686,13 +713,15 @@ export function attachConversationNavigator(
     highlightedIndex = index;
     const item = items[index];
     if (!item) return;
-    renderPreviewCard(doc, preview, item, theme);
+    const activeTheme = getCurrentTheme();
+    applyNavigatorTheme(elements, activeTheme);
+    renderPreviewCard(doc, preview, item, activeTheme);
     positionPreviewCard(elements, index);
     refreshTickVisuals();
   };
 
   const renderTickMarks = () => {
-    renderRailTicks(elements, items, theme);
+    renderRailTicks(elements, items, getCurrentTheme());
     refreshTickVisuals();
   };
 
@@ -761,7 +790,8 @@ export function attachConversationNavigator(
   root.addEventListener("mouseleave", onRootLeave);
 
   return {
-    update(messages: ChatMessage[]) {
+    update(messages: ChatMessage[], themeOverride?: ThemeColors) {
+      const activeTheme = resolveNavigatorTheme(themeOverride);
       const nextItems = buildPreviewRailItems(buildConversationTurns(messages));
       const structureChanged = !haveSameRailItems(items, nextItems);
       items = nextItems;
@@ -773,7 +803,7 @@ export function attachConversationNavigator(
 
       mount();
       root.style.display = "flex";
-      applyNavigatorTheme(elements, theme);
+      applyNavigatorTheme(elements, activeTheme);
 
       if (structureChanged) {
         activeIndex = Math.max(
@@ -850,7 +880,7 @@ export function syncConversationNavigator(
   messages: ChatMessage[],
   theme: ThemeColors,
 ): void {
-  ensureConversationNavigator(container, theme)?.update(messages);
+  ensureConversationNavigator(container, theme)?.update(messages, theme);
 }
 
 export function disposeConversationNavigator(container: HTMLElement): void {
@@ -875,5 +905,6 @@ export function updateConversationNavigatorTheme(
   if (!root || !preview) return;
 
   const rail = root.querySelector(`.${NAV_RAIL_CLASS}`) as HTMLElement;
-  applyNavigatorTheme({ root, rail, ticks: root, preview }, theme);
+  const activeTheme = resolveNavigatorTheme(theme);
+  applyNavigatorTheme({ root, rail, ticks: root, preview }, activeTheme);
 }

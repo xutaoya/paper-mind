@@ -5,6 +5,7 @@ import {
   extractMathMLMarkup,
   normalizeBlockquoteListIndentation,
   normalizeMathContent,
+  preserveStrongEmphasisAsHtml,
   repairIncompleteInlineMath,
 } from "../src/utils/chatMathMarkdown.ts";
 import katex from "katex";
@@ -48,5 +49,13 @@ describe("chat math markdown helpers", function () {
     const math = extractMathMLMarkup(html);
     assert.match(math || "", /^<math\b/);
     assert.include(math || "", "D(\\Phi_F)");
+  });
+
+  it("preserves bold spans that markdown-it would leave as literal asterisks", function () {
+    const input =
+      '下面从**核心思想**、架构、关键设计到**为什么它能提供"全特征"**逐层说明。';
+    const processed = preserveStrongEmphasisAsHtml(input);
+    assert.include(processed, "<strong>为什么它能提供&quot;全特征&quot;</strong>");
+    assert.notInclude(processed, '**为什么它能提供"全特征"**');
   });
 });

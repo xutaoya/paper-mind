@@ -13,6 +13,10 @@ import type {
 } from "../../types/bookmark";
 import { getBookmarkRepository } from "./BookmarkRepository";
 
+export function isPersistedBookmarkRecord(bookmark: BookmarkRecord): boolean {
+  return bookmark.id.startsWith("bm-");
+}
+
 export function canBookmarkAssistantReply(message: ChatMessage): boolean {
   return (
     message.role === "assistant" &&
@@ -168,6 +172,13 @@ export class BookmarkService {
       current = folderById.get(current.parentId);
     }
     return false;
+  }
+
+  async findBookmarkByMessage(
+    sessionId: string,
+    messageId: string,
+  ): Promise<BookmarkRecord | null> {
+    return this.repository().findBookmarkByMessage(sessionId, messageId);
   }
 
   async listBookmarks(options: {

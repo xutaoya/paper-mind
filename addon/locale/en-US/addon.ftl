@@ -545,6 +545,12 @@ paperchat-chat-bookmark-reader-user-message = User message
 
 paperchat-chat-bookmark-reader-assistant-message = AI reply
 
+paperchat-chat-bookmark-reader-toggle-save = Save bookmark
+
+paperchat-chat-bookmark-reader-toggle-remove = Remove bookmark
+
+paperchat-chat-bookmark-removed = Bookmark removed
+
 paperchat-chat-bookmark-reader-jump-to-chat = Jump to chat
 
 paperchat-chat-bookmark-reader-open-hint = Open in reader

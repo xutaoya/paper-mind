@@ -9,8 +9,14 @@ import {
   openBookmarkTextPrompt,
   showBookmarkError,
 } from "./BookmarkUiPrompts";
+import { getBookmarkDialogColors, getBookmarkFolderRowStyle } from "./bookmarkDialogTheme";
 import type { ThemeColors } from "./types";
 import { HTML_NS } from "./types";
+
+export interface BookmarkSaveDialogOptions {
+  /** Called after the overlay is mounted (e.g. raise parent reader window). */
+  onPresent?: () => void;
+}
 
 export interface BookmarkSaveDialogInput {
   defaultTitle: string;
@@ -30,10 +36,12 @@ export async function openBookmarkSaveDialog(
   doc: Document,
   theme: ThemeColors,
   input: BookmarkSaveDialogInput,
+  options: BookmarkSaveDialogOptions = {},
 ): Promise<BookmarkSaveDialogResult | null> {
   const service = getBookmarkService();
   const folders = await service.listFolders();
   let selectedFolderId: string | null = folders[0]?.id ?? null;
+  const dialogColors = getBookmarkDialogColors(theme);
 
   return new Promise((resolve) => {
     const overlay = doc.createElementNS(HTML_NS, "div") as HTMLElement;
@@ -41,7 +49,7 @@ export async function openBookmarkSaveDialog(
     Object.assign(overlay.style, {
       position: "fixed",
       inset: "0",
-      background: "rgba(15, 23, 42, 0.45)",
+      background: dialogColors.overlayBg,
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -193,8 +201,8 @@ export async function openBookmarkSaveDialog(
       getString("chat-bookmark-save"),
       {
         border: "none",
-        background: "#2563eb",
-        color: "#fff",
+        background: dialogColors.saveButtonBg,
+        color: dialogColors.saveButtonColor,
         borderRadius: "10px",
         padding: "8px 16px",
         cursor: "pointer",
@@ -222,6 +230,8 @@ export async function openBookmarkSaveDialog(
         selectedFolderId = items[0]?.id ?? null;
       }
       for (const folder of items) {
+        const selected = folder.id === selectedFolderId;
+        const rowStyle = getBookmarkFolderRowStyle(theme, selected);
         const row = createElement(
           doc,
           "button",
@@ -233,12 +243,8 @@ export async function openBookmarkSaveDialog(
             width: "100%",
             boxSizing: "border-box",
             appearance: "none",
-            border:
-              folder.id === selectedFolderId
-                ? "1px solid #93c5fd"
-                : `1px solid ${theme.borderColor}`,
-            background:
-              folder.id === selectedFolderId ? "#eff6ff" : theme.inputBg,
+            border: rowStyle.border,
+            background: rowStyle.background,
             borderRadius: "10px",
             padding: "10px 12px",
             cursor: "pointer",
@@ -255,7 +261,7 @@ export async function openBookmarkSaveDialog(
           minWidth: "0",
         });
         const check = createElement(doc, "span", {
-          color: folder.id === selectedFolderId ? "#2563eb" : "transparent",
+          color: rowStyle.checkColor,
           fontWeight: "700",
           flexShrink: "0",
           width: "16px",
@@ -350,6 +356,7 @@ export async function openBookmarkSaveDialog(
     dialog.appendChild(footer);
     overlay.appendChild(dialog);
     doc.documentElement.appendChild(overlay);
+    options.onPresent?.();
     titleInput.focus();
     titleInput.select();
   });

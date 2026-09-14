@@ -204,6 +204,32 @@ export function scrollMessageToViewportCenter(
   return messageElement;
 }
 
+/** Align the top of a rendered message near the top of the chat viewport. */
+export function scrollMessageToViewportStart(
+  chatHistory: HTMLElement,
+  messageId: string,
+  topPadding = 24,
+): HTMLElement | null {
+  const messageElement = findRenderedMessageElement(chatHistory, messageId);
+  if (!messageElement) return null;
+
+  const historyRect = chatHistory.getBoundingClientRect();
+  const messageRect = messageElement.getBoundingClientRect();
+  const relativeTop =
+    chatHistory.scrollTop + (messageRect.top - historyRect.top);
+  const maxScrollTop = Math.max(
+    0,
+    chatHistory.scrollHeight - chatHistory.clientHeight,
+  );
+  chatHistory.scrollTop = Math.min(
+    Math.max(0, relativeTop - topPadding),
+    maxScrollTop,
+  );
+  chatHistory.setAttribute(CHAT_HISTORY_AUTO_SCROLL_ATTR, "false");
+  updateChatHistoryScrollBottomButton(chatHistory);
+  return messageElement;
+}
+
 export function scrollToAndHighlightMessage(
   chatHistory: HTMLElement,
   messageId: string,
