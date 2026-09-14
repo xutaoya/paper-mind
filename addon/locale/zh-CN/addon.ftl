@@ -270,6 +270,8 @@ paperchat-chat-tool-result-output-label = 结果
 
 paperchat-chat-history-title = 对话 { $time }
 
+paperchat-chat-history-load-older = 加载更早的消息
+
 paperchat-guide-toolbar-title = 开始与 AI 对话
 
 paperchat-guide-toolbar-description = 点击这里打开 AI 聊天面板，与 AI 讨论你的文献内容

@@ -57,5 +57,11 @@ describe("chat math markdown helpers", function () {
     const processed = preserveStrongEmphasisAsHtml(input);
     assert.include(processed, "<strong>为什么它能提供&quot;全特征&quot;</strong>");
     assert.notInclude(processed, '**为什么它能提供"全特征"**');
+    assert.include(processed, "**核心思想**");
+  });
+
+  it("leaves ordinary bold markdown unchanged", function () {
+    const input = "这是**普通加粗**文本";
+    assert.equal(preserveStrongEmphasisAsHtml(input), input);
   });
 });

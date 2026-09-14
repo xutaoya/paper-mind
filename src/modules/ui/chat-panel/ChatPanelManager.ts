@@ -60,6 +60,7 @@ import {
   updateAgentActivityPanel,
 } from "./AgentActivityPanel";
 import {
+  cancelPendingHistoryRender,
   ensureStreamingTypingIndicator,
   getMessageMarkdownRenderOptions,
   getStreamingContentSelector,
@@ -120,7 +121,6 @@ import { Guide } from "../Guide";
 import { ANALYTICS_EVENTS, getAnalyticsService } from "../../analytics";
 import {
   NextQuestionHintController,
-  requestNextQuestionHintAfterRecentRender,
 } from "./NextQuestionHintController";
 import { UserMessageEditController } from "./UserMessageEditController";
 import {
@@ -191,11 +191,14 @@ const quotedMessageNavigationGenerations = new WeakMap<HTMLElement, number>();
 
 function cancelPendingStreamingTextRender(container: HTMLElement): void {
   const state = streamingTextRenderStates.get(container);
-  if (!state) return;
-  if (state.timeoutId) {
+  if (state?.timeoutId) {
     clearTimeout(state.timeoutId);
   }
   streamingTextRenderStates.delete(container);
+  const chatHistory = container.querySelector("#chat-history") as HTMLElement | null;
+  if (chatHistory) {
+    cancelPendingHistoryRender(chatHistory);
+  }
 }
 
 function shouldForceStreamingMarkdownRender(
@@ -1403,6 +1406,7 @@ let resizeHandler: (() => void) | null = null;
 let sidebarObserver: MutationObserver | null = null;
 let tabNotifierID: string | null = null;
 let globalTabNotifierID: string | null = null; // Persistent notifier for sidebar sync
+let sidebarSizeTimer: number | null = null;
 let contentInitialized = false;
 let moduleCurrentItem: Zotero.Item | null = null;
 let pendingPanelItem: Zotero.Item | null = null;
@@ -1422,6 +1426,65 @@ let panelOpenSource: ChatPanelOpenSource = "unknown";
 let suppressFloatingUnloadTracking = false;
 const eventHandlerDisposers = new WeakMap<HTMLElement, () => void>();
 const readyPanelContainers = new WeakSet<HTMLElement>();
+const TAB_CHAT_REFRESH_DEBOUNCE_MS = 300;
+const tabChatRefreshTimers = new WeakMap<HTMLElement, number>();
+const tabChatRefreshInFlight = new WeakMap<HTMLElement, Promise<void>>();
+const lastTabChatRenderKey = new WeakMap<HTMLElement, string>();
+
+function buildTabChatRenderKey(
+  session: ChatSession | null,
+  item: Zotero.Item | null,
+): string {
+  if (!session) {
+    const itemPart = item ? `${item.libraryID}:${item.key}` : "none";
+    return `empty:${itemPart}`;
+  }
+  const last = session.messages[session.messages.length - 1];
+  const itemPart = item ? `${item.libraryID}:${item.key}` : "none";
+  return [
+    itemPart,
+    session.id,
+    String(session.messages.length),
+    last?.id ?? "",
+    String(last?.timestamp ?? 0),
+    last?.streamingState ?? "",
+    String(last?.content?.length ?? 0),
+  ].join("|");
+}
+
+function rememberTabChatRenderKey(
+  container: HTMLElement,
+  session: ChatSession | null,
+  item: Zotero.Item | null,
+): void {
+  lastTabChatRenderKey.set(container, buildTabChatRenderKey(session, item));
+}
+
+function shouldSkipTabChatRefresh(
+  container: HTMLElement,
+  session: ChatSession | null,
+  item: Zotero.Item | null,
+): boolean {
+  const nextKey = buildTabChatRenderKey(session, item);
+  return lastTabChatRenderKey.get(container) === nextKey;
+}
+
+function scheduleTabChatRefresh(container: HTMLElement): void {
+  const win = container.ownerDocument?.defaultView ?? Zotero.getMainWindow();
+  if (!win) {
+    void refreshChatForContainer(container);
+    return;
+  }
+  const existing = tabChatRefreshTimers.get(container);
+  if (existing !== undefined) {
+    win.clearTimeout(existing);
+  }
+  const timerId = win.setTimeout(() => {
+    tabChatRefreshTimers.delete(container);
+    void refreshChatForContainer(container);
+  }, TAB_CHAT_REFRESH_DEBOUNCE_MS);
+  tabChatRefreshTimers.set(container, timerId);
+}
 
 function removeStaleSidebarContainers(doc: Document): void {
   const containers = Array.from(
@@ -1594,21 +1657,21 @@ function collapseSidebar(): void {
  * Update sidebar container position
  */
 function updateSidebarContainerPosition(): void {
+  expandSidebar();
+  syncSidebarContainerPosition();
+}
+
+function syncSidebarContainerPosition(): void {
   if (!chatContainer) return;
 
   const sidebar = getSidebar();
   if (!sidebar) return;
 
-  // Ensure sidebar is visible FIRST before getting dimensions
-  expandSidebar();
-
-  // Hide drag bar in sidebar mode
   const dragBar = chatContainer.querySelector("#chat-drag-bar") as HTMLElement;
   if (dragBar) {
     dragBar.style.display = "none";
   }
 
-  // Use requestAnimationFrame to ensure layout is updated after expanding
   const win = Zotero.getMainWindow();
   win.requestAnimationFrame(() => {
     if (!chatContainer || !sidebar) return;
@@ -1625,6 +1688,31 @@ function updateSidebarContainerPosition(): void {
     chatContainer.style.border = "none";
     chatContainer.style.borderLeft = "1px solid var(--fill-quinary)";
   });
+}
+
+function clearSidebarSizeTimer(): void {
+  if (sidebarSizeTimer === null) {
+    return;
+  }
+  Zotero.getMainWindow()?.clearTimeout(sidebarSizeTimer);
+  sidebarSizeTimer = null;
+}
+
+function scheduleSidebarSizeSync(): void {
+  const win = Zotero.getMainWindow();
+  if (!win) {
+    syncSidebarContainerPosition();
+    return;
+  }
+  if (sidebarSizeTimer !== null) {
+    win.clearTimeout(sidebarSizeTimer);
+  }
+  sidebarSizeTimer = win.setTimeout(() => {
+    sidebarSizeTimer = null;
+    if (currentPanelMode === "sidebar") {
+      syncSidebarContainerPosition();
+    }
+  }, 80);
 }
 
 /**
@@ -1930,6 +2018,7 @@ function renderActiveSessionInContainer(
       },
       onMarkdownError: refreshContext.appendError,
       onRenderComplete: () => {
+        rememberTabChatRenderKey(container, session, moduleCurrentItem);
         syncConversationNavigator(
           container,
           manager.getActiveSession()?.messages ?? session.messages,
@@ -1952,11 +2041,29 @@ function renderActiveSessionInContainer(
  * Switches to the active reader item's conversation when available.
  */
 async function refreshChatForContainer(container: HTMLElement): Promise<void> {
-  const activeItem = pendingPanelItem || getActiveReaderItem();
-  pendingPanelItem = null;
-  const session = await syncChatSessionForActiveItem(container, activeItem);
-  renderActiveSessionInContainer(container, session);
-  focusInput(container);
+  const inFlight = tabChatRefreshInFlight.get(container);
+  if (inFlight) {
+    await inFlight;
+    return;
+  }
+
+  const run = async () => {
+    const activeItem = pendingPanelItem || getActiveReaderItem();
+    pendingPanelItem = null;
+    const session = await syncChatSessionForActiveItem(container, activeItem);
+    if (shouldSkipTabChatRefresh(container, session, activeItem)) {
+      return;
+    }
+    rememberTabChatRenderKey(container, session, activeItem);
+    renderActiveSessionInContainer(container, session);
+    focusInput(container);
+  };
+
+  const promise = run().finally(() => {
+    tabChatRefreshInFlight.delete(container);
+  });
+  tabChatRefreshInFlight.set(container, promise);
+  await promise;
 }
 
 /**
@@ -1969,9 +2076,9 @@ async function initializeFloatingChatContent(): Promise<void> {
   if (!floatingTabNotifierID) {
     floatingTabNotifierID = Zotero.Notifier.registerObserver(
       {
-        notify: async () => {
+        notify: () => {
           if (floatingContainer) {
-            await refreshChatForContainer(floatingContainer);
+            scheduleTabChatRefresh(floatingContainer);
           }
         },
       },
@@ -2079,11 +2186,12 @@ function showSidebarPanel(): boolean {
   const MutationObserverClass = mainWin.MutationObserver;
   const sidebar = getSidebar();
   if (!sidebarObserver && MutationObserverClass && sidebar) {
-    sidebarObserver = new MutationObserverClass(() => updateContainerSize());
+    sidebarObserver = new MutationObserverClass(() => scheduleSidebarSizeSync());
     sidebarObserver.observe(sidebar, {
       attributes: true,
-      childList: true,
-      subtree: true,
+      attributeFilter: ["collapsed", "width", "style", "hidden"],
+      childList: false,
+      subtree: false,
     });
   }
 
@@ -2093,8 +2201,9 @@ function showSidebarPanel(): boolean {
       {
         notify: () => {
           updateContainerSize();
-          if (chatContainer?.style.display !== "none") {
-            refreshChatForCurrentItem();
+          const container = chatContainer;
+          if (container && container.style.display !== "none") {
+            scheduleTabChatRefresh(container);
           }
         },
       },
@@ -2119,7 +2228,7 @@ function showSidebarPanel(): boolean {
     const context = createContext(chatContainer);
     NextQuestionHintController.attach(context);
     setupChatManagerCallbacks(manager, context, chatContainer);
-    refreshChatForCurrentItem();
+    void refreshChatForContainer(chatContainer);
   }
 
   ztoolkit.log("Sidebar panel shown");
@@ -2148,6 +2257,7 @@ function hideSidebarPanel(): void {
     sidebarObserver.disconnect();
     sidebarObserver = null;
   }
+  clearSidebarSizeTimer();
 
   if (tabNotifierID) {
     Zotero.Notifier.unregisterObserver(tabNotifierID);
@@ -3190,6 +3300,11 @@ function createContext(container: HTMLElement): ChatPanelContext {
               },
               onMarkdownError: context.appendError,
               onRenderComplete: () => {
+                rememberTabChatRenderKey(
+                  container,
+                  manager.getActiveSession(),
+                  moduleCurrentItem,
+                );
                 syncConversationNavigator(
                   container,
                   messages,
@@ -3217,7 +3332,6 @@ function createContext(container: HTMLElement): ChatPanelContext {
         if (!NextQuestionHintController.get(container)) {
           NextQuestionHintController.attach(context);
         }
-        requestNextQuestionHintAfterRecentRender(container);
       }
     },
     renderExecutionPlan: (plan?: ExecutionPlan) => {
@@ -3287,6 +3401,7 @@ export async function unregisterAll(): Promise<void> {
     sidebarObserver.disconnect();
     sidebarObserver = null;
   }
+  clearSidebarSizeTimer();
 
   if (tabNotifierID) {
     Zotero.Notifier.unregisterObserver(tabNotifierID);

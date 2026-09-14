@@ -153,6 +153,7 @@ export type FluentMessageId =
   | 'paperchat-chat-evidence-citation-title'
   | 'paperchat-chat-evidence-view-source'
   | 'paperchat-chat-history'
+  | 'paperchat-chat-history-load-older'
   | 'paperchat-chat-history-search-clear'
   | 'paperchat-chat-history-search-more-matches'
   | 'paperchat-chat-history-search-more-sessions'

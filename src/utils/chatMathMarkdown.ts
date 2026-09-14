@@ -15,6 +15,9 @@ export function containsInlineMathDelimiters(content: string): boolean {
  * indentation, which leaves inline math as literal $...$ inside <pre><code>.
  */
 export function normalizeBlockquoteListIndentation(content: string): string {
+  if (!content.includes(">")) {
+    return content;
+  }
   return content.replace(
     /(^|\n)([ \t]*>\s*\d+\.)\s{4,}/gm,
     (_, prefix, marker) => `${prefix}${marker}   `,
@@ -37,6 +40,9 @@ function escapeHtmlText(text: string): string {
 }
 
 export function normalizeEmphasisDelimiters(markdown: string): string {
+  if (!markdown.includes("*") && !markdown.includes("_")) {
+    return markdown;
+  }
   let normalized = markdown.replace(
     /\*\*([^*\n]+?)[ \t]+\*\*/g,
     (_, text: string) => `**${text.trimEnd()}**`,
@@ -45,14 +51,16 @@ export function normalizeEmphasisDelimiters(markdown: string): string {
     /\*\*[ \t]+([^*\n]+?)\*\*/g,
     (_, text: string) => `**${text.trimStart()}**`,
   );
-  normalized = normalized.replace(
-    /__([^_\n]+?)[ \t]+__/g,
-    (_, text: string) => `__${text.trimEnd()}__`,
-  );
-  normalized = normalized.replace(
-    /__[ \t]+([^_\n]+?)__/g,
-    (_, text: string) => `__${text.trimStart()}__`,
-  );
+  if (normalized.includes("__")) {
+    normalized = normalized.replace(
+      /__([^_\n]+?)[ \t]+__/g,
+      (_, text: string) => `__${text.trimEnd()}__`,
+    );
+    normalized = normalized.replace(
+      /__[ \t]+([^_\n]+?)__/g,
+      (_, text: string) => `__${text.trimStart()}__`,
+    );
+  }
   normalized = normalized.replace(
     /(?<!\*)\*([^*\n]+?)[ \t]+\*(?!\*)/g,
     (_, text: string) => `*${text.trimEnd()}*`,
@@ -66,27 +74,29 @@ export function normalizeEmphasisDelimiters(markdown: string): string {
 
 /**
  * markdown-it can leave ** literals when bold text contains ASCII quotes and is
- * immediately followed by CJK letters. Pre-convert matched spans to <strong>.
+ * immediately followed by CJK letters. Only rewrite that failing pattern so
+ * ordinary bold does not become extra HTML on every message.
  */
 export function preserveStrongEmphasisAsHtml(content: string): string {
-  let processed = content.replace(/\*\*([^*\n]+?)\*\*/g, (match, text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) {
-      return match;
-    }
-    return `<strong>${escapeHtmlText(trimmed)}</strong>`;
-  });
-  processed = processed.replace(/__([^_\n]+?)__/g, (match, text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) {
-      return match;
-    }
-    return `<strong>${escapeHtmlText(trimmed)}</strong>`;
-  });
-  return processed;
+  if (!content.includes("**")) {
+    return content;
+  }
+  return content.replace(
+    /\*\*([^*\n]*?["“”][^*\n]*?)\*\*(?=[\u4e00-\u9fff])/g,
+    (match, text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed) {
+        return match;
+      }
+      return `<strong>${escapeHtmlText(trimmed)}</strong>`;
+    },
+  );
 }
 
 export function repairIncompleteInlineMath(content: string): string {
+  if (!content.includes("$")) {
+    return content;
+  }
   return content
     .split("\n")
     .map((line) => {

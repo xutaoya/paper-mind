@@ -38,7 +38,10 @@ import {
 } from "./TodoListElement";
 import { isMaxIterationsNoticeContent } from "../../chat/agent-runtime/messages";
 import { isTerminalPresentationArtifact } from "../../chat/presentation-artifacts";
-import { selectChatMessagePresentations } from "../../chat/message-presentation";
+import {
+  selectChatMessagePresentations,
+  type ChatMessagePresentation,
+} from "../../chat/message-presentation";
 import { canBookmarkAssistantReply } from "../../bookmarks";
 import { canSummarizeAssistantReply } from "./NoteSummaryActions";
 import {
@@ -57,6 +60,10 @@ export {
 } from "./AgentActivityPanel";
 
 const CHAT_HISTORY_BOTTOM_STICKY_THRESHOLD = 24;
+const MESSAGE_RENDER_SYNC_TAIL = 2;
+const MESSAGE_RENDER_EAGER_MAX_COUNT = 6;
+const MESSAGE_RENDER_EAGER_MAX_CHARS = 6000;
+const HISTORY_LOAD_OLDER_ID = "paperchat-history-load-older";
 const CHAT_HISTORY_AUTO_SCROLL_ATTR = "data-auto-scroll";
 const CHAT_SCROLL_BOTTOM_BUTTON_ID = "chat-scroll-bottom-btn";
 const STREAMING_TYPING_INDICATOR_ATTR = "data-streaming-typing-indicator";
@@ -91,6 +98,88 @@ const messageHighlightLeases = new WeakMap<
   HTMLElement,
   MessageHighlightLease
 >();
+
+interface PendingHistoryRender {
+  cancelled: boolean;
+  timerId: number | null;
+  scrollHandler: (() => void) | null;
+  presentations: ChatMessagePresentation[];
+  renderedStart: number;
+  lastAssistantIndex: number;
+  theme: ThemeColors;
+  retryableErrorMessageId?: string;
+  onReroll?: () => void | Promise<void>;
+  onRerollError?: (error: Error) => void;
+  renderOptions: MessageRenderOptions;
+  tailMarker: Comment | null;
+  loading: boolean;
+}
+
+const pendingHistoryRenders = new WeakMap<HTMLElement, PendingHistoryRender>();
+const historyClickActions = new WeakMap<HTMLElement, MessageRenderOptions>();
+const delegatedHistoryRoots = new WeakSet<HTMLElement>();
+
+const HISTORY_BUBBLE_IGNORE_SELECTOR =
+  "button, a, [data-quoted-message-id], .message-actions, .chat-source-group, .chat-tool-call-card";
+
+function shouldIgnoreHistoryBubbleClick(target: EventTarget | null): boolean {
+  const element = target as Element | null;
+  return Boolean(element?.closest?.(HISTORY_BUBBLE_IGNORE_SELECTOR));
+}
+
+function bindHistoryClickDelegation(chatHistory: HTMLElement): void {
+  if (delegatedHistoryRoots.has(chatHistory)) {
+    return;
+  }
+  delegatedHistoryRoots.add(chatHistory);
+  chatHistory.addEventListener("click", (event) => {
+    if (shouldIgnoreHistoryBubbleClick(event.target)) {
+      return;
+    }
+    const selection = chatHistory.ownerDocument.getSelection();
+    if (selection && !selection.isCollapsed && selection.toString().trim()) {
+      return;
+    }
+    const target = event.target as Element | null;
+    const wrapper = target?.closest?.("[data-message-id]") as HTMLElement | null;
+    const messageId = wrapper?.getAttribute("data-message-id");
+    if (!wrapper || !messageId) {
+      return;
+    }
+    const actions = historyClickActions.get(chatHistory);
+    const bubble = target?.closest?.(".chat-bubble") as HTMLElement | null;
+    if (!bubble || !wrapper.contains(bubble)) {
+      return;
+    }
+    if (bubble.dataset.openReader === "true") {
+      void Promise.resolve(actions?.onOpenMessageReader?.(messageId)).catch(
+        (error: unknown) => {
+          ztoolkit.log("[MessageRenderer] Open message reader failed:", error);
+        },
+      );
+      return;
+    }
+    if (bubble.dataset.editable === "true") {
+      actions?.onEditUserMessage?.(messageId);
+    }
+  });
+}
+
+export function cancelPendingHistoryRender(chatHistory: HTMLElement): void {
+  const pending = pendingHistoryRenders.get(chatHistory);
+  if (!pending) {
+    return;
+  }
+  pending.cancelled = true;
+  if (pending.timerId !== null) {
+    const win = chatHistory.ownerDocument?.defaultView;
+    win?.clearTimeout(pending.timerId);
+  }
+  if (pending.scrollHandler) {
+    chatHistory.removeEventListener("scroll", pending.scrollHandler);
+  }
+  pendingHistoryRenders.delete(chatHistory);
+}
 
 function getChatHistoryBottomOffset(chatHistory: HTMLElement): number {
   return (
@@ -1082,25 +1171,7 @@ export function createMessageElement(
   ) {
     bubble.style.cursor = "pointer";
     bubble.title = getString("chat-bookmark-reader-open-hint");
-    bubble.addEventListener("click", (event) => {
-      const target = event.target as Element | null;
-      if (
-        target?.closest(
-          "button, a, [data-quoted-message-id], .message-actions, .chat-source-group, .chat-tool-call-card",
-        )
-      ) {
-        return;
-      }
-      const selection = bubble.ownerDocument.getSelection();
-      if (selection && !selection.isCollapsed && selection.toString().trim()) {
-        return;
-      }
-      void Promise.resolve(
-        renderOptions.onOpenMessageReader?.(msg.id),
-      ).catch((error: unknown) => {
-        ztoolkit.log("[MessageRenderer] Open message reader failed:", error);
-      });
-    });
+    bubble.dataset.openReader = "true";
   }
 
   if (msg.role === "user" && msg.streamingState === undefined && !msg.isSystemNotice) {
@@ -1112,19 +1183,6 @@ export function createMessageElement(
     if (renderOptions.editingUserMessageId === msg.id) {
       wrapper.classList.add("chat-message--editing");
       bubble.style.boxShadow = `0 0 0 2px ${theme.inputFocusBorderColor}`;
-    }
-    if (renderOptions.onEditUserMessage) {
-      bubble.addEventListener("click", (event) => {
-        const target = event.target as Element | null;
-        if (target?.closest("button, a, [data-quoted-message-id]")) {
-          return;
-        }
-        const selection = bubble.ownerDocument.getSelection();
-        if (selection && !selection.isCollapsed && selection.toString().trim()) {
-          return;
-        }
-        renderOptions.onEditUserMessage?.(msg.id);
-      });
     }
   }
 
@@ -1738,8 +1796,261 @@ function createChatEmptyState(doc: Document, theme: ThemeColors): HTMLElement {
   return emptyState;
 }
 
+function appendPresentationRange(
+  doc: Document,
+  target: DocumentFragment | HTMLElement,
+  presentations: ChatMessagePresentation[],
+  start: number,
+  end: number,
+  lastAssistantIndex: number,
+  previousMessageTimestamp: number | undefined,
+  theme: ThemeColors,
+  retryableErrorMessageId: string | undefined,
+  onReroll: (() => void | Promise<void>) | undefined,
+  onRerollError: ((error: Error) => void) | undefined,
+  renderOptions: MessageRenderOptions,
+): void {
+  let previousTimestamp = previousMessageTimestamp;
+  for (let index = start; index < end; index++) {
+    const { message: msg, attachedError, attachedNotices } = presentations[index];
+    if (shouldShowMessageTimeSeparator(previousTimestamp, msg.timestamp)) {
+      target.appendChild(
+        createMessageTimeSeparatorElement(doc, theme, msg.timestamp),
+      );
+    }
+    previousTimestamp = msg.timestamp;
+    target.appendChild(
+      createMessageElement(
+        doc,
+        msg,
+        theme,
+        index === lastAssistantIndex,
+        (msg.role === "error" && retryableErrorMessageId === msg.id) ||
+          (!!attachedError && retryableErrorMessageId === attachedError.id),
+        onReroll,
+        onRerollError,
+        renderOptions,
+        attachedError,
+        attachedNotices,
+      ),
+    );
+  }
+}
+
+function finishHistoryRender(
+  chatHistory: HTMLElement,
+  shouldScrollToBottom: boolean,
+  onRenderComplete?: () => void,
+): void {
+  if (shouldScrollToBottom) {
+    scrollChatHistoryToBottom(chatHistory);
+  } else {
+    updateChatHistoryScrollBottomButton(chatHistory);
+  }
+  onRenderComplete?.();
+}
+
+function shouldEagerRenderHistory(
+  presentations: ChatMessagePresentation[],
+): boolean {
+  if (presentations.length <= MESSAGE_RENDER_SYNC_TAIL) {
+    return true;
+  }
+  if (presentations.length > MESSAGE_RENDER_EAGER_MAX_COUNT) {
+    return false;
+  }
+  let totalChars = 0;
+  for (const presentation of presentations) {
+    totalChars += presentation.message.content?.length || 0;
+    if (totalChars > MESSAGE_RENDER_EAGER_MAX_CHARS) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function createLoadOlderControl(doc: Document, theme: ThemeColors): HTMLElement {
+  return createElement(
+    doc,
+    "button",
+    {
+      display: "flex",
+      width: "100%",
+      boxSizing: "border-box",
+      border: "none",
+      background: "transparent",
+      color: theme.textMuted,
+      fontSize: "12px",
+      lineHeight: "1.4",
+      padding: "10px 8px",
+      cursor: "pointer",
+      justifyContent: "center",
+    },
+    {
+      id: HISTORY_LOAD_OLDER_ID,
+      type: "button",
+    },
+  );
+}
+
+function syncLoadOlderControl(
+  chatHistory: HTMLElement,
+  pending: PendingHistoryRender,
+): void {
+  const doc = chatHistory.ownerDocument;
+  if (!doc) {
+    return;
+  }
+  const existing = chatHistory.querySelector(
+    `#${HISTORY_LOAD_OLDER_ID}`,
+  ) as HTMLButtonElement | null;
+  if (pending.renderedStart <= 0) {
+    existing?.remove();
+    return;
+  }
+  const control = existing || createLoadOlderControl(doc, pending.theme);
+  control.textContent = pending.loading
+    ? `${getString("chat-history-load-older")}…`
+    : getString("chat-history-load-older");
+  (control as HTMLButtonElement).disabled = pending.loading;
+  if (!existing) {
+    chatHistory.insertBefore(control, chatHistory.firstChild);
+    control.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      loadOlderHistoryMessages(chatHistory, 1);
+    });
+  }
+}
+
+function loadOlderHistoryMessages(
+  chatHistory: HTMLElement,
+  count = 1,
+): boolean {
+  const pending = pendingHistoryRenders.get(chatHistory);
+  if (
+    !pending ||
+    pending.cancelled ||
+    pending.loading ||
+    pending.renderedStart <= 0
+  ) {
+    return false;
+  }
+
+  const doc = chatHistory.ownerDocument;
+  if (!doc) {
+    return false;
+  }
+
+  pending.loading = true;
+  syncLoadOlderControl(chatHistory, pending);
+
+  const batchEnd = pending.renderedStart;
+  const batchStart = Math.max(0, batchEnd - Math.max(1, count));
+  const fragment = doc.createDocumentFragment();
+  appendPresentationRange(
+    doc,
+    fragment,
+    pending.presentations,
+    batchStart,
+    batchEnd,
+    pending.lastAssistantIndex,
+    batchStart > 0
+      ? pending.presentations[batchStart - 1]?.message.timestamp
+      : undefined,
+    pending.theme,
+    pending.retryableErrorMessageId,
+    pending.onReroll,
+    pending.onRerollError,
+    pending.renderOptions,
+  );
+
+  const previousScrollHeight = chatHistory.scrollHeight;
+  const previousScrollTop = chatHistory.scrollTop;
+  const insertBeforeNode =
+    chatHistory.querySelector(`#${HISTORY_LOAD_OLDER_ID}`)?.nextSibling ||
+    pending.tailMarker ||
+    chatHistory.firstChild;
+  chatHistory.insertBefore(fragment, insertBeforeNode);
+  chatHistory.scrollTop =
+    previousScrollTop + (chatHistory.scrollHeight - previousScrollHeight);
+
+  pending.renderedStart = batchStart;
+  pending.loading = false;
+  if (pending.renderedStart <= 0) {
+    pending.tailMarker?.remove();
+    pending.tailMarker = null;
+    if (pending.scrollHandler) {
+      chatHistory.removeEventListener("scroll", pending.scrollHandler);
+      pending.scrollHandler = null;
+    }
+    pendingHistoryRenders.delete(chatHistory);
+    const leftover = chatHistory.querySelector(`#${HISTORY_LOAD_OLDER_ID}`);
+    leftover?.remove();
+  } else {
+    syncLoadOlderControl(chatHistory, pending);
+  }
+  return true;
+}
+
+function attachLazyHistoryLoader(
+  chatHistory: HTMLElement,
+  pending: PendingHistoryRender,
+): void {
+  syncLoadOlderControl(chatHistory, pending);
+  const scrollHandler = () => {
+    if (chatHistory.scrollTop <= 72) {
+      loadOlderHistoryMessages(chatHistory, 1);
+    }
+  };
+  pending.scrollHandler = scrollHandler;
+  chatHistory.addEventListener("scroll", scrollHandler, { passive: true });
+}
+
+function scheduleEnsureHistoryMessage(
+  chatHistory: HTMLElement,
+  messageId: string,
+  onReady: (element: HTMLElement | null) => void,
+): void {
+  const existing = findRenderedMessageElement(chatHistory, messageId);
+  if (existing || !pendingHistoryRenders.get(chatHistory)) {
+    onReady(existing);
+    return;
+  }
+
+  const win = chatHistory.ownerDocument?.defaultView ?? Zotero.getMainWindow();
+  const step = () => {
+    const state = pendingHistoryRenders.get(chatHistory);
+    if (!state || state.cancelled) {
+      onReady(findRenderedMessageElement(chatHistory, messageId));
+      return;
+    }
+    const found = findRenderedMessageElement(chatHistory, messageId);
+    if (found) {
+      onReady(found);
+      return;
+    }
+    if (!loadOlderHistoryMessages(chatHistory, 1)) {
+      onReady(findRenderedMessageElement(chatHistory, messageId));
+      return;
+    }
+    state.timerId = win.setTimeout(step, 16);
+  };
+  step();
+}
+
+export function ensureRenderedMessage(
+  chatHistory: HTMLElement,
+  messageId: string,
+  onReady: (element: HTMLElement | null) => void,
+): void {
+  scheduleEnsureHistoryMessage(chatHistory, messageId, onReady);
+}
+
 /**
- * Render all messages to the chat history element
+ * Render all messages to the chat history element.
+ * Long sessions only paint the latest turns immediately. Older Markdown/KaTeX
+ * is loaded when the user scrolls up, so opening the sidebar stays responsive.
  */
 export function renderMessages(
   chatHistory: HTMLElement,
@@ -1753,6 +2064,9 @@ export function renderMessages(
 ): void {
   const doc = chatHistory.ownerDocument;
   if (!doc) return;
+  cancelPendingHistoryRender(chatHistory);
+  bindHistoryClickDelegation(chatHistory);
+  historyClickActions.set(chatHistory, renderOptions);
   const shouldScrollToBottom = shouldAutoScrollChatHistory(chatHistory);
 
   chatHistory.textContent = "";
@@ -1777,48 +2091,62 @@ export function renderMessages(
     }
   }
 
-  // Render each message into an off-DOM fragment, then insert once. Appending
-  // 100+ message elements directly to the live chatHistory forces a reflow per
-  // node; batching through a fragment collapses that to a single insertion.
-  const fragment = doc.createDocumentFragment();
-  let previousMessageTimestamp: number | undefined;
-  for (let index = 0; index < presentations.length; index++) {
-    const {
-      message: msg,
-      attachedError,
-      attachedNotices,
-    } = presentations[index];
-    if (shouldShowMessageTimeSeparator(previousMessageTimestamp, msg.timestamp)) {
-      fragment.appendChild(
-        createMessageTimeSeparatorElement(doc, theme, msg.timestamp),
-      );
-    }
-    previousMessageTimestamp = msg.timestamp;
-    const isLastAssistant = index === lastAssistantIndex;
-    fragment.appendChild(
-      createMessageElement(
-        doc,
-        msg,
-        theme,
-        isLastAssistant,
-        (msg.role === "error" && retryableErrorMessageId === msg.id) ||
-          (!!attachedError && retryableErrorMessageId === attachedError.id),
-        onReroll,
-        onRerollError,
-        renderOptions,
-        attachedError,
-        attachedNotices,
-      ),
-    );
+  const eager = shouldEagerRenderHistory(presentations);
+  const syncStart = eager
+    ? 0
+    : Math.max(0, presentations.length - MESSAGE_RENDER_SYNC_TAIL);
+  const tailFragment = doc.createDocumentFragment();
+  appendPresentationRange(
+    doc,
+    tailFragment,
+    presentations,
+    syncStart,
+    presentations.length,
+    lastAssistantIndex,
+    presentations[syncStart - 1]?.message.timestamp,
+    theme,
+    retryableErrorMessageId,
+    onReroll,
+    onRerollError,
+    renderOptions,
+  );
+  const tailMarker = doc.createComment("paperchat-history-tail");
+  if (syncStart > 0) {
+    chatHistory.appendChild(tailMarker);
   }
-  chatHistory.appendChild(fragment);
+  chatHistory.appendChild(tailFragment);
 
-  if (shouldScrollToBottom) {
-    scrollChatHistoryToBottom(chatHistory);
-  } else {
-    updateChatHistoryScrollBottomButton(chatHistory);
+  if (syncStart === 0) {
+    finishHistoryRender(
+      chatHistory,
+      shouldScrollToBottom,
+      renderOptions.onRenderComplete,
+    );
+    return;
   }
-  renderOptions.onRenderComplete?.();
+
+  const pending: PendingHistoryRender = {
+    cancelled: false,
+    timerId: null,
+    scrollHandler: null,
+    presentations,
+    renderedStart: syncStart,
+    lastAssistantIndex,
+    theme,
+    retryableErrorMessageId,
+    onReroll,
+    onRerollError,
+    renderOptions,
+    tailMarker,
+    loading: false,
+  };
+  pendingHistoryRenders.set(chatHistory, pending);
+  attachLazyHistoryLoader(chatHistory, pending);
+  finishHistoryRender(
+    chatHistory,
+    shouldScrollToBottom,
+    renderOptions.onRenderComplete,
+  );
 }
 
 export function updateExecutionPlanView(

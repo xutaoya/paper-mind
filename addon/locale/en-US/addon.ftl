@@ -270,6 +270,8 @@ paperchat-chat-tool-result-output-label = Result
 
 paperchat-chat-history-title = Chat { $time }
 
+paperchat-chat-history-load-older = Load earlier messages
+
 paperchat-guide-toolbar-title = Start Chatting with AI
 
 paperchat-guide-toolbar-description = Click here to open the AI chat panel and discuss your documents with AI

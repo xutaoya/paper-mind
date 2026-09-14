@@ -6,7 +6,6 @@ import MarkdownIt from "markdown-it";
 import {
   containsInlineMathDelimiters,
   extractMathMLMarkup,
-  importKaTeXHtmlIntoDocument,
   importMathMLIntoDocument,
   normalizeBlockquoteListIndentation,
   normalizeEmphasisDelimiters,
@@ -1787,39 +1786,50 @@ function renderToolCallCards(
  * Preprocess math delimiters: convert \(...\) and \[...\] to $...$ and $$...$$
  */
 function preprocessMathDelimiters(content: string): string {
+  const needsCodeProtect = content.includes("`");
+  const needsEmphasis =
+    content.includes("*") || content.includes("_");
+  const needsDisplayMath = content.includes("\\[");
+  const needsInlineParenMath = content.includes("\\(");
+
   const preserved: string[] = [];
   let processed = repairIncompleteInlineMath(
     normalizeBlockquoteListIndentation(content),
   );
 
-  // Protect fenced code blocks
-  processed = processed.replace(/```[\s\S]*?```/g, (match) => {
-    preserved.push(match);
-    return `\x00PRESERVE_${preserved.length - 1}\x00`;
-  });
-  // Protect inline code
-  processed = processed.replace(/`[^`]+`/g, (match) => {
-    preserved.push(match);
-    return `\x00PRESERVE_${preserved.length - 1}\x00`;
-  });
+  if (needsCodeProtect) {
+    processed = processed.replace(/```[\s\S]*?```/g, (match) => {
+      preserved.push(match);
+      return `\x00PRESERVE_${preserved.length - 1}\x00`;
+    });
+    processed = processed.replace(/`[^`]+`/g, (match) => {
+      preserved.push(match);
+      return `\x00PRESERVE_${preserved.length - 1}\x00`;
+    });
+  }
 
-  processed = normalizeEmphasisDelimiters(processed);
-  processed = preserveStrongEmphasisAsHtml(processed);
+  if (needsEmphasis) {
+    processed = normalizeEmphasisDelimiters(processed);
+    processed = preserveStrongEmphasisAsHtml(processed);
+  }
 
-  // Convert \[...\] to $$...$$ (block math)
-  processed = processed.replace(
-    /\\\[([\s\S]*?)\\\]/g,
-    (_, math) => `$$${math}$$`,
-  );
-  // Convert \(...\) to $...$ (inline math)
-  processed = processed.replace(/\\\((.*?)\\\)/g, (_, math) => `$${math}$`);
+  if (needsDisplayMath) {
+    processed = processed.replace(
+      /\\\[([\s\S]*?)\\\]/g,
+      (_, math) => `$$${math}$$`,
+    );
+  }
+  if (needsInlineParenMath) {
+    processed = processed.replace(/\\\((.*?)\\\)/g, (_, math) => `$${math}$`);
+  }
 
-  // Restore preserved blocks
-  processed = processed.replace(
-    // eslint-disable-next-line no-control-regex
-    /\x00PRESERVE_(\d+)\x00/g,
-    (_, idx) => preserved[parseInt(idx)],
-  );
+  if (preserved.length > 0) {
+    processed = processed.replace(
+      // eslint-disable-next-line no-control-regex
+      /\x00PRESERVE_(\d+)\x00/g,
+      (_, idx) => preserved[parseInt(idx)],
+    );
+  }
 
   return processed;
 }
@@ -1828,6 +1838,13 @@ function preprocessMathDelimiters(content: string): string {
  * Render math expression to DOM element using KaTeX with MathML output
  * MathML is natively supported by Firefox/Zotero, so no CSS needed
  */
+const KATEX_RENDER_OPTIONS = {
+  throwOnError: false,
+  strict: false as const,
+  maxSize: 16,
+  maxExpand: 200,
+};
+
 function renderMathToElement(
   doc: Document,
   parent: HTMLElement,
@@ -1838,27 +1855,17 @@ function renderMathToElement(
 
   try {
     const mathml = katex.renderToString(normalized, {
+      ...KATEX_RENDER_OPTIONS,
       displayMode,
       output: "mathml",
-      throwOnError: false,
-      strict: false,
     });
     const mathMarkup = extractMathMLMarkup(mathml);
     if (mathMarkup && importMathMLIntoDocument(doc, parent, mathMarkup)) {
       return;
     }
-
-    const html = katex.renderToString(normalized, {
-      displayMode,
-      output: "html",
-      throwOnError: false,
-      strict: false,
-    });
-    if (importKaTeXHtmlIntoDocument(doc, parent, HTML_NS, html)) {
-      return;
-    }
   } catch {
-    // fall through to raw fallback
+    // fall through to raw fallback instead of KaTeX HTML, which creates a
+    // very large span tree and was a major memory source in long papers.
   }
 
   renderMathFallback(doc, parent, normalized, displayMode);

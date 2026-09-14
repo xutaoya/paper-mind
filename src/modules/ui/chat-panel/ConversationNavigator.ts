@@ -9,6 +9,7 @@
 import type { ChatMessage } from "../../../types/chat";
 import { selectChatMessagePresentations } from "../../chat/message-presentation";
 import {
+  ensureRenderedMessage,
   findRenderedMessageElement,
   scrollMessageToViewportStart,
 } from "./MessageRenderer";
@@ -537,7 +538,11 @@ function scrollToRailItem(
   const item = items[index];
   if (!item) return;
 
-  scrollMessageToViewportStart(chatHistory, item.id);
+  ensureRenderedMessage(chatHistory, item.id, (element) => {
+    if (element) {
+      scrollMessageToViewportStart(chatHistory, item.id);
+    }
+  });
 }
 
 export function attachConversationNavigator(
