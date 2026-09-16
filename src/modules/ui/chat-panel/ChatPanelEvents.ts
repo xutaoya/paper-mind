@@ -38,6 +38,7 @@ import {
   getChatManager,
   navigateToQuotedMessage,
   openBookmarkReaderForContext,
+  quoteAssistantReplySelection,
   type PanelMode,
 } from "./ChatPanelManager";
 import type { BookmarkManagerActions } from "./BookmarkManagerPanel";
@@ -81,6 +82,7 @@ import {
   type TurnRunResult,
 } from "./SessionTurnQueue";
 import { UserMessageEditController } from "./UserMessageEditController";
+import { setupChatHistorySelectionQuote } from "./ChatHistorySelectionQuote";
 
 // Import getActiveReaderItem from the manager module to avoid circular dependency
 // This is set by ChatPanelManager during initialization
@@ -1404,6 +1406,14 @@ export function setupEventHandlers(context: ChatPanelContext): () => void {
         togglePanelModeFn();
       }
     });
+  }
+
+  if (chatHistory) {
+    disposers.push(
+      setupChatHistorySelectionQuote(chatHistory, (quote) => {
+        quoteAssistantReplySelection(context, quote.messageId, quote.excerpt);
+      }),
+    );
   }
 
   // @ Mention selector

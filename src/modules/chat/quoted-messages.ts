@@ -121,16 +121,24 @@ export function normalizeQuotedMessageRefs(value: unknown): QuotedMessageRef[] {
 export function appendPendingQuotedMessage(
   current: readonly QuotedMessageRef[],
   next: QuotedMessageRef,
+  options?: { replaceSameMessageId?: boolean },
 ): QuotedMessageRef[] {
   const normalizedCurrent = normalizeQuotedMessageRefs(current);
   const normalizedNext = normalizeQuotedMessageRefs([next])[0];
   if (!normalizedNext) return normalizedCurrent;
-  const alreadyPresent = normalizedCurrent.some(
+  const sameMessageIndex = normalizedCurrent.findIndex(
     (quote) =>
       quote.sessionId === normalizedNext.sessionId &&
       quote.messageId === normalizedNext.messageId,
   );
-  if (alreadyPresent) return normalizedCurrent;
+  if (sameMessageIndex >= 0) {
+    if (!options?.replaceSameMessageId) {
+      return normalizedCurrent;
+    }
+    const replaced = [...normalizedCurrent];
+    replaced[sameMessageIndex] = normalizedNext;
+    return replaced;
+  }
   return [...normalizedCurrent, normalizedNext].slice(-MAX_QUOTED_MESSAGES);
 }
 

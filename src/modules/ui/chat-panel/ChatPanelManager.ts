@@ -2865,6 +2865,9 @@ export async function openBookmarkReaderForContext(
 ): Promise<void> {
   await openBookmarkReader(bookmarks, startIndex, {
     loadSession: (sessionId) => getChatManager().getSessionById(sessionId),
+    onQuoteAssistantExcerpt: (messageId, excerpt) => {
+      quoteAssistantReplySelection(context, messageId, excerpt);
+    },
     onJumpToChat: async (quote) => {
       closeBookmarkReader();
       await navigateToQuotedMessage(context, quote);
@@ -2989,6 +2992,7 @@ export async function navigateToQuotedMessage(
 function addAssistantReplyQuote(
   context: ChatPanelContext,
   assistantMessageId: string,
+  excerpt?: string,
 ): void {
   const session = context.chatManager.getActiveSession();
   const message = session?.messages.find(
@@ -2999,9 +3003,11 @@ function addAssistantReplyQuote(
     return;
   }
 
-  const visibleContent = formatMarkdownForMessageCopy(message.content, {
+  const fullVisibleContent = formatMarkdownForMessageCopy(message.content, {
     evidenceRecords: message.evidence,
   });
+  const normalizedExcerpt = excerpt?.trim();
+  const visibleContent = normalizedExcerpt || fullVisibleContent;
   if (!canQuoteAssistantReply(message, visibleContent)) {
     context.appendError(getString("chat-quoted-reply-unavailable"));
     return;
@@ -3010,6 +3016,7 @@ function addAssistantReplyQuote(
   pendingQuotedMessages = appendPendingQuotedMessage(
     pendingQuotedMessages,
     createQuotedMessageRef(session.id, message, visibleContent),
+    { replaceSameMessageId: Boolean(normalizedExcerpt) },
   );
   syncPendingAttachmentsPreviews(context.container);
   focusInput(context.container);
@@ -3433,6 +3440,14 @@ export async function unregisterAll(): Promise<void> {
 /**
  * Add selected text as attachment
  */
+export function quoteAssistantReplySelection(
+  context: ChatPanelContext,
+  assistantMessageId: string,
+  excerpt: string,
+): void {
+  addAssistantReplyQuote(context, assistantMessageId, excerpt);
+}
+
 export function addSelectedTextAttachment(text: string): void {
   pendingSelectedText = text;
   syncPendingAttachmentsPreviews(chatContainer || undefined);

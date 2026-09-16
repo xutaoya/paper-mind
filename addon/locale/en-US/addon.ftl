@@ -184,6 +184,10 @@ paperchat-chat-copy = Copy
 
 paperchat-chat-quote-reply = Quote this reply
 
+paperchat-chat-quote-selection = Quote selection
+
+paperchat-chat-quote-selection-tooltip = Add the selected AI reply text to your message
+
 paperchat-chat-quoted-reply = Quoted reply
 
 paperchat-chat-remove-quoted-reply = Remove quoted reply

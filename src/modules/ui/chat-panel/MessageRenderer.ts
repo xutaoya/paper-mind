@@ -1170,7 +1170,6 @@ export function createMessageElement(
     renderOptions.onOpenMessageReader
   ) {
     bubble.style.cursor = "pointer";
-    bubble.title = getString("chat-bookmark-reader-open-hint");
     bubble.dataset.openReader = "true";
   }
 

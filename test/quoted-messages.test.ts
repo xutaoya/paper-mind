@@ -118,6 +118,25 @@ The visible **answer** remains.`;
     );
   });
 
+  it("can replace an existing quote when quoting a new excerpt from the same reply", function () {
+    const first = createQuotedMessageRef(
+      "session-1",
+      assistantMessage("assistant-1", "Full reply body"),
+      "Full reply body",
+    );
+    const excerpt = createQuotedMessageRef(
+      "session-1",
+      assistantMessage("assistant-1", "Full reply body"),
+      "selected excerpt",
+    );
+    let pending = appendPendingQuotedMessage([], first);
+    pending = appendPendingQuotedMessage(pending, excerpt, {
+      replaceSameMessageId: true,
+    });
+    assert.lengthOf(pending, 1);
+    assert.equal(pending[0].contentSnapshot, "selected excerpt");
+  });
+
   it("uses previews for replies still in context and snapshots for missing replies", function () {
     const firstAssistant = assistantMessage(
       "assistant-1",

@@ -184,6 +184,10 @@ paperchat-chat-copy = 复制
 
 paperchat-chat-quote-reply = 引用此回复
 
+paperchat-chat-quote-selection = 引用提问
+
+paperchat-chat-quote-selection-tooltip = 将选中的 AI 回复内容加入输入框并提问
+
 paperchat-chat-quoted-reply = 引用回复
 
 paperchat-chat-remove-quoted-reply = 删除引用回复

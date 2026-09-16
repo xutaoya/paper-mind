@@ -16,6 +16,7 @@ import { darkTheme, getCurrentTheme, isDarkMode } from "./ChatPanelTheme";
 import { renderMarkdownToElement } from "./MarkdownRenderer";
 import type { ThemeColors } from "./types";
 import { HTML_NS } from "./types";
+import { setupChatHistorySelectionQuote } from "./ChatHistorySelectionQuote";
 
 const READER_WINDOW_NAME = "paperchat-bookmark-reader";
 const READER_HOST_ID = "bookmark-reader-root";
@@ -50,6 +51,10 @@ export interface BookmarkReaderDialogHost {
 
 export interface BookmarkReaderActions {
   onJumpToChat: (quote: QuotedMessageRef) => void | Promise<void>;
+  onQuoteAssistantExcerpt?: (
+    messageId: string,
+    excerpt: string,
+  ) => void | Promise<void>;
   onClose: () => void;
   onCopySuccess?: (message: string) => void;
   loadSession?: (sessionId: string) => Promise<ChatSession | null>;
@@ -625,6 +630,9 @@ function renderReaderSection(
     marginBottom: "18px",
   });
   section.className = `paperchat-reader-section paperchat-reader-section--${options.variant}`;
+  if (options.variant === "assistant" && options.messageId) {
+    section.setAttribute("data-message-id", options.messageId);
+  }
 
   const heading = createElement(doc, "div", {
     marginBottom: "8px",
@@ -1035,6 +1043,7 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
     paintReaderBody(host, theme, {
       userContent: null,
       assistantContent: prepareReaderAssistantContent(bookmark.content),
+      assistantMessageId: bookmark.messageId ?? undefined,
     });
 
     const loadSession =
@@ -1159,6 +1168,17 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
       const win = readerHosts.get(host) ?? host.ownerDocument.defaultView;
       closeBookmarkReader(win);
     });
+
+  const readerBody = host.querySelector(
+    "#chat-bookmark-reader-body",
+  ) as HTMLElement | null;
+  if (readerBody && state.actions.onQuoteAssistantExcerpt) {
+    setupChatHistorySelectionQuote(readerBody, (quote) => {
+      void Promise.resolve(
+        state.actions.onQuoteAssistantExcerpt?.(quote.messageId, quote.excerpt),
+      );
+    });
+  }
 
   void showBookmarkAt(currentIndex);
 }

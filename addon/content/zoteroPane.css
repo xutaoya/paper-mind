@@ -1010,6 +1010,10 @@
   }
 }
 
+#chat-quick-actions-bar.chat-quick-actions-bar--floating > * {
+  pointer-events: auto;
+}
+
 .chat-container[data-theme="dark"] .chat-quick-action-chip,
 .chat-container[data-theme="dark"] .chat-quick-action-add {
   box-shadow: none;

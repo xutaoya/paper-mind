@@ -212,6 +212,8 @@ export type FluentMessageId =
   | 'paperchat-chat-quick-action-run-title'
   | 'paperchat-chat-quick-action-save'
   | 'paperchat-chat-quote-reply'
+  | 'paperchat-chat-quote-selection'
+  | 'paperchat-chat-quote-selection-tooltip'
   | 'paperchat-chat-quoted-reply'
   | 'paperchat-chat-quoted-reply-unavailable'
   | 'paperchat-chat-reader-ask'
