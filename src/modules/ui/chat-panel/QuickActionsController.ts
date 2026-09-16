@@ -11,7 +11,10 @@ import type { ChatPanelContext, ThemeColors } from "./types";
 import { HTML_NS } from "./types";
 import { createElement } from "./ChatPanelBuilder";
 import { openQuickActionEditDialog } from "./QuickActionEditDialog";
-import { resolveQuickActionChipTheme } from "./ComposerTheme";
+import {
+  applyQuickActionsTheme,
+  resolveQuickActionChipTheme,
+} from "./ComposerTheme";
 
 const CHIP_CLASS = "chat-quick-action-chip";
 const ADD_BUTTON_CLASS = "chat-quick-action-add";
@@ -34,8 +37,6 @@ export async function renderQuickActionsBar(
     bar.removeChild(bar.firstChild);
   }
 
-  bar.style.display = "flex";
-
   for (const action of actions) {
     bar.appendChild(
       createQuickActionChip(context, theme, action, runPrompt, bar),
@@ -43,6 +44,21 @@ export async function renderQuickActionsBar(
   }
 
   bar.appendChild(createQuickActionManageButton(context, theme, runPrompt));
+
+  const hasShortcuts = bar.childElementCount > 0;
+  bar.style.display = hasShortcuts ? "flex" : "none";
+  bar.classList.toggle("is-visible", hasShortcuts);
+
+  const scrollBottomBtn = context.container.querySelector(
+    "#chat-scroll-bottom-btn",
+  ) as HTMLElement | null;
+  if (scrollBottomBtn) {
+    scrollBottomBtn.style.bottom = hasShortcuts ? "62px" : "16px";
+  }
+
+  if (hasShortcuts) {
+    applyQuickActionsTheme(context.container, theme);
+  }
 }
 
 function createQuickActionChip(

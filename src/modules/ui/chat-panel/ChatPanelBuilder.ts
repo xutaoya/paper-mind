@@ -361,6 +361,8 @@ export function createChatContainer(
     "div",
     {
       position: "relative",
+      display: "flex",
+      flexDirection: "column",
       flex: "1",
       minHeight: "0",
       overflow: "hidden",
@@ -418,12 +420,12 @@ export function createChatContainer(
     doc,
     "div",
     {
-      height: "100%",
+      flex: "1 1 auto",
       minHeight: "0",
       boxSizing: "border-box",
       overflowY: "auto",
       overflowX: "hidden",
-      padding: "14px 14px 52px",
+      padding: "14px",
       background: theme.chatHistoryBg,
     },
     { id: "chat-history" },
@@ -725,18 +727,16 @@ export function createChatContainer(
     "div",
     {
       display: "none",
-      position: "absolute",
-      left: "12px",
-      right: "52px",
-      bottom: "10px",
-      flexWrap: "wrap",
+      flex: "0 0 auto",
+      flexWrap: "nowrap",
       alignItems: "center",
-      gap: "8px",
+      gap: "6px",
       padding: "0",
-      zIndex: "6",
-      pointerEvents: "none",
+      background: "transparent",
+      overflowX: "auto",
+      overflowY: "hidden",
     },
-    { id: "chat-quick-actions-bar", class: "chat-quick-actions-bar--floating" },
+    { id: "chat-quick-actions-bar", class: "chat-quick-actions-bar--docked" },
   );
 
   const inputWrapper = createElement(
@@ -1402,10 +1402,10 @@ export function createChatContainer(
   root.appendChild(userBar);
   root.appendChild(toolbar);
   chatViewport.appendChild(chatHistory);
+  chatViewport.appendChild(quickActionsBar);
   chatViewport.appendChild(executionPlanPanel);
   chatViewport.appendChild(executionApprovalPanel);
   chatViewport.appendChild(scrollBottomBtn);
-  chatViewport.appendChild(quickActionsBar);
   root.appendChild(chatViewport);
   root.appendChild(attachmentsPreview);
   root.appendChild(inputArea);
