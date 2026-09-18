@@ -2355,17 +2355,15 @@ export function buildDOMFromTokens(
           display: "block",
           width: "100%",
           maxWidth: "100%",
-          overflowX: "auto",
-          overflowY: "hidden",
           margin: "10px 0",
-          WebkitOverflowScrolling: "touch",
         });
 
         const table = doc.createElementNS(HTML_NS, "table") as HTMLElement;
         table.setAttribute("class", "md-table");
         table.style.borderCollapse = "collapse";
-        table.style.width = "max-content";
-        table.style.minWidth = "100%";
+        table.style.width = "100%";
+        table.style.maxWidth = "100%";
+        table.style.tableLayout = "fixed";
         table.style.fontSize = "12px";
         wrapper.appendChild(table);
         parent.appendChild(wrapper);
@@ -2415,7 +2413,9 @@ export function buildDOMFromTokens(
         th.style.fontWeight = "bold";
         th.style.textAlign = "left";
         th.style.verticalAlign = "top";
-        th.style.whiteSpace = "nowrap";
+        th.style.wordBreak = "break-word";
+        th.style.overflowWrap = "anywhere";
+        th.style.whiteSpace = "normal";
         parent.appendChild(th);
         stack.push(th);
         break;
@@ -2430,7 +2430,9 @@ export function buildDOMFromTokens(
         td.style.border = `1px solid ${darkTd ? "#444" : chatColors.tableBorder}`;
         td.style.padding = "8px";
         td.style.verticalAlign = "top";
-        td.style.minWidth = "120px";
+        td.style.wordBreak = "break-word";
+        td.style.overflowWrap = "anywhere";
+        td.style.whiteSpace = "normal";
         parent.appendChild(td);
         stack.push(td);
         break;

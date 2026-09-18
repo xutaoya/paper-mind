@@ -406,14 +406,18 @@
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible;
   margin: 10px 0;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.55);
   -webkit-overflow-scrolling: touch;
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.28) transparent;
 }
 
 .md-table-scroll::-webkit-scrollbar {
+  width: 8px;
   height: 8px;
 }
 
@@ -427,18 +431,46 @@
 }
 
 .md-table {
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
+  max-width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   margin: 0;
   font-size: 12px;
+  line-height: 1.45;
 }
 
 .md-table th,
 .md-table td {
   border: 1px solid #e0e0e0;
-  padding: 6px 10px;
+  padding: 7px 10px;
   text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  hyphens: auto;
+}
+
+.md-table th:first-child,
+.md-table td:first-child {
+  width: 2.6em;
+  max-width: 3.2em;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.md-table th:nth-child(2),
+.md-table td:nth-child(2) {
+  width: 4.8em;
+  max-width: 6.5em;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.md-table th:last-child,
+.md-table td:last-child {
+  width: auto;
 }
 
 .md-table th {
@@ -757,6 +789,8 @@
   }
 
   .md-table-scroll {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(24, 24, 24, 0.72);
     scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
   }
 

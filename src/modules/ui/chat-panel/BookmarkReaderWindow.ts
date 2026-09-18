@@ -240,17 +240,45 @@ function injectReaderStyles(doc: Document): void {
     .paperchat-reader-markdown li + li {
       margin-top: 0.25em;
     }
-    .paperchat-reader-markdown table {
-      width: 100%;
-      border-collapse: collapse;
+    .paperchat-reader-markdown .md-table-scroll {
+      overflow-x: auto;
+      overflow-y: visible;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      border-radius: 10px;
       margin: 0.8em 0;
+    }
+    .paperchat-reader-markdown table,
+    .paperchat-reader-markdown .md-table {
+      width: 100%;
+      max-width: 100%;
+      table-layout: fixed;
+      border-collapse: collapse;
+      margin: 0;
       font-size: 13px;
+      line-height: 1.45;
     }
     .paperchat-reader-markdown th,
     .paperchat-reader-markdown td {
       border: 1px solid rgba(148, 163, 184, 0.45);
       padding: 8px 10px;
       vertical-align: top;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+    .paperchat-reader-markdown th:first-child,
+    .paperchat-reader-markdown td:first-child {
+      width: 2.6em;
+      max-width: 3.2em;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .paperchat-reader-markdown th:nth-child(2),
+    .paperchat-reader-markdown td:nth-child(2) {
+      width: 4.8em;
+      max-width: 6.5em;
+      text-align: center;
+      white-space: nowrap;
     }
     .paperchat-reader-markdown blockquote {
       margin-left: 0;
