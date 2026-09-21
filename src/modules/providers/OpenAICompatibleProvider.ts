@@ -54,12 +54,27 @@ export function shouldUseOpenAIMaxCompletionTokens(config: {
   return isOfficialOpenAIEndpoint(config);
 }
 
+/** Models that reject the OpenAI-style `temperature` request field. */
+export function modelSupportsTemperatureParameter(modelId: string): boolean {
+  const model = modelId.trim();
+  if (!model) {
+    return true;
+  }
+  if (/^kimi-k3(?:$|[-._/])/i.test(model)) {
+    return false;
+  }
+  return true;
+}
+
 export function supportsOpenAITemperature(config: {
   id: string;
   type: string;
   baseUrl: string;
   defaultModel: string;
 }): boolean {
+  if (!modelSupportsTemperatureParameter(config.defaultModel)) {
+    return false;
+  }
   if (!isOfficialOpenAIEndpoint(config)) {
     return true;
   }

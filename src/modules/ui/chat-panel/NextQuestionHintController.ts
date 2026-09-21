@@ -14,10 +14,12 @@ import type {
 import type { ChatPanelContext } from "./types";
 
 const CONTROLLER_KEY = "__paperchatNextQuestionHintController";
+const HOST_HINT_KEY = "__paperchatNextQuestionHintState";
 const RECENT_COMPLETION_WINDOW_MS = 2 * 60 * 1000;
 
 type HostElement = HTMLElement & {
   [CONTROLLER_KEY]?: NextQuestionHintController;
+  [HOST_HINT_KEY]?: NextQuestionHint;
 };
 
 function scheduleNextFrame(callback: () => void, doc: Document): void {
@@ -40,17 +42,34 @@ function setInputPlaceholder(input: HTMLTextAreaElement, placeholder: string): v
 
 export class NextQuestionHintController {
   private readonly service = getNextQuestionHintService();
-  private readonly input: HTMLTextAreaElement | null;
-  private readonly wrapper: HTMLElement | null;
-  private readonly hintLayer: HTMLElement | null;
-  private readonly hintTextEl: HTMLElement | null;
-  private readonly hintActionEl: HTMLElement | null;
-  private readonly originalPlaceholder: string;
+  private input: HTMLTextAreaElement | null;
+  private wrapper: HTMLElement | null;
+  private hintLayer: HTMLElement | null;
+  private hintTextEl: HTMLElement | null;
+  private hintActionEl: HTMLElement | null;
+  private originalPlaceholder: string;
   private hint: NextQuestionHint | null = null;
   private generationController: ManagedAbortController | null = null;
   private generationAssistantMessageId: string | null = null;
   private isComposing = false;
   private disposed = false;
+
+  private readonly onWrapperKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== "Tab" || event.shiftKey || !this.isHintActive()) {
+      return;
+    }
+    const target = event.target as Node | null;
+    if (!target || !this.wrapper?.contains(target)) {
+      return;
+    }
+    if (this.input && target === this.input) {
+      return;
+    }
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    this.input?.focus();
+    this.acceptHint();
+  };
 
   private readonly onKeyDown = (event: KeyboardEvent) => {
     if (event.key === "Escape" && this.hint) {
@@ -108,7 +127,7 @@ export class NextQuestionHintController {
     }, doc);
   };
 
-  constructor(private readonly context: ChatPanelContext) {
+  constructor(private context: ChatPanelContext) {
     const inputElements = findChatInputElements(context.container);
     this.input = inputElements.input;
     this.wrapper = inputElements.wrapper;
@@ -133,11 +152,23 @@ export class NextQuestionHintController {
     this.wrapper.appendChild(this.hintLayer);
     syncComposerHintOffset(this.context.container);
     this.bindEvents();
+    this.restoreHintFromHost();
+  }
+
+  static ensureAttached(
+    context: ChatPanelContext,
+  ): NextQuestionHintController | null {
+    const host = context.container as HostElement;
+    const existing = host[CONTROLLER_KEY];
+    if (existing && !existing.disposed && existing.rebindToContainer(context)) {
+      return existing;
+    }
+    return NextQuestionHintController.attach(context);
   }
 
   static attach(context: ChatPanelContext): NextQuestionHintController | null {
     const host = context.container as HostElement;
-    host[CONTROLLER_KEY]?.dispose();
+    host[CONTROLLER_KEY]?.dispose({ persistHint: true });
     const controller = new NextQuestionHintController(context);
     if (!controller.isReady()) {
       controller.dispose();
@@ -155,7 +186,7 @@ export class NextQuestionHintController {
       return null;
     }
     if (!controller.isReady()) {
-      controller.dispose();
+      controller.dispose({ persistHint: true });
       delete host[CONTROLLER_KEY];
       return null;
     }
@@ -261,26 +292,74 @@ export class NextQuestionHintController {
     this.showHint(outcome.hint);
   }
 
-  dispose(): void {
+  dispose(options: { persistHint?: boolean } = {}): void {
     if (this.disposed) {
       return;
+    }
+    if (options.persistHint) {
+      this.persistHintOnHost();
+    } else {
+      this.clearPersistedHintOnHost();
     }
     this.disposed = true;
     this.generationController?.abort();
     this.generationController = null;
     this.generationAssistantMessageId = null;
-    this.input?.removeEventListener("keydown", this.onKeyDown, true);
-    this.input?.removeEventListener("input", this.onInput);
-    this.input?.removeEventListener("paste", this.onPaste);
-    this.input?.removeEventListener(
-      "compositionstart",
-      this.onCompositionStart,
-    );
-    this.input?.removeEventListener("compositionend", this.onCompositionEnd);
-    this.input?.removeEventListener("focus", this.onFocus);
+    this.unbindEvents();
     this.restorePlaceholder();
     this.hintLayer?.remove();
     this.hint = null;
+    this.hintLayer = null;
+    this.hintTextEl = null;
+    this.hintActionEl = null;
+    this.input = null;
+    this.wrapper = null;
+  }
+
+  rebindToContainer(context: ChatPanelContext): boolean {
+    if (this.disposed) {
+      return false;
+    }
+    this.context = context;
+    const { input, wrapper } = findChatInputElements(context.container);
+    if (!input || !wrapper) {
+      return false;
+    }
+    if (input === this.input && wrapper === this.wrapper && input.isConnected) {
+      this.syncVisibility();
+      return true;
+    }
+    this.unbindEvents();
+    this.input = input;
+    this.wrapper = wrapper;
+    if (!this.originalPlaceholder) {
+      this.originalPlaceholder = input.placeholder;
+    }
+    this.ensureWrapperPositioning();
+    if (!this.hintLayer) {
+      this.hintLayer = this.createHintLayer();
+      this.hintTextEl = this.hintLayer.querySelector(
+        "[data-next-question-hint-text]",
+      ) as HTMLElement | null;
+      this.hintActionEl = this.hintLayer.querySelector(
+        "[data-next-question-hint-action]",
+      ) as HTMLElement | null;
+    }
+    if (this.hintLayer.parentNode !== wrapper) {
+      wrapper.appendChild(this.hintLayer);
+    }
+    if (this.hint) {
+      if (this.hintTextEl) {
+        this.hintTextEl.textContent = this.hint.text;
+      }
+      if (this.hintActionEl) {
+        this.hintActionEl.textContent = getString("chat-next-question-hint-tab");
+      }
+    }
+    syncComposerHintOffset(context.container);
+    this.bindEvents();
+    this.syncVisibility();
+    return true;
   }
 
   private isHintActive(): boolean {
@@ -317,6 +396,45 @@ export class NextQuestionHintController {
     this.input?.addEventListener("compositionstart", this.onCompositionStart);
     this.input?.addEventListener("compositionend", this.onCompositionEnd);
     this.input?.addEventListener("focus", this.onFocus);
+    this.wrapper?.addEventListener("keydown", this.onWrapperKeyDown, true);
+  }
+
+  private unbindEvents(): void {
+    this.input?.removeEventListener("keydown", this.onKeyDown, true);
+    this.input?.removeEventListener("input", this.onInput);
+    this.input?.removeEventListener("paste", this.onPaste);
+    this.input?.removeEventListener(
+      "compositionstart",
+      this.onCompositionStart,
+    );
+    this.input?.removeEventListener("compositionend", this.onCompositionEnd);
+    this.input?.removeEventListener("focus", this.onFocus);
+    this.wrapper?.removeEventListener("keydown", this.onWrapperKeyDown, true);
+  }
+
+  private persistHintOnHost(): void {
+    const host = this.context.container as HostElement;
+    if (this.hint && this.hint.expiresAt > Date.now()) {
+      host[HOST_HINT_KEY] = this.hint;
+      return;
+    }
+    delete host[HOST_HINT_KEY];
+  }
+
+  private clearPersistedHintOnHost(): void {
+    delete (this.context.container as HostElement)[HOST_HINT_KEY];
+  }
+
+  private restoreHintFromHost(): void {
+    const persisted = (this.context.container as HostElement)[HOST_HINT_KEY];
+    if (
+      !persisted ||
+      persisted.expiresAt <= Date.now() ||
+      this.input?.value.trim()
+    ) {
+      return;
+    }
+    this.showHint(persisted);
   }
 
   private showHint(hint: NextQuestionHint): void {
@@ -326,6 +444,7 @@ export class NextQuestionHintController {
     this.hint = hint;
     this.hintTextEl.textContent = hint.text;
     this.hintActionEl.textContent = getString("chat-next-question-hint-tab");
+    this.persistHintOnHost();
     this.syncVisibility();
   }
 
@@ -352,6 +471,7 @@ export class NextQuestionHintController {
 
   private clearHint(): void {
     this.hint = null;
+    this.clearPersistedHintOnHost();
     if (this.hintTextEl) {
       this.hintTextEl.textContent = "";
     }
@@ -373,6 +493,7 @@ export class NextQuestionHintController {
       !this.input?.value.trim() &&
       !this.isMentionPopupVisible();
     this.hintLayer.style.display = visible ? "flex" : "none";
+    this.hintLayer.setAttribute("aria-hidden", visible ? "false" : "true");
     if (visible) {
       syncComposerHintOffset(this.context.container);
     }

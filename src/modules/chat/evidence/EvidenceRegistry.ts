@@ -213,6 +213,12 @@ function findTagEnd(content: string, start: number): number | null {
   return null;
 }
 
+export function parseEvidenceRefAttributeBody(rawTagBody: string): string[] {
+  const normalized = rawTagBody.trim();
+  const withSlash = normalized.endsWith("/") ? normalized : `${normalized}/`;
+  return parseEvidenceIds(withSlash);
+}
+
 function parseEvidenceIds(rawTagBody: string): string[] {
   const trimmed = rawTagBody.trim();
   if (!trimmed.endsWith("/")) return [];

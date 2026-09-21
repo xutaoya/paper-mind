@@ -80,6 +80,16 @@ class FakeElement {
   }
 }
 
+function collectRenderedText(node: FakeElement): string {
+  if (node.nodeType === 3) {
+    return node.textContent;
+  }
+  if (node.children.length > 0) {
+    return node.children.map((child) => collectRenderedText(child)).join("");
+  }
+  return node.textContent;
+}
+
 class FakeDocument {
   readonly body = new FakeElement(this, "body");
   readonly documentElement = this.body;
@@ -1336,15 +1346,43 @@ Missing label should not be parsed.
     it("never renders an unknown evidence ID as a citation action", function () {
       const doc = new FakeDocument();
       const root = new FakeElement(doc, "div");
+      const markdown =
+        'Claim.<evidence-ref ids="ev-ffffffffffffffff"/> After.';
       renderMarkdownToElement(
         root as unknown as HTMLElement,
-        'Claim.<evidence-ref ids="ev-ffffffffffffffff"/>',
+        markdown,
         "message-forged-evidence",
         { evidenceRecords: [record] },
       );
       assert.isUndefined(
         findByAttribute(root, "data-evidence-ref", "ev-ffffffffffffffff"),
       );
+      const rendered = collectRenderedText(root);
+      assert.notInclude(rendered, "<evidence-ref");
+      assert.include(rendered, "Claim.");
+      assert.include(rendered, "After.");
+    });
+
+    it("hides evidence-ref tags placed after quoted figure references", function () {
+      const originalZotero = (globalThis as { Zotero?: unknown }).Zotero;
+      (globalThis as { Zotero?: unknown }).Zotero = {
+        getMainWindow: () => null,
+      };
+      const doc = new FakeDocument();
+      const root = new FakeElement(doc, "div");
+      const markdown = `Fig. 5."<evidence-ref ids="${record.id}"/>——蓝色虚框`;
+      try {
+        renderMarkdownToElement(root as unknown as HTMLElement, markdown, "msg-fig5", {
+          evidenceRecords: [record],
+        });
+        const rendered = collectRenderedText(root);
+        assert.notInclude(rendered, "<evidence-ref");
+        assert.include(rendered, "Fig. 5.");
+        assert.include(rendered, "[1]");
+        assert.include(rendered, "蓝色虚框");
+      } finally {
+        (globalThis as { Zotero?: unknown }).Zotero = originalZotero;
+      }
     });
 
     it("copies citation numbers and an evidence appendix without raw tags", function () {

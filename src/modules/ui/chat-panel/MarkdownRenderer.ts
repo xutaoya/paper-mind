@@ -22,7 +22,11 @@ import { isDarkMode, getCurrentTheme } from "./ChatPanelTheme";
 import type { EvidenceRecord } from "../../../types/evidence";
 import type { PresentationToolCardArtifact } from "../../../types/chat";
 import type { PresentationCardProgress } from "../../presentation/contracts";
-import { normalizeEvidenceRecords } from "../../chat/evidence";
+import {
+  normalizeEvidenceRecords,
+  parseEvidenceRefAttributeBody,
+  sanitizeEvidenceReferences,
+} from "../../chat/evidence";
 import { isTerminalPresentationArtifact } from "../../chat/presentation-artifacts";
 import {
   getToolCallCardExpandKey,
@@ -58,13 +62,12 @@ function evidenceRefPlugin(mdInstance: MarkdownIt) {
     "evidence_ref",
     (state, silent) => {
       const remaining = state.src.slice(state.pos, state.posMax);
-      const match = remaining.match(
-        /^<evidence-ref ids="(ev-[a-f0-9]{16}(?:,ev-[a-f0-9]{16})*)"\/>/,
-      );
+      const match = remaining.match(/^<evidence-ref\b([^>]*?)\s*\/>/i);
       if (!match) return false;
+      const ids = parseEvidenceRefAttributeBody(match[1]);
       if (!silent) {
         const token = state.push("evidence_ref", "", 0);
-        token.meta = { ids: match[1].split(",") };
+        token.meta = { ids };
       }
       state.pos += match[0].length;
       return true;
@@ -1201,6 +1204,12 @@ function renderToolCallGroup(
   parent.appendChild(buildEntryCard(latest));
 }
 
+function stripEscapedEvidenceReferenceMarkup(content: string): string {
+  return content
+    .replace(/&lt;evidence-ref\b[^&]*(?:\/&gt;|&gt;)/gi, "")
+    .replace(/<\/evidence-ref\s*>/gi, "");
+}
+
 function renderMarkdownFragment(
   doc: Document,
   parent: HTMLElement,
@@ -1210,7 +1219,14 @@ function renderMarkdownFragment(
   const normalized = content.trim();
   if (!normalized) return;
 
-  const tokens = md.parse(preprocessMathDelimiters(normalized), {});
+  const { content: evidencePrepared } = sanitizeEvidenceReferences(
+    normalized,
+    normalizeEvidenceRecords(options.evidenceRecords),
+  );
+  const prepared = stripEscapedEvidenceReferenceMarkup(
+    preprocessMathDelimiters(evidencePrepared),
+  );
+  const tokens = md.parse(prepared, {});
   const builtContent = buildDOMFromTokens(doc, tokens, options);
   while (builtContent.firstChild) {
     parent.appendChild(builtContent.firstChild);
@@ -2047,6 +2063,45 @@ function getEvidenceLocaleString(
   }
 }
 
+const EVIDENCE_REF_INLINE_PATTERN = /<evidence-ref\b([^>]*?)\s*\/>/gi;
+
+function appendInlineTextWithEvidenceRefs(
+  doc: Document,
+  parent: HTMLElement,
+  content: string,
+  options: MarkdownRenderOptions,
+): void {
+  if (!content) return;
+  if (!EVIDENCE_REF_INLINE_PATTERN.test(content)) {
+    parent.appendChild(doc.createTextNode(content));
+    return;
+  }
+
+  EVIDENCE_REF_INLINE_PATTERN.lastIndex = 0;
+  const trustedIds = new Set(
+    normalizeEvidenceRecords(options.evidenceRecords).map((record) => record.id),
+  );
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = EVIDENCE_REF_INLINE_PATTERN.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      parent.appendChild(
+        doc.createTextNode(content.slice(lastIndex, match.index)),
+      );
+    }
+    const ids = parseEvidenceRefAttributeBody(match[1]).filter((id) =>
+      trustedIds.has(id),
+    );
+    if (ids.length > 0) {
+      appendEvidenceReference(doc, parent, ids, options);
+    }
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < content.length) {
+    parent.appendChild(doc.createTextNode(content.slice(lastIndex)));
+  }
+}
+
 function appendEvidenceReference(
   doc: Document,
   parent: HTMLElement,
@@ -2486,7 +2541,7 @@ export function renderInlineTokens(
 
     switch (token.type) {
       case "text":
-        current.appendChild(doc.createTextNode(token.content));
+        appendInlineTextWithEvidenceRefs(doc, current, token.content, options);
         break;
 
       case "strong_open": {

@@ -12,7 +12,10 @@ import type {
 import type { ToolCall, ToolDefinition } from "../../types/tool";
 import { sanitizeOpenAIToolCallMessages } from "./openai-tool-call-messages";
 import { HttpResponseError } from "./HttpResponseError";
-import { OpenAICompatibleProvider } from "./OpenAICompatibleProvider";
+import {
+  modelSupportsTemperatureParameter,
+  OpenAICompatibleProvider,
+} from "./OpenAICompatibleProvider";
 import {
   logPromptCacheUsage,
   stablePromptCacheStringify,
@@ -1023,6 +1026,9 @@ function isInvalidPreviousResponseError(error: unknown): boolean {
 }
 
 function supportsTemperature(modelId: string): boolean {
+  if (!modelSupportsTemperatureParameter(modelId)) {
+    return false;
+  }
   return !/^(?:o\d|gpt-5)(?:[-.]|$)/i.test(modelId);
 }
 

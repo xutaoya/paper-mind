@@ -2226,7 +2226,7 @@ function showSidebarPanel(): boolean {
     // (they may have been redirected to a floating window container)
     const manager = getChatManager();
     const context = createContext(chatContainer);
-    NextQuestionHintController.attach(context);
+    NextQuestionHintController.ensureAttached(context);
     setupChatManagerCallbacks(manager, context, chatContainer);
     void refreshChatForContainer(chatContainer);
   }
@@ -3336,9 +3336,7 @@ function createContext(container: HTMLElement): ChatPanelContext {
             manager.getActiveSession()?.executionPlan,
           );
         }
-        if (!NextQuestionHintController.get(container)) {
-          NextQuestionHintController.attach(context);
-        }
+        NextQuestionHintController.ensureAttached(context);
       }
     },
     renderExecutionPlan: (plan?: ExecutionPlan) => {

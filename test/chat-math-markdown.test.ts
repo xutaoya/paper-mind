@@ -60,6 +60,25 @@ describe("chat math markdown helpers", function () {
     assert.include(processed, "**核心思想**");
   });
 
+  it("preserves quoted bold spans before fullwidth colons", function () {
+    const input =
+      '它表达的是**"四维图像张量如何被摊平成一个可以做矩阵乘法的二维矩阵"**：';
+    const processed = preserveStrongEmphasisAsHtml(input);
+    assert.include(
+      processed,
+      "<strong>&quot;四维图像张量如何被摊平成一个可以做矩阵乘法的二维矩阵&quot;</strong>",
+    );
+    assert.notInclude(processed, "**\"四维图像张量");
+  });
+
+  it("preserves quoted bold spans before ascii colons and at line end", function () {
+    const input = '对应**"转置"这个动作**: 以及 **"把列搬到行的位置"**';
+    const processed = preserveStrongEmphasisAsHtml(input);
+    assert.include(processed, "<strong>&quot;转置&quot;这个动作</strong>");
+    assert.include(processed, "<strong>&quot;把列搬到行的位置&quot;</strong>");
+    assert.notInclude(processed, '**"转置"');
+  });
+
   it("leaves ordinary bold markdown unchanged", function () {
     const input = "这是**普通加粗**文本";
     assert.equal(preserveStrongEmphasisAsHtml(input), input);

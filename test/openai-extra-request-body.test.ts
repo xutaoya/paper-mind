@@ -152,6 +152,35 @@ describe("OpenAI-compatible extra request body", function () {
     );
   });
 
+  it("omits temperature for Kimi K3 models", function () {
+    assert.isFalse(
+      supportsOpenAITemperature({
+        id: "custom",
+        type: "custom",
+        baseUrl: "https://api.moonshot.cn/v1",
+        defaultModel: "kimi-k3",
+      }),
+    );
+
+    assert.isFalse(
+      supportsOpenAITemperature({
+        id: "custom",
+        type: "custom",
+        baseUrl: "https://api.moonshot.cn/v1",
+        defaultModel: "kimi-k3-turbo",
+      }),
+    );
+
+    assert.isTrue(
+      supportsOpenAITemperature({
+        id: "custom",
+        type: "custom",
+        baseUrl: "https://api.moonshot.cn/v1",
+        defaultModel: "kimi-k2",
+      }),
+    );
+  });
+
   it("canonicalizes extra request body fields for stable prompt cache keys", function () {
     const requestBody: Record<string, unknown> = {
       model: "gpt-5",

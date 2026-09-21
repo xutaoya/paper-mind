@@ -72,9 +72,13 @@ export function normalizeEmphasisDelimiters(markdown: string): string {
   return normalized;
 }
 
+const STRONG_EMPHASIS_QUOTE_PATTERN = /["“”‘’「」『』]/;
+const STRONG_EMPHASIS_FOLLOW_PATTERN =
+  /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef：:，,。．；;！!？?、\s]|$/;
+
 /**
- * markdown-it can leave ** literals when bold text contains ASCII quotes and is
- * immediately followed by CJK letters. Only rewrite that failing pattern so
+ * markdown-it can leave ** literals when bold text contains quotes and is
+ * followed by CJK or fullwidth punctuation. Only rewrite that failing pattern so
  * ordinary bold does not become extra HTML on every message.
  */
 export function preserveStrongEmphasisAsHtml(content: string): string {
@@ -82,10 +86,14 @@ export function preserveStrongEmphasisAsHtml(content: string): string {
     return content;
   }
   return content.replace(
-    /\*\*([^*\n]*?["“”][^*\n]*?)\*\*(?=[\u4e00-\u9fff])/g,
-    (match, text: string) => {
+    /\*\*([^*\n]+?)\*\*/g,
+    (match, text: string, offset: number, source: string) => {
       const trimmed = text.trim();
-      if (!trimmed) {
+      if (!trimmed || !STRONG_EMPHASIS_QUOTE_PATTERN.test(trimmed)) {
+        return match;
+      }
+      const after = source.slice(offset + match.length);
+      if (!STRONG_EMPHASIS_FOLLOW_PATTERN.test(after)) {
         return match;
       }
       return `<strong>${escapeHtmlText(trimmed)}</strong>`;
