@@ -505,6 +505,12 @@ paperchat-chat-bookmark-search-result-count = 找到 { $count } 条结果
 
 paperchat-chat-bookmark-search-clear = 清除搜索
 
+paperchat-chat-bookmark-manager-summary = { $folderCount } 个文件夹 · { $bookmarkCount } 条书签
+
+paperchat-chat-bookmark-expand-all = 展开全部
+
+paperchat-chat-bookmark-collapse-all = 折叠全部
+
 paperchat-chat-bookmark-close = 关闭
 
 paperchat-chat-bookmark-filter-all = 全部
@@ -532,6 +538,8 @@ paperchat-chat-bookmark-delete = 删除
 paperchat-chat-bookmark-delete-confirm = 确定删除这个书签吗？
 
 paperchat-chat-bookmark-open-unavailable = 无法跳转到原消息
+
+paperchat-chat-bookmark-session-missing = 原聊天已不存在，无法跳转
 
 paperchat-chat-bookmark-copied = 已复制书签内容
 

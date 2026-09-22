@@ -78,7 +78,7 @@ export function createBookmarkIconButton(
       padding: "0",
       appearance: "none",
       color: options.danger ? "#dc2626" : theme.textMuted,
-      transition: "background 0.15s ease, color 0.15s ease, transform 0.15s ease",
+      transition: "background 0.15s ease, color 0.15s ease",
     },
     { type: "button", title, "aria-label": title },
   ) as HTMLButtonElement;
@@ -96,11 +96,9 @@ export function createBookmarkIconButton(
   button.appendChild(icon);
   button.addEventListener("mouseenter", () => {
     button.style.background = options.danger ? "#fef2f2" : theme.buttonHoverBg;
-    button.style.transform = "translateY(-1px)";
   });
   button.addEventListener("mouseleave", () => {
     button.style.background = "transparent";
-    button.style.transform = "translateY(0)";
   });
   button.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -110,6 +108,78 @@ export function createBookmarkIconButton(
     });
   });
   return button;
+}
+
+export interface BookmarkRowTrailingOptions {
+  align?: "center" | "top";
+}
+
+export function createBookmarkRowTrailingSlot(
+  doc: Document,
+  summaryEl: HTMLElement,
+  actionBar: HTMLElement,
+  options: BookmarkRowTrailingOptions = {},
+): HTMLElement {
+  const align = options.align ?? "center";
+  const slot = createElement(doc, "div", {
+    position: "absolute",
+    right: "10px",
+    top: align === "top" ? "10px" : "50%",
+    transform: align === "top" ? "none" : "translateY(-50%)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    maxWidth: "46%",
+    overflow: "visible",
+    zIndex: "1",
+  });
+  slot.className = "paperchat-bookmark-row-trailing";
+  Object.assign(summaryEl.style, {
+    flexShrink: "0",
+    maxWidth: "100%",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  });
+  Object.assign(actionBar.style, {
+    position: "absolute",
+    right: "0",
+    top: "50%",
+    transform: "translateY(-50%)",
+    opacity: "0",
+    pointerEvents: "none",
+    paddingLeft: "12px",
+  });
+  slot.appendChild(summaryEl);
+  slot.appendChild(actionBar);
+  return slot;
+}
+
+export function bindBookmarkRowHoverEffects(
+  row: HTMLElement,
+  theme: ThemeColors,
+  summaryEl: HTMLElement,
+  actionBar: HTMLElement,
+  restingBackground: string,
+): void {
+  row.style.transition = "background 0.16s ease";
+  summaryEl.style.transition = "opacity 0.16s ease";
+  actionBar.style.transition = "opacity 0.16s ease";
+
+  const setHovered = (hovered: boolean) => {
+    const hoverBackground = hovered ? theme.buttonHoverBg : restingBackground;
+    row.style.background = hoverBackground;
+    summaryEl.style.opacity = hovered ? "0" : "1";
+    actionBar.style.opacity = hovered ? "1" : "0";
+    actionBar.style.pointerEvents = hovered ? "auto" : "none";
+    actionBar.style.background = hovered
+      ? `linear-gradient(to left, ${hoverBackground} 72%, transparent)`
+      : "transparent";
+  };
+
+  row.addEventListener("mouseenter", () => setHovered(true));
+  row.addEventListener("mouseleave", () => setHovered(false));
+  setHovered(false);
 }
 
 export function createBookmarkRowCheckbox(doc: Document): HTMLInputElement {

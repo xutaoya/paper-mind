@@ -7,6 +7,7 @@ import {
 import {
   mergeAdjacentSourceGroups,
   mergeDuplicateMarkdownHeadings,
+  resolveBookmarkJumpMessageId,
   stripReaderThinkingSection,
 } from "../src/modules/bookmarks/bookmarkTurnContent.ts";
 
@@ -72,6 +73,42 @@ describe("bookmark reader content", function () {
   it("keeps regular assistant content unchanged", function () {
     const content = "Plain assistant reply without thinking.";
     assert.equal(stripReaderThinkingSection(content), content);
+  });
+
+  it("resolves bookmark jump target to the preceding user message", function () {
+    const messages = [
+      {
+        id: "user-1",
+        role: "user" as const,
+        content: "Explain this paper",
+        timestamp: 1,
+      },
+      {
+        id: "assistant-1",
+        role: "assistant" as const,
+        content: "Here is the explanation.",
+        timestamp: 2,
+      },
+    ];
+    assert.equal(
+      resolveBookmarkJumpMessageId(messages, "assistant-1"),
+      "user-1",
+    );
+  });
+
+  it("falls back to the assistant message when no user turn exists", function () {
+    const messages = [
+      {
+        id: "assistant-1",
+        role: "assistant" as const,
+        content: "Standalone assistant reply.",
+        timestamp: 1,
+      },
+    ];
+    assert.equal(
+      resolveBookmarkJumpMessageId(messages, "assistant-1"),
+      "assistant-1",
+    );
   });
 });
 

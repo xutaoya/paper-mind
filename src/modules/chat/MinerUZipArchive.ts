@@ -1,4 +1,7 @@
+import { ensureSetImmediate } from "../../utils/setImmediatePolyfill";
 import JSZip from "jszip";
+
+ensureSetImmediate();
 
 const MAX_PATH_COMPONENT_LENGTH = 200;
 

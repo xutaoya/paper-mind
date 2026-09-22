@@ -505,6 +505,12 @@ paperchat-chat-bookmark-search-result-count = { $count } results
 
 paperchat-chat-bookmark-search-clear = Clear search
 
+paperchat-chat-bookmark-manager-summary = { $folderCount } folders · { $bookmarkCount } bookmarks
+
+paperchat-chat-bookmark-expand-all = Expand all
+
+paperchat-chat-bookmark-collapse-all = Collapse all
+
 paperchat-chat-bookmark-close = Close
 
 paperchat-chat-bookmark-filter-all = All
@@ -532,6 +538,8 @@ paperchat-chat-bookmark-delete = Delete
 paperchat-chat-bookmark-delete-confirm = Delete this bookmark?
 
 paperchat-chat-bookmark-open-unavailable = Cannot jump to the original message
+
+paperchat-chat-bookmark-session-missing = The original chat no longer exists
 
 paperchat-chat-bookmark-copied = Bookmark content copied
 

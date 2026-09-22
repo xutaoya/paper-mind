@@ -99,7 +99,7 @@
   position: absolute;
   top: 8px;
   left: 50%;
-  z-index: 20;
+  z-index: 10020;
   max-width: calc(100% - 24px);
   padding: 8px 14px;
   border-radius: 8px;

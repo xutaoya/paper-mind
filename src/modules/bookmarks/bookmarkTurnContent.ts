@@ -151,6 +151,24 @@ export function prepareReaderAssistantContent(rawContent: string): string {
   return mergeDuplicateMarkdownHeadings(stripped);
 }
 
+/** Resolve the chat message to focus when jumping from a bookmarked assistant reply. */
+export function resolveBookmarkJumpMessageId(
+  messages: readonly ChatMessage[],
+  assistantMessageId: string,
+): string | null {
+  const hasAssistant = messages.some(
+    (message) => message.id === assistantMessageId,
+  );
+  if (!hasAssistant) {
+    return null;
+  }
+  const user = findPrecedingUserMessage(
+    [...messages],
+    assistantMessageId,
+  );
+  return user?.id ?? assistantMessageId;
+}
+
 export function findPrecedingUserMessage(
   messages: ChatMessage[],
   assistantMessageId: string,

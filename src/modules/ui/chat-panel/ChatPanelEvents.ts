@@ -32,11 +32,12 @@ import {
   getBookmarkManagerPanel,
   isBookmarkManagerVisible,
   refreshBookmarkManagerPanel,
+  showBookmarkManagerToast,
   setBookmarkManagerVisible,
 } from "./BookmarkManagerPanel";
 import {
   getChatManager,
-  navigateToQuotedMessage,
+  navigateToBookmarkMessage,
   openBookmarkReaderForContext,
   quoteAssistantReplySelection,
   type PanelMode,
@@ -1118,19 +1119,22 @@ export function setupEventHandlers(context: ChatPanelContext): () => void {
     onOpenBookmark: (_bookmark, bookmarks, index) =>
       openBookmarkReaderForContext(context, bookmarks, index),
     onJumpToChat: async (bookmark: BookmarkRecord) => {
-      if (!bookmark.sessionId || !bookmark.messageId) {
-        context.appendError(getString("chat-bookmark-open-unavailable"));
-        return;
+      try {
+        const navigated = await navigateToBookmarkMessage(context, bookmark);
+        if (navigated) {
+          setBookmarkManagerVisible(container, false);
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : getString("chat-bookmark-open-unavailable");
+        context.appendError(message);
+        const panel = getBookmarkManagerPanel(container);
+        if (panel && isBookmarkManagerVisible(container)) {
+          showBookmarkManagerToast(panel, message, "error");
+        }
       }
-      setBookmarkManagerVisible(container, false);
-      await navigateToQuotedMessage(context, {
-        sessionId: bookmark.sessionId,
-        messageId: bookmark.messageId,
-        role: "assistant",
-        preview: bookmark.title,
-        contentSnapshot: bookmark.content || bookmark.title,
-        timestamp: bookmark.createdAt,
-      });
     },
     onClose: () => {
       setBookmarkManagerVisible(container, false);
@@ -1138,8 +1142,20 @@ export function setupEventHandlers(context: ChatPanelContext): () => void {
         historyDropdown.style.display = "none";
       }
     },
-    onError: (message) => context.appendError(message),
-    onSuccess: (message) => context.appendSuccess(message),
+    onError: (message) => {
+      context.appendError(message);
+      const panel = getBookmarkManagerPanel(container);
+      if (panel && isBookmarkManagerVisible(container)) {
+        showBookmarkManagerToast(panel, message, "error");
+      }
+    },
+    onSuccess: (message) => {
+      context.appendSuccess(message);
+      const panel = getBookmarkManagerPanel(container);
+      if (panel && isBookmarkManagerVisible(container)) {
+        showBookmarkManagerToast(panel, message, "success");
+      }
+    },
   });
 
   let bookmarkPanel = getBookmarkManagerPanel(container);

@@ -11,6 +11,7 @@ export {
   isPersistedBookmarkRecord,
 } from "./BookmarkService";
 export {
+  resolveBookmarkJumpMessageId,
   resolveBookmarkTurnContent,
   type BookmarkTurnContent,
 } from "./bookmarkTurnContent";

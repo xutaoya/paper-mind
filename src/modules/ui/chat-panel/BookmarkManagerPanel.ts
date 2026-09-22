@@ -5,18 +5,23 @@ import type {
   BookmarkRecord,
   BookmarkSortMode,
 } from "../../../types/bookmark";
+import { config } from "../../../../package.json";
 import { getString } from "../../../utils/locale";
 import { copyToClipboard, createElement } from "./ChatPanelBuilder";
+import { HTML_NS } from "./types";
 import {
   createBookmarkDialogButton,
+  bindBookmarkRowHoverEffects,
   createBookmarkDragHandle,
   createBookmarkIconButton,
   createBookmarkRowCheckbox,
   createBookmarkRowIcon,
+  createBookmarkRowTrailingSlot,
   createFolderIcon,
   openBookmarkConfirm,
   openBookmarkTextPrompt,
 } from "./BookmarkUiPrompts";
+import { sanitizeMessagePreview } from "./HistoryDropdown";
 import type { ThemeColors } from "./types";
 
 const BOOKMARK_DROP_ROOT = "__bookmark_root__";
@@ -61,17 +66,15 @@ interface BookmarkManagerState {
   expandedFolderIds: Set<string>;
   selectedFolderId: string | null;
   lastSearchResultCount?: number;
+  lastTotalFolderCount?: number;
+  lastTotalBookmarkCount?: number;
 }
 
 const PANEL_ID = "chat-bookmark-panel";
 const BOOKMARK_SEARCH_INPUT_ID = "chat-bookmark-search-input";
 const BOOKMARK_SEARCH_CLEAR_ID = "chat-bookmark-search-clear";
-const BOOKMARK_SEARCH_META_ID = "chat-bookmark-search-meta";
-const BOOKMARK_FILTER_BUTTON_IDS: Record<BookmarkFilterType, string> = {
-  all: "chat-bookmark-filter-btn-all",
-  page: "chat-bookmark-filter-btn-page",
-  message: "chat-bookmark-filter-btn-message",
-};
+const BOOKMARK_TOOLBAR_META_ID = "chat-bookmark-toolbar-meta";
+const BOOKMARK_TREE_TOGGLE_ID = "chat-bookmark-tree-toggle";
 const BOOKMARK_SEARCH_DEBOUNCE_MS = 250;
 
 const bookmarkSearchDebounceTimers = new WeakMap<
@@ -140,6 +143,75 @@ export function isBookmarkManagerVisible(container: HTMLElement): boolean {
   return panel?.style.display === "flex";
 }
 
+const BOOKMARK_MANAGER_TOAST_CLASS = "paperchat-bookmark-manager-toast";
+const BOOKMARK_MANAGER_TOAST_MS = 3200;
+
+export function showBookmarkManagerToast(
+  panel: HTMLElement,
+  message: string,
+  kind: "error" | "success" = "error",
+): void {
+  const doc = panel.ownerDocument;
+  if (!doc) {
+    return;
+  }
+  panel
+    .querySelector(`.${BOOKMARK_MANAGER_TOAST_CLASS}`)
+    ?.remove();
+
+  const isError = kind === "error";
+  const toast = createElement(
+    doc,
+    "div",
+    {
+      position: "absolute",
+      top: "10px",
+      left: "50%",
+      transform: "translateX(-50%) translateY(-6px)",
+      zIndex: "10020",
+      maxWidth: "calc(100% - 24px)",
+      padding: "8px 14px",
+      borderRadius: "10px",
+      fontSize: "12px",
+      lineHeight: "1.45",
+      boxShadow: "0 8px 24px rgba(15, 23, 42, 0.16)",
+      pointerEvents: "auto",
+      cursor: "pointer",
+      opacity: "0",
+      whiteSpace: "normal",
+      wordBreak: "break-word",
+      transition: "opacity 0.2s ease, transform 0.2s ease",
+      background: isError ? "#fef2f2" : "#ecfdf5",
+      border: isError ? "1px solid #fecaca" : "1px solid #a7f3d0",
+      color: isError ? "#991b1b" : "#065f46",
+    },
+    {
+      class: BOOKMARK_MANAGER_TOAST_CLASS,
+      role: "status",
+      "aria-live": "polite",
+    },
+  );
+  toast.textContent = `${isError ? "⚠️" : "✓"} ${message}`;
+  panel.appendChild(toast);
+
+  const win = doc.defaultView ?? Zotero.getMainWindow();
+  win.requestAnimationFrame(() => {
+    toast.style.opacity = "1";
+    toast.style.transform = "translateX(-50%) translateY(0)";
+  });
+
+  const dismiss = () => {
+    toast.style.opacity = "0";
+    toast.style.transform = "translateX(-50%) translateY(-6px)";
+    win.setTimeout(() => toast.remove(), 200);
+  };
+  const timer = win.setTimeout(dismiss, BOOKMARK_MANAGER_TOAST_MS);
+  toast.addEventListener("click", () => {
+    win.clearTimeout(timer);
+    dismiss();
+  });
+}
+
 export async function refreshBookmarkManagerPanel(
   container: HTMLElement,
   theme: ThemeColors,
@@ -150,7 +222,7 @@ export async function refreshBookmarkManagerPanel(
     return;
   }
   const state = getBookmarkManagerState(panel);
-  syncBookmarkSearchControls(panel, state);
+  syncBookmarkToolbarMeta(panel, state);
   await renderBookmarkManagerBody(panel, theme, actions, state);
 }
 
@@ -179,6 +251,7 @@ function getBookmarkManagerState(panel: HTMLElement): BookmarkManagerState {
   };
   return {
     ...parsed,
+    filter: "all",
     expandedFolderIds: new Set(parsed.expandedFolderIds || []),
   };
 }
@@ -292,6 +365,26 @@ function pruneFolderTree(
     .filter((node): node is FolderTreeNode => node !== null);
 }
 
+function deriveBookmarkRowPreview(bookmark: BookmarkRecord): string | null {
+  const raw = bookmark.content?.trim();
+  if (!raw) {
+    return null;
+  }
+  const cleaned = sanitizeMessagePreview(raw).replace(/\s+/g, " ").trim();
+  if (!cleaned) {
+    return null;
+  }
+  const title = bookmark.title.trim();
+  if (cleaned === title || cleaned.startsWith(title)) {
+    const remainder = cleaned.slice(title.length).trim();
+    if (!remainder) {
+      return null;
+    }
+    return remainder.length > 56 ? `${remainder.slice(0, 55)}…` : remainder;
+  }
+  return cleaned.length > 56 ? `${cleaned.slice(0, 55)}…` : cleaned;
+}
+
 function appendHighlightedText(
   parent: HTMLElement,
   text: string,
@@ -332,7 +425,68 @@ function appendHighlightedText(
   }
 }
 
-function syncBookmarkSearchControls(
+function createToolbarIconButton(
+  doc: Document,
+  theme: ThemeColors,
+  iconName: string,
+  title: string,
+  attributes: Record<string, string> = {},
+): HTMLButtonElement {
+  const button = createElement(
+    doc,
+    "button",
+    {
+      width: "36px",
+      height: "36px",
+      minWidth: "36px",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      border: `1px solid ${theme.inputBorderColor}`,
+      background: theme.buttonBg,
+      borderRadius: "10px",
+      cursor: "pointer",
+      padding: "0",
+      appearance: "none",
+      color: theme.textMuted,
+      boxShadow: theme.composerShadow,
+      transition:
+        "background 0.18s ease, border-color 0.18s ease, color 0.18s ease",
+      flexShrink: "0",
+    },
+    {
+      type: "button",
+      title,
+      "aria-label": title,
+      ...attributes,
+    },
+  ) as HTMLButtonElement;
+  const icon = doc.createElementNS(HTML_NS, "img") as HTMLImageElement;
+  icon.src = `chrome://${config.addonRef}/content/icons/${iconName}.svg`;
+  icon.alt = "";
+  icon.setAttribute("aria-hidden", "true");
+  Object.assign(icon.style, {
+    width: "16px",
+    height: "16px",
+    display: "block",
+    pointerEvents: "none",
+    opacity: "0.9",
+  });
+  button.appendChild(icon);
+  button.addEventListener("mouseenter", () => {
+    button.style.background = theme.buttonHoverBg;
+    button.style.borderColor = theme.inputFocusBorderColor;
+    button.style.color = theme.textPrimary;
+  });
+  button.addEventListener("mouseleave", () => {
+    button.style.background = theme.buttonBg;
+    button.style.borderColor = theme.inputBorderColor;
+    button.style.color = theme.textMuted;
+  });
+  return button;
+}
+
+function syncBookmarkToolbarMeta(
   panel: HTMLElement,
   state: BookmarkManagerState,
 ): void {
@@ -343,8 +497,11 @@ function syncBookmarkSearchControls(
     `#${BOOKMARK_SEARCH_CLEAR_ID}`,
   ) as HTMLButtonElement | null;
   const meta = panel.querySelector(
-    `#${BOOKMARK_SEARCH_META_ID}`,
+    `#${BOOKMARK_TOOLBAR_META_ID}`,
   ) as HTMLElement | null;
+  const treeToggle = panel.querySelector(
+    `#${BOOKMARK_TREE_TOGGLE_ID}`,
+  ) as HTMLButtonElement | null;
 
   if (searchInput && searchInput.value !== state.query) {
     searchInput.value = state.query;
@@ -358,8 +515,26 @@ function syncBookmarkSearchControls(
       ? getString("chat-bookmark-search-result-count", {
           args: { count: String(state.lastSearchResultCount ?? 0) },
         })
-      : "";
-    meta.style.display = isSearchActive ? "block" : "none";
+      : getString("chat-bookmark-manager-summary", {
+          args: {
+            folderCount: String(state.lastTotalFolderCount ?? 0),
+            bookmarkCount: String(state.lastTotalBookmarkCount ?? 0),
+          },
+        });
+  }
+  if (treeToggle) {
+    const hasExpandedFolders = state.expandedFolderIds.size > 0;
+    const treeToggleTitle = hasExpandedFolders
+      ? getString("chat-bookmark-collapse-all")
+      : getString("chat-bookmark-expand-all");
+    treeToggle.title = treeToggleTitle;
+    treeToggle.setAttribute("aria-label", treeToggleTitle);
+    const icon = treeToggle.querySelector("img");
+    if (icon) {
+      icon.src = `chrome://${config.addonRef}/content/icons/${
+        hasExpandedFolders ? "collapse-text-input" : "expand-text-input"
+      }.svg`;
+    }
   }
 }
 
@@ -401,12 +576,12 @@ async function renderBookmarkManagerBody(
   });
   const searchQuery = state.query;
   const isSearchActive = normalizeBookmarkSearchQuery(searchQuery).length > 0;
-  const isTypeFilterActive = state.filter !== "all";
   const bookmarks = filterBookmarksForSearch(allBookmarks, folders, searchQuery);
   state.lastSearchResultCount = bookmarks.length;
+  state.lastTotalFolderCount = folders.length;
+  state.lastTotalBookmarkCount = allBookmarks.length;
   setBookmarkManagerState(panel, state);
-  syncBookmarkSearchControls(panel, state);
-  syncFilterButtons(panel, theme, state.filter);
+  syncBookmarkToolbarMeta(panel, state);
 
   const bookmarksByFolder = new Map<string | null, BookmarkRecord[]>();
   for (const bookmark of bookmarks) {
@@ -416,7 +591,7 @@ async function renderBookmarkManagerBody(
     bookmarksByFolder.set(key, bucket);
   }
 
-  const shouldPruneFolders = isSearchActive || isTypeFilterActive;
+  const shouldPruneFolders = isSearchActive;
   const visibleFolderIds = collectVisibleFolderIds(
     folders,
     bookmarksByFolder,
@@ -480,61 +655,9 @@ async function renderBookmarkManagerBody(
     });
     empty.textContent = isSearchActive
       ? getString("chat-bookmark-search-no-results")
-      : isTypeFilterActive
-        ? state.filter === "page"
-          ? getString("chat-bookmark-filter-page-empty")
-          : getString("chat-bookmark-filter-message-empty")
-        : getString("chat-bookmark-empty");
+      : getString("chat-bookmark-empty");
     body.appendChild(empty);
   }
-}
-
-function syncFilterButtons(
-  panel: HTMLElement,
-  theme: ThemeColors,
-  filter: BookmarkFilterType,
-): void {
-  for (const [type, id] of Object.entries(BOOKMARK_FILTER_BUTTON_IDS) as [
-    BookmarkFilterType,
-    string,
-  ][]) {
-    const button = panel.querySelector(`#${id}`) as HTMLElement | null;
-    if (!button) {
-      continue;
-    }
-    const active = type === filter;
-    button.style.background = active ? "#eff6ff" : "transparent";
-    button.style.color = active ? "#2563eb" : theme.textSecondary;
-    button.style.fontWeight = active ? "600" : "500";
-  }
-}
-
-function createFilterButton(
-  doc: Document,
-  theme: ThemeColors,
-  label: string,
-  active: boolean,
-  onClick: () => void,
-  id?: string,
-): HTMLElement {
-  const button = createElement(
-    doc,
-    "button",
-    {
-      border: "none",
-      borderRadius: "999px",
-      padding: "6px 12px",
-      fontSize: "12px",
-      cursor: "pointer",
-      background: active ? "#eff6ff" : "transparent",
-      color: active ? "#2563eb" : theme.textSecondary,
-      fontWeight: active ? "600" : "500",
-    },
-    { type: "button", ...(id ? { id } : {}) },
-  );
-  button.textContent = label;
-  button.addEventListener("click", onClick);
-  return button;
 }
 
 function buildFolderTree(folders: BookmarkFolder[]): FolderTreeNode[] {
@@ -926,7 +1049,13 @@ function jumpToBookmarkChat(
     openBookmarkReader(bookmark, [bookmark], actions);
     return;
   }
-  void actions.onJumpToChat(bookmark);
+  void Promise.resolve(actions.onJumpToChat(bookmark)).catch((error: unknown) => {
+    actions.onError?.(
+      error instanceof Error
+        ? error.message
+        : getString("chat-bookmark-open-unavailable"),
+    );
+  });
 }
 
 function createBookmarkRow(
@@ -941,11 +1070,12 @@ function createBookmarkRow(
   searchQuery = "",
 ): HTMLElement {
   const row = createElement(doc, "div", {
+    position: "relative",
     display: "grid",
-    gridTemplateColumns: "auto auto 1fr auto",
-    alignItems: "center",
-    gap: "8px",
-    padding: "8px 10px",
+    gridTemplateColumns: "16px 18px minmax(0, 1fr)",
+    columnGap: "10px",
+    alignItems: "start",
+    padding: "10px 12px",
     borderRadius: "12px",
     border: `1px solid ${theme.borderColor}`,
     background: theme.inputBg,
@@ -956,54 +1086,62 @@ function createBookmarkRow(
   row.dataset.bookmarkId = bookmark.id;
 
   const checkbox = createBookmarkRowCheckbox(doc);
+  Object.assign(checkbox.style, { marginTop: "2px" });
   const icon =
     bookmark.type === "message"
-      ? createBookmarkRowIcon(doc, "favicon", 18)
-      : createBookmarkRowIcon(doc, "bookmark", 18);
+      ? createBookmarkRowIcon(doc, "favicon", 16)
+      : createBookmarkRowIcon(doc, "bookmark", 16);
+  Object.assign(icon.style, { marginTop: "1px" });
 
   const main = createElement(doc, "div", {
     minWidth: "0",
     cursor: "pointer",
-  });
-  const titleRow = createElement(doc, "div", {
     display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    minWidth: "0",
+    flexDirection: "column",
+    gap: "3px",
+    overflow: "hidden",
+    paddingRight: "76px",
   });
-  const typeTag = createElement(doc, "span", {
-    fontSize: "11px",
-    padding: "2px 8px",
-    borderRadius: "999px",
-    background: theme.buttonHoverBg,
-    color: theme.textMuted,
-    flexShrink: "0",
-  });
-  typeTag.textContent =
-    bookmark.type === "message"
-      ? getString("chat-bookmark-type-message")
-      : getString("chat-bookmark-type-page");
-  const title = createElement(doc, "span", {
-    fontSize: "14px",
+  const title = createElement(doc, "div", {
+    fontSize: "13px",
+    fontWeight: "500",
+    lineHeight: "1.4",
     color: theme.textPrimary,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
+    minWidth: "0",
   });
+  title.title = bookmark.title;
   appendHighlightedText(title, bookmark.title, searchQuery);
-  titleRow.appendChild(typeTag);
-  titleRow.appendChild(title);
-  main.appendChild(titleRow);
+  main.appendChild(title);
+  const previewText = deriveBookmarkRowPreview(bookmark);
+  if (previewText) {
+    const preview = createElement(doc, "div", {
+      fontSize: "11px",
+      lineHeight: "1.4",
+      color: theme.textMuted,
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+      minWidth: "0",
+    });
+    preview.title = previewText;
+    appendHighlightedText(preview, previewText, searchQuery);
+    main.appendChild(preview);
+  }
 
   const date = createElement(doc, "span", {
-    fontSize: "12px",
+    fontSize: "11px",
+    lineHeight: "1.3",
     color: theme.textMuted,
     whiteSpace: "nowrap",
+    fontVariantNumeric: "tabular-nums",
   });
   date.textContent = formatBookmarkDate(bookmark.createdAt);
 
   const actionBar = createElement(doc, "div", {
-    display: "none",
+    display: "flex",
     alignItems: "center",
     gap: "2px",
     flexShrink: "0",
@@ -1074,16 +1212,7 @@ function createBookmarkRow(
     }, { danger: true }),
   );
 
-  row.addEventListener("mouseenter", () => {
-    row.style.background = theme.buttonHoverBg;
-    actionBar.style.display = "flex";
-    date.style.display = "none";
-  });
-  row.addEventListener("mouseleave", () => {
-    row.style.background = theme.inputBg;
-    actionBar.style.display = "none";
-    date.style.display = "";
-  });
+  bindBookmarkRowHoverEffects(row, theme, date, actionBar, theme.inputBg);
 
   main.addEventListener("click", () => {
     openBookmarkReader(bookmark, allBookmarks, actions);
@@ -1092,17 +1221,9 @@ function createBookmarkRow(
   row.appendChild(checkbox);
   row.appendChild(icon);
   row.appendChild(main);
-  const right = createElement(doc, "div", {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    flexShrink: "0",
-    overflow: "visible",
-    justifyContent: "flex-end",
-  });
-  right.appendChild(date);
-  right.appendChild(actionBar);
-  row.appendChild(right);
+  row.appendChild(
+    createBookmarkRowTrailingSlot(doc, date, actionBar, { align: "top" }),
+  );
   return row;
 }
 
@@ -1120,18 +1241,23 @@ function createFolderRow(
   searchQuery = "",
 ): HTMLElement {
   const row = createElement(doc, "div", {
+    position: "relative",
     display: "grid",
-    gridTemplateColumns: "auto auto auto 1fr auto",
+    gridTemplateColumns: "20px 16px 18px minmax(0, 1fr)",
+    columnGap: "8px",
     alignItems: "center",
-    gap: "8px",
-    padding: "8px 10px",
+    padding: "9px 12px",
     borderRadius: "12px",
     border: `1px solid ${theme.borderColor}`,
-    background: expanded ? "#eff6ff22" : theme.inputBg,
+    background: theme.inputBg,
     marginTop: "6px",
     marginLeft: `${depth * 18}px`,
+    transition: "background 0.16s ease, border-color 0.16s ease",
   });
   row.className = "paperchat-bookmark-folder-row";
+  if (expanded) {
+    row.style.borderColor = theme.inputFocusBorderColor;
+  }
   row.dataset.folderId = folder.id;
 
   const chevron = createElement(
@@ -1166,25 +1292,29 @@ function createFolderRow(
   const checkbox = createBookmarkRowCheckbox(doc);
   const folderIcon = createFolderIcon(doc, "18px");
   const name = createElement(doc, "span", {
-    fontSize: "14px",
+    fontSize: "13px",
     fontWeight: "600",
+    lineHeight: "1.35",
     color: theme.textPrimary,
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     minWidth: "0",
+    paddingRight: "40px",
   });
   appendHighlightedText(name, folder.name, searchQuery);
 
   const count = createElement(doc, "span", {
-    fontSize: "12px",
+    fontSize: "11px",
+    lineHeight: "1.3",
     color: theme.textMuted,
     whiteSpace: "nowrap",
+    fontVariantNumeric: "tabular-nums",
   });
   count.textContent = String(bookmarkCount);
 
   const actionBar = createElement(doc, "div", {
-    display: "none",
+    display: "flex",
     alignItems: "center",
     gap: "2px",
   });
@@ -1258,16 +1388,8 @@ function createFolderRow(
     }, { danger: true }),
   );
 
-  row.addEventListener("mouseenter", () => {
-    row.style.background = theme.buttonHoverBg;
-    actionBar.style.display = "flex";
-    count.style.display = "none";
-  });
-  row.addEventListener("mouseleave", () => {
-    row.style.background = expanded ? "#eff6ff22" : theme.inputBg;
-    actionBar.style.display = "none";
-    count.style.display = "";
-  });
+  const restingBackground = theme.inputBg;
+  bindBookmarkRowHoverEffects(row, theme, count, actionBar, restingBackground);
 
   row.style.cursor = "pointer";
   row.setAttribute("role", "button");
@@ -1283,14 +1405,9 @@ function createFolderRow(
   row.appendChild(checkbox);
   row.appendChild(folderIcon);
   row.appendChild(name);
-  const right = createElement(doc, "div", {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-  });
-  right.appendChild(count);
-  right.appendChild(actionBar);
-  row.appendChild(right);
+  row.appendChild(
+    createBookmarkRowTrailingSlot(doc, count, actionBar, { align: "center" }),
+  );
   return row;
 }
 
@@ -1458,17 +1575,100 @@ export function createBookmarkManagerPanel(
   );
 
   const toolbar = createElement(doc, "div", {
-    display: "grid",
-    gap: "10px",
-    padding: "12px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+    padding: "12px 14px 10px",
     borderBottom: `1px solid ${theme.borderColor}`,
     background: theme.toolbarBg,
+    flexShrink: "0",
   });
 
-  const topRow = createElement(doc, "div", {
+  const headerRow = createElement(doc, "div", {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    minWidth: "0",
+  });
+  const headerMain = createElement(doc, "div", {
+    display: "flex",
+    flexDirection: "column",
+    gap: "2px",
+    minWidth: "0",
+    flex: "1",
+  });
+  const title = createElement(doc, "div", {
+    fontSize: "15px",
+    fontWeight: "650",
+    color: theme.textPrimary,
+    letterSpacing: "-0.01em",
+    lineHeight: "1.2",
+  });
+  title.textContent = getString("chat-bookmarks");
+  const toolbarMeta = createElement(
+    doc,
+    "div",
+    {
+      fontSize: "12px",
+      lineHeight: "1.35",
+      color: theme.textMuted,
+      whiteSpace: "nowrap",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+    },
+    { id: BOOKMARK_TOOLBAR_META_ID },
+  );
+
+  const closeBtn = createElement(
+    doc,
+    "button",
+    {
+      width: "32px",
+      height: "32px",
+      minWidth: "32px",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      border: "none",
+      borderRadius: "8px",
+      background: "transparent",
+      cursor: "pointer",
+      padding: "0",
+      appearance: "none",
+      color: theme.textMuted,
+    },
+    {
+      type: "button",
+      title: getString("chat-bookmark-close"),
+      "aria-label": getString("chat-bookmark-close"),
+    },
+  ) as HTMLButtonElement;
+  const closeIcon = doc.createElementNS(HTML_NS, "img") as HTMLImageElement;
+  closeIcon.src = `chrome://${config.addonRef}/content/icons/close.svg`;
+  closeIcon.alt = "";
+  closeIcon.setAttribute("aria-hidden", "true");
+  Object.assign(closeIcon.style, {
+    width: "14px",
+    height: "14px",
+    display: "block",
+    opacity: "0.82",
+  });
+  closeBtn.appendChild(closeIcon);
+  closeBtn.addEventListener("mouseenter", () => {
+    closeBtn.style.background = theme.buttonHoverBg;
+    closeBtn.style.color = theme.textPrimary;
+  });
+  closeBtn.addEventListener("mouseleave", () => {
+    closeBtn.style.background = "transparent";
+    closeBtn.style.color = theme.textMuted;
+  });
+
+  const searchRow = createElement(doc, "div", {
     display: "flex",
     alignItems: "center",
     gap: "8px",
+    minWidth: "0",
   });
   const searchWrap = createElement(doc, "div", {
     position: "relative",
@@ -1483,12 +1683,23 @@ export function createBookmarkManagerPanel(
     width: "100%",
     boxSizing: "border-box",
     border: `1px solid ${theme.inputBorderColor}`,
-    borderRadius: "999px",
+    borderRadius: "10px",
     padding: "8px 34px 8px 12px",
     fontSize: "13px",
+    lineHeight: "1.4",
     background: theme.inputBg,
     color: theme.textPrimary,
     outline: "none",
+    boxShadow: theme.composerShadow,
+    transition: "border-color 0.18s ease, box-shadow 0.18s ease",
+  });
+  searchInput.addEventListener("focus", () => {
+    searchInput.style.borderColor = theme.inputFocusBorderColor;
+    searchInput.style.boxShadow = `0 0 0 3px ${theme.inputFocusRingColor}`;
+  });
+  searchInput.addEventListener("blur", () => {
+    searchInput.style.borderColor = theme.inputBorderColor;
+    searchInput.style.boxShadow = theme.composerShadow;
   });
   const searchClearBtn = createBookmarkDialogButton(
     doc,
@@ -1520,66 +1731,18 @@ export function createBookmarkManagerPanel(
       "aria-label": getString("chat-bookmark-search-clear"),
     },
   );
-  const searchMeta = createElement(
+  const treeToggleBtn = createToolbarIconButton(
     doc,
-    "div",
-    {
-      display: "none",
-      fontSize: "12px",
-      color: theme.textMuted,
-      padding: "0 4px",
-    },
-    { id: BOOKMARK_SEARCH_META_ID },
+    theme,
+    "expand-text-input",
+    getString("chat-bookmark-expand-all"),
+    { id: BOOKMARK_TREE_TOGGLE_ID },
   );
-
-  const closeBtn = createBookmarkDialogButton(
+  const newFolderBtn = createToolbarIconButton(
     doc,
-    getString("chat-bookmark-close"),
-    {
-      border: `1px solid ${theme.borderColor}`,
-      background: theme.buttonBg,
-      borderRadius: "8px",
-      padding: "6px 10px",
-      cursor: "pointer",
-      color: theme.textPrimary,
-      fontSize: "12px",
-      minWidth: "auto",
-    },
-  );
-
-  const filterRow = createElement(doc, "div", {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "8px",
-    flexWrap: "wrap",
-  });
-  const filters = createElement(doc, "div", {
-    display: "flex",
-    gap: "4px",
-    padding: "2px",
-    borderRadius: "999px",
-    background: theme.inputBg,
-  });
-  const actionsRow = createElement(doc, "div", {
-    display: "flex",
-    gap: "6px",
-  });
-
-  const newFolderBtn = createBookmarkDialogButton(
-    doc,
+    theme,
+    "folder-plus",
     getString("chat-bookmark-new-folder"),
-    {
-      border: `1px solid ${theme.borderColor}`,
-      background: theme.buttonBg,
-      borderRadius: "8px",
-      padding: "6px 10px",
-      cursor: "pointer",
-      color: theme.textPrimary,
-      fontSize: "12px",
-      minWidth: "auto",
-    },
-    { type: "button", title: getString("chat-bookmark-new-folder") },
   );
 
   const body = createElement(
@@ -1599,49 +1762,11 @@ export function createBookmarkManagerPanel(
     await renderBookmarkManagerBody(panel, theme, actions, state);
   };
 
-  const updateFilter = async (filter: BookmarkFilterType) => {
-    const state = getBookmarkManagerState(panel);
-    state.filter = filter;
-    setBookmarkManagerState(panel, state);
-    await rerender();
-  };
-
-  filters.appendChild(
-    createFilterButton(
-      doc,
-      theme,
-      getString("chat-bookmark-filter-all"),
-      true,
-      () => updateFilter("all"),
-      BOOKMARK_FILTER_BUTTON_IDS.all,
-    ),
-  );
-  filters.appendChild(
-    createFilterButton(
-      doc,
-      theme,
-      getString("chat-bookmark-filter-page"),
-      false,
-      () => updateFilter("page"),
-      BOOKMARK_FILTER_BUTTON_IDS.page,
-    ),
-  );
-  filters.appendChild(
-    createFilterButton(
-      doc,
-      theme,
-      getString("chat-bookmark-filter-message"),
-      false,
-      () => updateFilter("message"),
-      BOOKMARK_FILTER_BUTTON_IDS.message,
-    ),
-  );
-
   const applySearchQuery = async (query: string) => {
     const state = getBookmarkManagerState(panel);
     state.query = query;
     setBookmarkManagerState(panel, state);
-    syncBookmarkSearchControls(panel, state);
+    syncBookmarkToolbarMeta(panel, state);
     await rerender();
   };
 
@@ -1681,17 +1806,31 @@ export function createBookmarkManagerPanel(
     await rerender();
   });
 
+  treeToggleBtn.addEventListener("click", async () => {
+    const state = getBookmarkManagerState(panel);
+    if (state.expandedFolderIds.size > 0) {
+      state.expandedFolderIds = new Set<string>();
+    } else {
+      const folders = await getBookmarkService().listFolders();
+      state.expandedFolderIds = new Set(folders.map((folder) => folder.id));
+    }
+    setBookmarkManagerState(panel, state);
+    syncBookmarkToolbarMeta(panel, state);
+    await rerender();
+  });
+
   searchWrap.appendChild(searchInput);
   searchWrap.appendChild(searchClearBtn);
-  topRow.appendChild(searchWrap);
-  topRow.appendChild(closeBtn);
-  actionsRow.appendChild(newFolderBtn);
-  filterRow.appendChild(filters);
-  filterRow.appendChild(actionsRow);
-  toolbar.appendChild(topRow);
-  toolbar.appendChild(searchMeta);
-  toolbar.appendChild(filterRow);
-  syncBookmarkSearchControls(panel, getBookmarkManagerState(panel));
+  searchRow.appendChild(searchWrap);
+  searchRow.appendChild(newFolderBtn);
+  searchRow.appendChild(treeToggleBtn);
+  headerMain.appendChild(title);
+  headerMain.appendChild(toolbarMeta);
+  headerRow.appendChild(headerMain);
+  headerRow.appendChild(closeBtn);
+  toolbar.appendChild(headerRow);
+  toolbar.appendChild(searchRow);
+  syncBookmarkToolbarMeta(panel, getBookmarkManagerState(panel));
   panel.appendChild(toolbar);
   panel.appendChild(body);
   return panel;

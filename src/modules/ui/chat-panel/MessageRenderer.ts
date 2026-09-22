@@ -293,15 +293,11 @@ export function scrollMessageToViewportCenter(
   return messageElement;
 }
 
-/** Align the top of a rendered message near the top of the chat viewport. */
-export function scrollMessageToViewportStart(
+function scrollMessageElementToViewportStart(
   chatHistory: HTMLElement,
-  messageId: string,
+  messageElement: HTMLElement,
   topPadding = 24,
-): HTMLElement | null {
-  const messageElement = findRenderedMessageElement(chatHistory, messageId);
-  if (!messageElement) return null;
-
+): void {
   const historyRect = chatHistory.getBoundingClientRect();
   const messageRect = messageElement.getBoundingClientRect();
   const relativeTop =
@@ -316,19 +312,51 @@ export function scrollMessageToViewportStart(
   );
   chatHistory.setAttribute(CHAT_HISTORY_AUTO_SCROLL_ATTR, "false");
   updateChatHistoryScrollBottomButton(chatHistory);
+}
+
+/** Align the top of a rendered message near the top of the chat viewport. */
+export function scrollMessageToViewportStart(
+  chatHistory: HTMLElement,
+  messageId: string,
+  topPadding = 24,
+): HTMLElement | null {
+  const messageElement = findRenderedMessageElement(chatHistory, messageId);
+  if (!messageElement) return null;
+  scrollMessageElementToViewportStart(chatHistory, messageElement, topPadding);
   return messageElement;
+}
+
+export interface ScrollToMessageHighlightOptions {
+  durationMs?: number;
+  align?: "center" | "start";
+  topPadding?: number;
 }
 
 export function scrollToAndHighlightMessage(
   chatHistory: HTMLElement,
   messageId: string,
-  durationMs: number = MESSAGE_HIGHLIGHT_DURATION_MS,
+  durationOrOptions:
+    | number
+    | ScrollToMessageHighlightOptions = MESSAGE_HIGHLIGHT_DURATION_MS,
 ): HTMLElement | null {
+  const options: ScrollToMessageHighlightOptions =
+    typeof durationOrOptions === "number"
+      ? { durationMs: durationOrOptions }
+      : durationOrOptions;
+  const durationMs = options.durationMs ?? MESSAGE_HIGHLIGHT_DURATION_MS;
   const messageElement = findRenderedMessageElement(chatHistory, messageId);
   if (!messageElement) return null;
 
   clearRenderedMessageHighlight(chatHistory);
-  centerMessageInChatHistory(chatHistory, messageElement);
+  if (options.align === "start") {
+    scrollMessageElementToViewportStart(
+      chatHistory,
+      messageElement,
+      options.topPadding ?? 24,
+    );
+  } else {
+    centerMessageInChatHistory(chatHistory, messageElement);
+  }
 
   const surface = findMessageHighlightSurface(messageElement);
   const safeDurationMs = Math.max(1, durationMs);

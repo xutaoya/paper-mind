@@ -31,6 +31,7 @@ import {
   canBookmarkAssistantReply,
   deriveBookmarkTitleForAssistantReply,
   getBookmarkService,
+  resolveBookmarkJumpMessageId,
 } from "../../bookmarks";
 import type {
   BookmarkReaderDialogHost,
@@ -61,6 +62,7 @@ import {
 } from "./AgentActivityPanel";
 import {
   cancelPendingHistoryRender,
+  ensureRenderedMessage,
   ensureStreamingTypingIndicator,
   getMessageMarkdownRenderOptions,
   getStreamingContentSelector,
@@ -97,6 +99,7 @@ import {
   canQuoteAssistantReply,
   createQuotedMessageRef,
 } from "../../chat/quoted-messages";
+import { createEvidenceMarkdownAction } from "./EvidenceMarkdownAction";
 import { navigateToPdfQuote } from "./PdfQuoteNavigator";
 import { normalizeNoteSourceKey } from "./NoteSourceNavigator";
 import { sessionTurnQueue } from "./SessionTurnQueue";
@@ -529,39 +532,13 @@ function createChatMarkdownRenderOptions(
         }
       },
     },
-    evidenceAction: {
-      citationTitle: getString("chat-evidence-citation-title"),
-      viewSourceLabel: getString("chat-evidence-view-source"),
-      onClick: async (record) => {
-        const target: SourceTarget = {
-          type: "item",
-          key: record.itemKey,
-          libraryID: record.libraryID,
-          page: record.page,
-        };
-        const sourceItem = getItemByLibraryKey(
-          record.itemKey,
-          record.libraryID,
-        );
-        if (!sourceItem) {
-          await openSourceTarget(target);
-          return;
-        }
-        const navigated = await navigateToPdfQuote(record.quote, sourceItem, {
-          allowActiveReaderFallback: false,
-          fallbackPageIndex: record.page ? record.page - 1 : undefined,
-        });
-        if (!navigated) {
-          await openSourceTarget(target);
-        }
-      },
+    evidenceAction: createEvidenceMarkdownAction({
       onError: (error) => {
-        ztoolkit.log("[ChatPanel] Failed to open evidence source:", error);
         context.appendError?.(
           `${getString("chat-open-source-failed")}: ${error.message}`,
         );
       },
-    },
+    }),
     sourceGroupAction:
       context.enableSourceActions === false
         ? undefined
@@ -1995,8 +1972,9 @@ function renderActiveSessionInContainer(
       },
       onQuoteReply: (assistantMessageId) =>
         addAssistantReplyQuote(refreshContext, assistantMessageId),
-      onNavigateToQuotedMessage: (quote) =>
-        navigateToQuotedMessage(refreshContext, quote),
+      onNavigateToQuotedMessage: (quote) => {
+        void navigateToQuotedMessage(refreshContext, quote);
+      },
       onSummarizeReply: (assistantMessageId) =>
         copyReplyToItemNote(refreshContext, assistantMessageId),
       onSummarizeReplyError: (error) => {
@@ -2869,8 +2847,18 @@ export async function openBookmarkReaderForContext(
       quoteAssistantReplySelection(context, messageId, excerpt);
     },
     onJumpToChat: async (quote) => {
-      closeBookmarkReader();
-      await navigateToQuotedMessage(context, quote);
+      try {
+        const navigated = await navigateToBookmarkQuote(context, quote);
+        if (navigated) {
+          closeBookmarkReader();
+        }
+      } catch (error) {
+        context.appendError(
+          error instanceof Error
+            ? error.message
+            : getString("chat-bookmark-open-unavailable"),
+        );
+      }
     },
     onClose: () => {},
     onCopySuccess: (message) => context.appendSuccess(message),
@@ -2908,10 +2896,198 @@ export async function openMessageTurnReader(
   await openBookmarkReaderForContext(context, bookmarks, index);
 }
 
+export function bookmarkToQuotedMessageRef(
+  bookmark: BookmarkRecord,
+): QuotedMessageRef | null {
+  if (
+    bookmark.type !== "message" ||
+    !bookmark.sessionId ||
+    !bookmark.messageId
+  ) {
+    return null;
+  }
+  return {
+    sessionId: bookmark.sessionId,
+    messageId: bookmark.messageId,
+    role: "assistant",
+    preview: bookmark.title,
+    contentSnapshot: bookmark.content || bookmark.title,
+    timestamp: bookmark.createdAt,
+  };
+}
+
+type QuotedMessageNavigationFailureMessageId =
+  | "chat-quoted-reply-unavailable"
+  | "chat-bookmark-open-unavailable";
+
+export interface NavigateToQuotedMessageOptions {
+  failureMessageId?: QuotedMessageNavigationFailureMessageId;
+  align?: "center" | "start";
+}
+
+function attemptScrollToQuotedMessage(
+  context: ChatPanelContext,
+  messageId: string,
+  options: NavigateToQuotedMessageOptions = {},
+): Promise<boolean> {
+  const scrollOptions = {
+    align: options.align,
+    topPadding: options.align === "start" ? 16 : undefined,
+  };
+  const chatHistory = context.container.querySelector(
+    "#chat-history",
+  ) as HTMLElement | null;
+  if (!chatHistory) {
+    return Promise.resolve(false);
+  }
+  if (scrollToAndHighlightMessage(chatHistory, messageId, scrollOptions)) {
+    return Promise.resolve(true);
+  }
+  return new Promise((resolve) => {
+    ensureRenderedMessage(chatHistory, messageId, (element) => {
+      if (!element) {
+        resolve(false);
+        return;
+      }
+      resolve(
+        Boolean(
+          scrollToAndHighlightMessage(chatHistory, messageId, scrollOptions),
+        ),
+      );
+    });
+  });
+}
+
+async function restoreSessionNavigation(
+  context: ChatPanelContext,
+  previousSessionId: string | null,
+  isLatestNavigation: () => boolean,
+): Promise<void> {
+  if (!previousSessionId) {
+    return;
+  }
+  const manager = context.chatManager;
+  if (manager.getActiveSession()?.id === previousSessionId) {
+    return;
+  }
+  const restored = await manager.switchSession(previousSessionId);
+  if (!restored || !isLatestNavigation()) {
+    return;
+  }
+  clearPendingQuotedMessages(context);
+  const item = getItemByLibraryKey(
+    restored.lastActiveItemKey,
+    restored.lastActiveItemLibraryID,
+  );
+  context.setCurrentItem(item);
+  await context.updatePdfCheckboxVisibility(item);
+  if (
+    !isLatestNavigation() ||
+    manager.getActiveSession()?.id !== restored.id
+  ) {
+    return;
+  }
+  context.renderMessages(restored.messages);
+  context.renderExecutionPlan(restored.executionPlan);
+  updateModelSelectorDisplay(context.container);
+  syncSendButtonState(
+    context.container.querySelector(
+      "#chat-send-button",
+    ) as HTMLButtonElement | null,
+    manager,
+  );
+}
+
+async function renderSessionAndScrollToMessage(
+  context: ChatPanelContext,
+  session: ChatSession,
+  messageId: string,
+  isLatestNavigation: () => boolean,
+  options: NavigateToQuotedMessageOptions = {},
+): Promise<boolean> {
+  const manager = context.chatManager;
+  if (!isLatestNavigation() || manager.getActiveSession()?.id !== session.id) {
+    return false;
+  }
+  return new Promise<boolean>((resolve) => {
+    context.renderMessages(session.messages, () => {
+      void attemptScrollToQuotedMessage(context, messageId, options).then(
+        (scrolled) => {
+        if (
+          !isLatestNavigation() ||
+          manager.getActiveSession()?.id !== session.id
+        ) {
+          resolve(false);
+          return;
+        }
+          resolve(scrolled);
+        },
+      );
+    });
+    context.renderExecutionPlan(session.executionPlan);
+    updateModelSelectorDisplay(context.container);
+    syncSendButtonState(
+      context.container.querySelector(
+        "#chat-send-button",
+      ) as HTMLButtonElement | null,
+      manager,
+    );
+  });
+}
+
+export async function navigateToBookmarkQuote(
+  context: ChatPanelContext,
+  quote: QuotedMessageRef,
+): Promise<boolean> {
+  const session = await context.chatManager.getSessionById(quote.sessionId);
+  if (!session) {
+    context.appendError(getString("chat-bookmark-session-missing"));
+    return false;
+  }
+  const targetMessageId = resolveBookmarkJumpMessageId(
+    session.messages,
+    quote.messageId,
+  );
+  if (!targetMessageId) {
+    context.appendError(getString("chat-bookmark-open-unavailable"));
+    return false;
+  }
+  return navigateToQuotedMessage(
+    context,
+    {
+      ...quote,
+      messageId: targetMessageId,
+    },
+    {
+      failureMessageId: "chat-bookmark-open-unavailable",
+      align: "start",
+    },
+  );
+}
+
+export async function navigateToBookmarkMessage(
+  context: ChatPanelContext,
+  bookmark: BookmarkRecord,
+): Promise<boolean> {
+  const quote = bookmarkToQuotedMessageRef(bookmark);
+  if (!quote) {
+    context.appendError(getString("chat-bookmark-open-unavailable"));
+    return false;
+  }
+  return navigateToBookmarkQuote(context, quote);
+}
+
 export async function navigateToQuotedMessage(
   context: ChatPanelContext,
   quote: QuotedMessageRef,
-): Promise<void> {
+  options: NavigateToQuotedMessageOptions = {},
+): Promise<boolean> {
+  const failureMessageId =
+    options.failureMessageId ?? "chat-quoted-reply-unavailable";
+  const reportFailure = () => {
+    context.appendError(getString(failureMessageId));
+  };
+
   const navigationGeneration =
     (quotedMessageNavigationGenerations.get(context.container) || 0) + 1;
   quotedMessageNavigationGenerations.set(
@@ -2923,39 +3099,68 @@ export async function navigateToQuotedMessage(
     navigationGeneration;
   const manager = context.chatManager;
   const currentSession = manager.getActiveSession();
-  const chatHistory = context.container.querySelector(
-    "#chat-history",
-  ) as HTMLElement | null;
-  const targetInCurrentSession = currentSession?.messages.some(
-    (message) => message.id === quote.messageId,
-  );
+  const previousSessionId = currentSession?.id ?? null;
 
-  if (targetInCurrentSession && chatHistory) {
-    if (scrollToAndHighlightMessage(chatHistory, quote.messageId)) return;
-    context.renderMessages(currentSession!.messages, () => {
-      if (!isLatestNavigation()) return;
-      if (manager.getActiveSession()?.id !== currentSession!.id) return;
-      if (!scrollToAndHighlightMessage(chatHistory, quote.messageId)) {
-        context.appendError(getString("chat-quoted-reply-unavailable"));
-      }
-    });
-    return;
-  }
+  const scrollToTargetInSession = async (
+    session: ChatSession,
+  ): Promise<boolean> => {
+    if (!session.messages.some((message) => message.id === quote.messageId)) {
+      return false;
+    }
+    if (manager.getActiveSession()?.id !== session.id) {
+      return false;
+    }
+    let scrolled = await attemptScrollToQuotedMessage(
+      context,
+      quote.messageId,
+      options,
+    );
+    if (!isLatestNavigation()) {
+      return false;
+    }
+    if (!scrolled) {
+      scrolled = await renderSessionAndScrollToMessage(
+        context,
+        session,
+        quote.messageId,
+        isLatestNavigation,
+        options,
+      );
+    }
+    return isLatestNavigation() && scrolled;
+  };
 
   if (currentSession?.id === quote.sessionId) {
-    context.appendError(getString("chat-quoted-reply-unavailable"));
-    return;
+    const session =
+      (await manager.getSessionById(quote.sessionId)) ?? currentSession;
+    const scrolled = await scrollToTargetInSession(session);
+    if (!isLatestNavigation()) {
+      return false;
+    }
+    if (!scrolled) {
+      reportFailure();
+      return false;
+    }
+    return true;
   }
 
   const sourceSession = await manager.switchSession(quote.sessionId);
-  if (!isLatestNavigation()) return;
-  if (!sourceSession) {
-    if (manager.getActiveSession()?.id === currentSession?.id) {
-      context.appendError(getString("chat-quoted-reply-unavailable"));
-    }
-    return;
+  if (!isLatestNavigation()) {
+    await restoreSessionNavigation(
+      context,
+      previousSessionId,
+      isLatestNavigation,
+    );
+    return false;
   }
-  if (manager.getActiveSession()?.id !== quote.sessionId) return;
+  if (!sourceSession) {
+    reportFailure();
+    return false;
+  }
+  if (manager.getActiveSession()?.id !== quote.sessionId) {
+    reportFailure();
+    return false;
+  }
 
   clearPendingQuotedMessages(context);
   const item = getItemByLibraryKey(
@@ -2964,29 +3169,41 @@ export async function navigateToQuotedMessage(
   );
   context.setCurrentItem(item);
   await context.updatePdfCheckboxVisibility(item);
-  if (!isLatestNavigation()) return;
-  if (manager.getActiveSession()?.id !== sourceSession.id) return;
-  context.renderMessages(sourceSession.messages, () => {
-    if (!isLatestNavigation()) return;
-    if (manager.getActiveSession()?.id !== sourceSession.id) return;
-    const sourceHistory = context.container.querySelector(
-      "#chat-history",
-    ) as HTMLElement | null;
-    if (
-      !sourceHistory ||
-      !scrollToAndHighlightMessage(sourceHistory, quote.messageId)
-    ) {
-      context.appendError(getString("chat-quoted-reply-unavailable"));
+  if (
+    !isLatestNavigation() ||
+    manager.getActiveSession()?.id !== sourceSession.id
+  ) {
+    await restoreSessionNavigation(
+      context,
+      previousSessionId,
+      isLatestNavigation,
+    );
+    return false;
+  }
+
+  const scrolled = await scrollToTargetInSession(sourceSession);
+  if (!isLatestNavigation()) {
+    if (!scrolled) {
+      await restoreSessionNavigation(
+        context,
+        previousSessionId,
+        isLatestNavigation,
+      );
     }
-  });
-  context.renderExecutionPlan(sourceSession.executionPlan);
-  updateModelSelectorDisplay(context.container);
-  syncSendButtonState(
-    context.container.querySelector(
-      "#chat-send-button",
-    ) as HTMLButtonElement | null,
-    manager,
-  );
+    return false;
+  }
+  if (!scrolled) {
+    await restoreSessionNavigation(
+      context,
+      previousSessionId,
+      isLatestNavigation,
+    );
+    if (isLatestNavigation()) {
+      reportFailure();
+    }
+    return false;
+  }
+  return true;
 }
 
 function addAssistantReplyQuote(
@@ -3059,8 +3276,9 @@ function renderPendingAttachmentsPreview(container: HTMLElement): void {
         pendingSelectedText = null;
         syncPendingAttachmentsPreviews(container);
       },
-      onNavigateQuote: (quote) =>
-        navigateToQuotedMessage(createContext(container), quote),
+      onNavigateQuote: (quote) => {
+        void navigateToQuotedMessage(createContext(container), quote);
+      },
     },
   );
 }
@@ -3271,8 +3489,9 @@ function createContext(container: HTMLElement): ChatPanelContext {
               },
               onQuoteReply: (assistantMessageId) =>
                 addAssistantReplyQuote(context, assistantMessageId),
-              onNavigateToQuotedMessage: (quote) =>
-                navigateToQuotedMessage(context, quote),
+              onNavigateToQuotedMessage: (quote) => {
+                void navigateToQuotedMessage(context, quote);
+              },
               onSummarizeReply: (assistantMessageId) =>
                 copyReplyToItemNote(context, assistantMessageId),
               onSummarizeReplyError: (error) => {

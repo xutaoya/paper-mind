@@ -13,7 +13,9 @@ import { isWindowAlive } from "../../../utils/window";
 import { createBookmarkDialogButton } from "./BookmarkUiPrompts";
 import { copyToClipboard, createElement } from "./ChatPanelBuilder";
 import { darkTheme, getCurrentTheme, isDarkMode } from "./ChatPanelTheme";
+import { createEvidenceMarkdownAction } from "./EvidenceMarkdownAction";
 import { renderMarkdownToElement } from "./MarkdownRenderer";
+import type { MarkdownRenderOptions } from "./MarkdownRenderer";
 import type { ThemeColors } from "./types";
 import { HTML_NS } from "./types";
 import { setupChatHistorySelectionQuote } from "./ChatHistorySelectionQuote";
@@ -652,6 +654,7 @@ function renderReaderSection(
     variant: "user" | "assistant";
     messageId?: string;
     evidenceRecords?: EvidenceRecord[];
+    evidenceAction?: MarkdownRenderOptions["evidenceAction"];
   },
 ): HTMLElement {
   const section = createElement(doc, "section", {
@@ -691,6 +694,7 @@ function renderReaderSection(
       renderMarkdownToElement(body, normalized, options.messageId, {
         suppressToolCallCards: true,
         evidenceRecords: options.evidenceRecords,
+        evidenceAction: options.evidenceAction,
       });
     } catch (error) {
       ztoolkit.log("[BookmarkReader] Markdown render failed:", error);
@@ -714,7 +718,18 @@ function paintReaderBody(
     evidenceRecords?: EvidenceRecord[];
     assistantMessageId?: string;
   },
+  readerActions?: BookmarkReaderActions,
 ): void {
+  const evidenceAction =
+    turn.evidenceRecords?.length
+      ? createEvidenceMarkdownAction({
+          onError: (error) => {
+            readerActions?.onBookmarkError?.(
+              `${getString("chat-open-source-failed")}: ${error.message}`,
+            );
+          },
+        })
+      : undefined;
   const body = host.querySelector(
     "#chat-bookmark-reader-body",
   ) as HTMLElement | null;
@@ -754,6 +769,7 @@ function paintReaderBody(
         variant: "assistant",
         messageId: turn.assistantMessageId,
         evidenceRecords: turn.evidenceRecords,
+        evidenceAction,
       },
     ),
   );
@@ -1068,11 +1084,16 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
       readerWindow.document.title = `${getString("chat-bookmark-reader-title")} - ${bookmark.title}`;
     }
 
-    paintReaderBody(host, theme, {
-      userContent: null,
-      assistantContent: prepareReaderAssistantContent(bookmark.content),
-      assistantMessageId: bookmark.messageId ?? undefined,
-    });
+    paintReaderBody(
+      host,
+      theme,
+      {
+        userContent: null,
+        assistantContent: prepareReaderAssistantContent(bookmark.content),
+        assistantMessageId: bookmark.messageId ?? undefined,
+      },
+      state.actions,
+    );
 
     const loadSession =
       state.actions.loadSession ?? (async () => null as ChatSession | null);
@@ -1081,7 +1102,7 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
       if (generation !== renderGeneration) {
         return;
       }
-      paintReaderBody(host, theme, turn);
+      paintReaderBody(host, theme, turn, state.actions);
     } catch (error) {
       ztoolkit.log("[BookmarkReader] Failed to resolve turn content:", error);
     }
