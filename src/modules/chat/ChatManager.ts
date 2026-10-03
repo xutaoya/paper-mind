@@ -65,6 +65,7 @@ import {
   generateTimestampId,
 } from "../../utils/common";
 import { applyTurnTokenUsage } from "../../utils/apiUsage";
+import { recordTokenUsage } from "../token-stats/TokenStatsStore";
 import {
   FailureTurnHandler,
   clearRetryableFailureState,
@@ -2190,6 +2191,13 @@ export class ChatManager {
                       return;
                     }
                     applyTurnTokenUsage(assistantMessage, delta);
+                    void recordTokenUsage(
+                      delta,
+                      currentProvider.config.defaultModel ||
+                        currentProvider.config.name,
+                    ).catch((error: unknown) => {
+                      ztoolkit.log("[TokenStats] Failed to record usage:", error);
+                    });
                     scheduleCheckpoint();
                     if (this.isSessionActive(sendingSession)) {
                       this.onReasoningUpdate?.(

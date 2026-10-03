@@ -34,6 +34,7 @@ declare namespace _ZoteroTypes {
       "webSearchProvider": string;
       "agentMaxPlanningIterations": number;
       "quickActions": string;
+      "readingStatsStyleImportFingerprint": string;
     };
   }
 }

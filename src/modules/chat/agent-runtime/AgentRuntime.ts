@@ -20,6 +20,7 @@ import type {
 import type { ToolCallingProvider } from "../../../types/provider";
 import { getErrorMessage } from "../../../utils/common";
 import { applyTurnTokenUsage } from "../../../utils/apiUsage";
+import { recordTokenUsage } from "../../token-stats/TokenStatsStore";
 import { isAbortRequested } from "../../../utils/abort";
 import { getPref } from "../../../utils/prefs";
 import { isAbortError, SessionRunInvalidatedError } from "../errors";
@@ -1372,6 +1373,12 @@ export class AgentRuntime {
               return;
             }
             applyTurnTokenUsage(assistantMessage, delta);
+            void recordTokenUsage(
+              delta,
+              provider.config.defaultModel || provider.config.name,
+            ).catch((error: unknown) => {
+              ztoolkit.log("[TokenStats] Failed to record usage:", error);
+            });
             assistantMessage.streamingState = "in_progress";
             this.messageCheckpointer.schedule(
               sendingSession,

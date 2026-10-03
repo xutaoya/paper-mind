@@ -469,6 +469,80 @@ paperchat-chat-bookmark = Bookmark
 
 paperchat-chat-bookmarks = Bookmarks
 
+paperchat-chat-stats-title = Statistics
+
+paperchat-chat-stats-view-reading = Reading
+
+paperchat-chat-stats-view-tokens = Tokens
+
+paperchat-chat-stats-token-total = Total tokens
+
+paperchat-chat-stats-token-week = { $total } this week
+
+paperchat-chat-stats-token-input = Input
+
+paperchat-chat-stats-token-output = Output
+
+paperchat-chat-stats-token-daily-title = Last 6 months
+
+paperchat-chat-stats-token-bars-title = Last 14 days
+
+paperchat-chat-stats-token-day-tooltip = { $date } · { $total }
+
+paperchat-chat-stats-token-day-split = Input { $input } · Output { $output }
+
+paperchat-chat-stats-token-models-title = By model
+
+paperchat-chat-stats-token-empty = No token usage yet. After you send a chat, reported model usage is recorded from now on.
+
+paperchat-chat-stats-token-footnote = Counts input and output tokens reported by the model API. Earlier chats without saved usage are not included.
+
+paperchat-chat-stats-literature-total = Literature items
+
+paperchat-chat-stats-literature-read = Read items
+
+paperchat-chat-stats-literature-with-reading = With reading time
+
+paperchat-chat-stats-literature-read-hint = Based on Zotero “Date Read”
+
+paperchat-chat-stats-literature-marked-read-hint = { $count } marked read in Zotero
+
+paperchat-chat-stats-literature-no-marked-read-hint = No Zotero “Date Read” set yet
+
+paperchat-chat-stats-literature-read-empty-hint = Open PDFs in the reader to track time
+
+paperchat-chat-stats-reading-this-week = This week
+
+paperchat-chat-stats-reading-active-days = { $count } days with reading (past 6 mo.)
+
+paperchat-chat-stats-daily-reading-title = Daily reading time
+
+paperchat-chat-stats-reading-footnote = { $total } in the past 6 months · counted while a PDF reader tab is focused
+
+paperchat-chat-stats-heatmap-less = Less
+
+paperchat-chat-stats-heatmap-more = More
+
+paperchat-chat-stats-heatmap-empty-day = No reading time
+
+paperchat-chat-stats-heatmap-day-tooltip = { $date } · { $duration } read
+
+paperchat-chat-stats-heatmap-day-none = No reading on this day
+
+paperchat-chat-stats-heatmap-day-no-items = Only the daily total is stored. Per-paper time is tracked from now on.
+
+paperchat-chat-stats-top-reading-title = Most read
+
+paperchat-chat-stats-top-reading-empty = No per-item reading time yet. Open a PDF in the reader to start tracking. If Ethereal Style reading progress is configured, historical time is imported the first time you open Statistics.
+
+paperchat-chat-stats-recent-added-title = Recently added
+
+paperchat-chat-stats-recent-added-empty = No literature items found in your library
+
+paperchat-chat-stats-item-last-read = Last read { $date }
+
+paperchat-chat-stats-item-added = Added { $date }
+
 paperchat-chat-bookmark-save-title = Save bookmark
 
 paperchat-chat-bookmark-field-title = Title

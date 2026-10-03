@@ -52,6 +52,10 @@ import {
   unregisterLibraryChatScopeMenus,
 } from "./modules/ui/LibraryChatScope";
 import {
+  startReadingStatsTracker,
+  stopReadingStatsTracker,
+} from "./modules/reading-stats";
+import {
   getMinerUAutoCacheService,
   destroyMinerUAutoCacheService,
 } from "./modules/chat/MinerUAutoCacheService";
@@ -159,6 +163,7 @@ async function onMainWindowLoad(win: _ZoteroTypes.MainWindow): Promise<void> {
   // Register reader-side chat entry points (selection popup + annotation menu)
   registerReaderChatEntries();
   registerLibraryChatScopeMenus();
+  startReadingStatsTracker();
 
   // Register Chat Panel menu in Tools menu
   ztoolkit.Menu.register("menuTools", {
@@ -183,6 +188,7 @@ async function onShutdown(): Promise<void> {
   getAISummaryService().unregisterMenus();
   unregisterReaderChatEntries();
   unregisterLibraryChatScopeMenus();
+  stopReadingStatsTracker();
   // Await so ChatManager.destroy() (session meta write, extraction) finishes
   // before StorageDatabase is torn down below.
   await unregisterChatPanel();

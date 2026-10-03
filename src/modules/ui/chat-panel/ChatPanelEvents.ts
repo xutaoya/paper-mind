@@ -36,6 +36,13 @@ import {
   setBookmarkManagerVisible,
 } from "./BookmarkManagerPanel";
 import {
+  createReadingStatsPanel,
+  getReadingStatsPanel,
+  isReadingStatsPanelVisible,
+  refreshReadingStatsPanel,
+  setReadingStatsPanelVisible,
+} from "./ReadingStatsPanel";
+import {
   getChatManager,
   navigateToBookmarkMessage,
   openBookmarkReaderForContext,
@@ -448,6 +455,9 @@ export function setupEventHandlers(context: ChatPanelContext): () => void {
   ) as HTMLButtonElement;
   const bookmarksBtn = container.querySelector(
     "#chat-bookmarks-btn",
+  ) as HTMLButtonElement;
+  const statsBtn = container.querySelector(
+    "#chat-stats-btn",
   ) as HTMLButtonElement;
   const chatViewport = container.querySelector(
     "#chat-viewport",
@@ -1171,6 +1181,9 @@ export function setupEventHandlers(context: ChatPanelContext): () => void {
   bookmarksBtn?.addEventListener("click", async () => {
     if (!bookmarkPanel) return;
     const willShow = !isBookmarkManagerVisible(container);
+    if (willShow && isReadingStatsPanelVisible(container)) {
+      setReadingStatsPanelVisible(container, false);
+    }
     setBookmarkManagerVisible(container, willShow);
     if (willShow && historyDropdown) {
       historyDropdown.style.display = "none";
@@ -1184,6 +1197,35 @@ export function setupEventHandlers(context: ChatPanelContext): () => void {
     }
   });
 
+  let readingStatsPanel = getReadingStatsPanel(container);
+  if (!readingStatsPanel && chatViewport) {
+    readingStatsPanel = createReadingStatsPanel(
+      container.ownerDocument!,
+      getCurrentTheme(),
+      () => {
+        setReadingStatsPanelVisible(container, false);
+      },
+    );
+    chatViewport.appendChild(readingStatsPanel);
+  }
+
+  statsBtn?.addEventListener("click", async () => {
+    if (!readingStatsPanel) {
+      return;
+    }
+    const willShow = !isReadingStatsPanelVisible(container);
+    if (willShow && isBookmarkManagerVisible(container)) {
+      setBookmarkManagerVisible(container, false);
+    }
+    if (willShow && historyDropdown) {
+      historyDropdown.style.display = "none";
+    }
+    setReadingStatsPanelVisible(container, willShow);
+    if (willShow) {
+      await refreshReadingStatsPanel(readingStatsPanel, getCurrentTheme());
+    }
+  });
+
   // History button - toggle dropdown with pagination
   historyBtn?.addEventListener("click", async () => {
     ztoolkit.log("History button clicked");
@@ -1191,6 +1233,9 @@ export function setupEventHandlers(context: ChatPanelContext): () => void {
 
     if (isBookmarkManagerVisible(container)) {
       setBookmarkManagerVisible(container, false);
+    }
+    if (isReadingStatsPanelVisible(container)) {
+      setReadingStatsPanelVisible(container, false);
     }
 
     const isNowVisible = toggleHistoryDropdown(historyDropdown, historyBtn);

@@ -608,6 +608,17 @@ export function createChatContainer(
   });
   bookmarksBtn.appendChild(bookmarksIcon);
 
+  const statsBtn = createElement(doc, "button", btnStyle, {
+    id: "chat-stats-btn",
+    title: getString("chat-stats-title"),
+    "aria-label": getString("chat-stats-title"),
+  });
+  const statsIcon = createElement(doc, "img", iconStyle, {
+    src: `chrome://${config.addonRef}/content/icons/chart.svg`,
+    alt: "",
+  });
+  statsBtn.appendChild(statsIcon);
+
   const panelModeBtn = createElement(doc, "button", btnStyle, {
     id: "chat-panel-mode-btn",
     title: getString("chat-toggle-panel-mode"),
@@ -650,11 +661,14 @@ export function createChatContainer(
   toolbarButtons.appendChild(uploadFileBtn);
   toolbarButtons.appendChild(historyBtn);
   toolbarButtons.appendChild(bookmarksBtn);
+  toolbarButtons.appendChild(statsBtn);
   for (const btn of [
     panelModeBtn,
     newChatBtn,
     uploadFileBtn,
     historyBtn,
+    bookmarksBtn,
+    statsBtn,
     clearConversationBtn,
     summarizeConversationBtn,
   ]) {

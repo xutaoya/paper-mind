@@ -469,6 +469,80 @@ paperchat-chat-bookmark = 书签
 
 paperchat-chat-bookmarks = 书签
 
+paperchat-chat-stats-title = 统计
+
+paperchat-chat-stats-view-reading = 阅读
+
+paperchat-chat-stats-view-tokens = Token
+
+paperchat-chat-stats-token-total = 累计 Token
+
+paperchat-chat-stats-token-week = 本周 { $total }
+
+paperchat-chat-stats-token-input = 输入
+
+paperchat-chat-stats-token-output = 输出
+
+paperchat-chat-stats-token-daily-title = 近 6 个月
+
+paperchat-chat-stats-token-bars-title = 近 14 天
+
+paperchat-chat-stats-token-day-tooltip = { $date } · { $total }
+
+paperchat-chat-stats-token-day-split = 输入 { $input } · 输出 { $output }
+
+paperchat-chat-stats-token-models-title = 按模型
+
+paperchat-chat-stats-token-empty = 还没有 Token 记录。发送对话后，模型返回的用量会从现在起累计。
+
+paperchat-chat-stats-token-footnote = 统计模型接口返回的输入与输出 Token。更早的对话如果没有保存用量，不会出现在这里。
+
+paperchat-chat-stats-literature-total = 文献数量
+
+paperchat-chat-stats-literature-read = 已读数量
+
+paperchat-chat-stats-literature-with-reading = 有阅读记录
+
+paperchat-chat-stats-literature-read-hint = 依据 Zotero「阅读日期」字段
+
+paperchat-chat-stats-literature-marked-read-hint = Zotero 标记已读 { $count } 篇
+
+paperchat-chat-stats-literature-no-marked-read-hint = 尚未在 Zotero 填写「阅读日期」
+
+paperchat-chat-stats-literature-read-empty-hint = 在阅读器中打开 PDF 后会统计
+
+paperchat-chat-stats-reading-this-week = 本周阅读
+
+paperchat-chat-stats-reading-active-days = 近 { $count } 天有阅读
+
+paperchat-chat-stats-daily-reading-title = 每日阅读时间
+
+paperchat-chat-stats-reading-footnote = 近 6 个月累计 { $total } · 在 PDF 阅读器中停留且窗口聚焦时累计
+
+paperchat-chat-stats-heatmap-less = 少
+
+paperchat-chat-stats-heatmap-more = 多
+
+paperchat-chat-stats-heatmap-empty-day = 无阅读记录
+
+paperchat-chat-stats-heatmap-day-tooltip = { $date } · 阅读 { $duration }
+
+paperchat-chat-stats-heatmap-day-none = 这一天没有阅读记录
+
+paperchat-chat-stats-heatmap-day-no-items = 当天总时长已记录，单篇明细从现在起开始统计
+
+paperchat-chat-stats-top-reading-title = 阅读最多
+
+paperchat-chat-stats-top-reading-empty = 还没有单篇阅读记录，在 PDF 阅读器中打开文献后会自动统计；若已安装 Style 且配置了阅读进度，首次打开统计时会自动导入历史时长
+
+paperchat-chat-stats-recent-added-title = 最近加入
+
+paperchat-chat-stats-recent-added-empty = 文库中还没有可统计的文献条目
+
+paperchat-chat-stats-item-last-read = 最近阅读 { $date }
+
+paperchat-chat-stats-item-added = 加入于 { $date }
+
 paperchat-chat-bookmark-save-title = 保存书签
 
 paperchat-chat-bookmark-field-title = 标题
