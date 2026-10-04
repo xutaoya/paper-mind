@@ -23,6 +23,52 @@ import {
 } from "./BookmarkUiPrompts";
 import { sanitizeMessagePreview } from "./HistoryDropdown";
 import type { ThemeColors } from "./types";
+import { isDarkMode } from "./ChatPanelTheme";
+import { overlayPanelIconFilter } from "./OverlayPanelsTheme";
+import {
+  applyBookmarkToolbarControlsTheme,
+  bookmarkToolbarControlSurface,
+} from "./BookmarkToolbarTheme";
+
+const bookmarkPanelActions = new WeakMap<HTMLElement, BookmarkManagerActions>();
+
+export function attachBookmarkManagerActions(
+  panel: HTMLElement,
+  actions: BookmarkManagerActions,
+): void {
+  bookmarkPanelActions.set(panel, actions);
+}
+
+function bookmarkSearchHighlightBg(): string {
+  return isDarkMode() ? "rgba(96, 165, 250, 0.32)" : "#dbeafe";
+}
+
+function bookmarkFolderExpandedBg(): string {
+  return isDarkMode() ? "rgba(96, 165, 250, 0.14)" : "#eff6ff22";
+}
+
+function bookmarkDropLineColor(): string {
+  return isDarkMode() ? "#60a5fa" : "#2563eb";
+}
+
+function bookmarkDropLineGlow(): string {
+  return isDarkMode() ? "0 0 0 1px rgba(96, 165, 250, 0.35)" : "0 0 0 1px #eff6ff";
+}
+
+export async function reapplyBookmarkManagerPanelTheme(
+  container: HTMLElement,
+  theme: ThemeColors,
+): Promise<void> {
+  const panel = getBookmarkManagerPanel(container);
+  if (!panel || !isBookmarkManagerVisible(container)) {
+    return;
+  }
+  const actions = bookmarkPanelActions.get(panel);
+  if (!actions) {
+    return;
+  }
+  await refreshBookmarkManagerPanel(container, theme, actions);
+}
 
 const BOOKMARK_DROP_ROOT = "__bookmark_root__";
 const BOOKMARK_DRAG_MIME = "application/x-paperchat-bookmark-id";
@@ -181,9 +227,25 @@ export function showBookmarkManagerToast(
       whiteSpace: "normal",
       wordBreak: "break-word",
       transition: "opacity 0.2s ease, transform 0.2s ease",
-      background: isError ? "#fef2f2" : "#ecfdf5",
-      border: isError ? "1px solid #fecaca" : "1px solid #a7f3d0",
-      color: isError ? "#991b1b" : "#065f46",
+      background: isError
+        ? isDarkMode()
+          ? "rgba(127, 29, 29, 0.92)"
+          : "#fef2f2"
+        : isDarkMode()
+          ? "rgba(6, 78, 59, 0.92)"
+          : "#ecfdf5",
+      border: isError
+        ? isDarkMode()
+          ? "1px solid rgba(248, 113, 113, 0.45)"
+          : "1px solid #fecaca"
+        : isDarkMode()
+          ? "1px solid rgba(52, 211, 153, 0.45)"
+          : "1px solid #a7f3d0",
+      color: isDarkMode()
+        ? "#f4f4f5"
+        : isError
+          ? "#991b1b"
+          : "#065f46",
     },
     {
       class: BOOKMARK_MANAGER_TOAST_CLASS,
@@ -221,6 +283,7 @@ export async function refreshBookmarkManagerPanel(
   if (!panel || panel.style.display === "none") {
     return;
   }
+  applyBookmarkToolbarControlsTheme(panel, theme);
   const state = getBookmarkManagerState(panel);
   syncBookmarkToolbarMeta(panel, state);
   await renderBookmarkManagerBody(panel, theme, actions, state);
@@ -410,7 +473,7 @@ function appendHighlightedText(
       parent.appendChild(doc.createTextNode(text.slice(start, index)));
     }
     const mark = createElement(doc, "mark", {
-      background: "#dbeafe",
+      background: bookmarkSearchHighlightBg(),
       color: "inherit",
       padding: "0 1px",
       borderRadius: "2px",
@@ -432,6 +495,7 @@ function createToolbarIconButton(
   title: string,
   attributes: Record<string, string> = {},
 ): HTMLButtonElement {
+  const surface = bookmarkToolbarControlSurface(theme);
   const button = createElement(
     doc,
     "button",
@@ -442,14 +506,14 @@ function createToolbarIconButton(
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
-      border: `1px solid ${theme.inputBorderColor}`,
-      background: theme.buttonBg,
+      border: surface.border,
+      background: surface.background,
       borderRadius: "10px",
       cursor: "pointer",
       padding: "0",
       appearance: "none",
       color: theme.textMuted,
-      boxShadow: theme.composerShadow,
+      boxShadow: surface.boxShadow,
       transition:
         "background 0.18s ease, border-color 0.18s ease, color 0.18s ease",
       flexShrink: "0",
@@ -459,6 +523,7 @@ function createToolbarIconButton(
       title,
       "aria-label": title,
       ...attributes,
+      class: "paperchat-bookmark-toolbar-btn",
     },
   ) as HTMLButtonElement;
   const icon = doc.createElementNS(HTML_NS, "img") as HTMLImageElement;
@@ -471,16 +536,25 @@ function createToolbarIconButton(
     display: "block",
     pointerEvents: "none",
     opacity: "0.9",
+    filter: overlayPanelIconFilter(theme),
   });
   button.appendChild(icon);
+  const hoverBg = isDarkMode()
+    ? "rgba(255, 255, 255, 0.1)"
+    : theme.buttonHoverBg;
+  const hoverBorder = isDarkMode()
+    ? "rgba(255, 255, 255, 0.18)"
+    : theme.inputFocusBorderColor;
   button.addEventListener("mouseenter", () => {
-    button.style.background = theme.buttonHoverBg;
-    button.style.borderColor = theme.inputFocusBorderColor;
+    button.style.background = hoverBg;
+    button.style.borderColor = hoverBorder;
     button.style.color = theme.textPrimary;
   });
   button.addEventListener("mouseleave", () => {
-    button.style.background = theme.buttonBg;
-    button.style.borderColor = theme.inputBorderColor;
+    button.style.background = surface.background;
+    button.style.borderColor = isDarkMode()
+      ? "rgba(255, 255, 255, 0.12)"
+      : theme.inputBorderColor;
     button.style.color = theme.textMuted;
   });
   return button;
@@ -746,14 +820,14 @@ function applyFolderDropIndicator(
     right: "8px",
     height: "2px",
     borderRadius: "999px",
-    background: "#2563eb",
+    background: bookmarkDropLineColor(),
     pointerEvents: "none",
     zIndex: "2",
-    boxShadow: "0 0 0 1px #eff6ff",
+    boxShadow: bookmarkDropLineGlow(),
   });
   line.style[placement === "before" ? "top" : "bottom"] = "-1px";
   row.appendChild(line);
-  row.style.background = expanded ? "#eff6ff22" : theme.inputBg;
+  row.style.background = expanded ? bookmarkFolderExpandedBg() : theme.inputBg;
 }
 
 function readDragPayload(event: DragEvent): DragPayload | null {
@@ -904,14 +978,18 @@ function attachFolderRowDropTarget(
       return;
     }
     clearDropTargetStyle(row);
-    row.style.background = expanded ? "#eff6ff22" : context.theme.inputBg;
+    row.style.background = expanded
+      ? bookmarkFolderExpandedBg()
+      : context.theme.inputBg;
   });
   row.addEventListener("drop", (event) => {
     event.preventDefault();
     event.stopPropagation();
     const placement = (row.dataset.dropPlacement as FolderDropPlacement) || "inside";
     clearDropTargetStyle(row);
-    row.style.background = expanded ? "#eff6ff22" : context.theme.inputBg;
+    row.style.background = expanded
+      ? bookmarkFolderExpandedBg()
+      : context.theme.inputBg;
     const payload = readDragPayload(event);
     if (!payload) {
       return;
@@ -1573,6 +1651,7 @@ export function createBookmarkManagerPanel(
     },
     { id: PANEL_ID },
   );
+  panel.dataset.theme = isDarkMode() ? "dark" : "light";
 
   const toolbar = createElement(doc, "div", {
     display: "flex",
@@ -1653,6 +1732,7 @@ export function createBookmarkManagerPanel(
     height: "14px",
     display: "block",
     opacity: "0.82",
+    filter: overlayPanelIconFilter(theme),
   });
   closeBtn.appendChild(closeIcon);
   closeBtn.addEventListener("mouseenter", () => {
@@ -1679,27 +1759,31 @@ export function createBookmarkManagerPanel(
   searchInput.type = "search";
   searchInput.id = BOOKMARK_SEARCH_INPUT_ID;
   searchInput.placeholder = getString("chat-bookmark-search-placeholder");
+  const searchSurface = bookmarkToolbarControlSurface(theme);
   Object.assign(searchInput.style, {
     width: "100%",
     boxSizing: "border-box",
-    border: `1px solid ${theme.inputBorderColor}`,
+    border: searchSurface.border,
     borderRadius: "10px",
     padding: "8px 34px 8px 12px",
     fontSize: "13px",
     lineHeight: "1.4",
-    background: theme.inputBg,
+    background: searchSurface.background,
     color: theme.textPrimary,
     outline: "none",
-    boxShadow: theme.composerShadow,
+    boxShadow: searchSurface.boxShadow,
     transition: "border-color 0.18s ease, box-shadow 0.18s ease",
+    colorScheme: isDarkMode() ? "dark" : "light",
   });
   searchInput.addEventListener("focus", () => {
     searchInput.style.borderColor = theme.inputFocusBorderColor;
     searchInput.style.boxShadow = `0 0 0 3px ${theme.inputFocusRingColor}`;
   });
   searchInput.addEventListener("blur", () => {
-    searchInput.style.borderColor = theme.inputBorderColor;
-    searchInput.style.boxShadow = theme.composerShadow;
+    searchInput.style.borderColor = isDarkMode()
+      ? "rgba(255, 255, 255, 0.12)"
+      : theme.inputBorderColor;
+    searchInput.style.boxShadow = searchSurface.boxShadow;
   });
   const searchClearBtn = createBookmarkDialogButton(
     doc,

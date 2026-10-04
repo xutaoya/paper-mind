@@ -1938,12 +1938,14 @@ export class ChatManager {
       }
 
       // 创建 AI 消息占位
+      const assistantTurnStart = Date.now();
       const assistantMessage: ChatMessage = reusedAssistantMessage || {
         id: this.generateId(),
         role: "assistant",
         content: "",
         streamingState: "in_progress",
-        timestamp: Date.now(),
+        timestamp: assistantTurnStart,
+        turnStartedAt: assistantTurnStart,
         sourceItemKeys: (() => {
           const keys = normalizeSourceItemKeys(
             options.trustedSourceItemKeys === undefined
@@ -1958,7 +1960,8 @@ export class ChatManager {
 
       if (reusedAssistantMessage) {
         assistantMessage.streamingState = "in_progress";
-        assistantMessage.timestamp = Date.now();
+        assistantMessage.timestamp = assistantTurnStart;
+        assistantMessage.turnStartedAt = assistantTurnStart;
         this.resetAssistantForRetry(assistantMessage);
         assistantMessage.content = initialAssistantContent;
         assistantMessage.reasoning = initialAssistantReasoning;
@@ -1970,6 +1973,7 @@ export class ChatManager {
           {
             streamingState: "in_progress",
             presentationArtifacts: [],
+            turnStartedAt: assistantMessage.turnStartedAt,
           },
         );
       } else {

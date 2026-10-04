@@ -11,7 +11,7 @@ import { getErrorMessage } from "../../../utils/common";
 
 const DB_DIR = "paper-chat";
 const DB_FILE = "storage";
-export const SCHEMA_VERSION = 17;
+export const SCHEMA_VERSION = 18;
 
 /** Build absolute DB path so Zotero.DBConnection doesn't parse subdirectory names */
 function getDBPath(): string {
@@ -253,6 +253,7 @@ export class StorageDatabase {
         source_item_keys TEXT,
         presentation_artifacts TEXT,
         edited_at INTEGER,
+        turn_started_at INTEGER,
         streaming_state TEXT,
         api_only INTEGER,
         is_system_notice INTEGER,
@@ -503,6 +504,7 @@ export class StorageDatabase {
       messageColumns.has("source_item_keys") &&
       messageColumns.has("presentation_artifacts") &&
       messageColumns.has("edited_at") &&
+      messageColumns.has("turn_started_at") &&
       sessionColumns.has("last_active_item_library_id")
     );
   }
@@ -602,6 +604,10 @@ export class StorageDatabase {
         await this.upgradeToV17(db);
         currentVersion = 17;
       }
+      if (currentVersion < 18) {
+        await this.upgradeToV18(db);
+        currentVersion = 18;
+      }
       if (
         currentVersion === SCHEMA_VERSION &&
         !(await this.hasCurrentSchemaColumns(db))
@@ -616,7 +622,44 @@ export class StorageDatabase {
         await this.upgradeToV15(db);
         await this.upgradeToV16(db);
         await this.upgradeToV17(db);
+        await this.upgradeToV18(db);
       }
+    }
+  }
+
+  /** Upgrade schema v17 -> v18: persist assistant turn start time for activity UI. */
+  private async upgradeToV18(db: ZoteroDBConnection): Promise<void> {
+    ztoolkit.log("[StorageDatabase] Upgrading schema v17 -> v18...");
+
+    await db.queryAsync("BEGIN TRANSACTION");
+    try {
+      const messageColumns = new Set(
+        ((await db.queryAsync("PRAGMA table_info(messages)")) || []).map(
+          (column: any) => String(column.name),
+        ),
+      );
+      if (!messageColumns.has("turn_started_at")) {
+        await db.queryAsync(
+          "ALTER TABLE messages ADD COLUMN turn_started_at INTEGER",
+        );
+      }
+      await db.queryAsync(
+        "UPDATE schema_version SET version = ?, updated_at = ? WHERE id = 1",
+        [18, Date.now()],
+      );
+      await db.queryAsync("COMMIT");
+      ztoolkit.log("[StorageDatabase] Schema upgraded to v18");
+    } catch (error) {
+      try {
+        await db.queryAsync("ROLLBACK");
+      } catch {
+        /* ignore */
+      }
+      ztoolkit.log(
+        "[StorageDatabase] Failed to upgrade to v18:",
+        getErrorMessage(error),
+      );
+      throw error;
     }
   }
 

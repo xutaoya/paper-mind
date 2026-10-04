@@ -426,6 +426,8 @@ export function createChatContainer(
       overflowY: "auto",
       overflowX: "hidden",
       padding: "14px",
+      paddingBottom: "28px",
+      scrollPaddingBottom: "140px",
       background: theme.chatHistoryBg,
     },
     { id: "chat-history" },
@@ -437,7 +439,7 @@ export function createChatContainer(
     {
       position: "absolute",
       right: "16px",
-      bottom: "16px",
+      bottom: "120px",
       width: "36px",
       height: "36px",
       display: "flex",
@@ -720,13 +722,28 @@ export function createChatContainer(
     {
       display: "flex",
       flexDirection: "column",
-      padding: "12px 14px 16px",
-      background: theme.containerBg,
-      borderTop: `1px solid ${theme.borderColor}`,
+      padding: "0 12px 14px",
+      background: "transparent",
+      borderTop: "none",
       overflow: "visible",
       flexShrink: "0",
+      position: "relative",
+      zIndex: "6",
     },
-    { id: "chat-input-area" },
+    { id: "chat-input-area", class: "chat-composer-dock" },
+  );
+
+  const composerFloat = createElement(
+    doc,
+    "div",
+    {
+      display: "flex",
+      flexDirection: "column",
+      gap: "8px",
+      width: "100%",
+      minWidth: "0",
+    },
+    { id: "chat-composer-float" },
   );
 
   const turnQueue = createElement(
@@ -750,7 +767,7 @@ export function createChatContainer(
       overflowX: "auto",
       overflowY: "hidden",
     },
-    { id: "chat-quick-actions-bar", class: "chat-quick-actions-bar--docked" },
+    { id: "chat-quick-actions-bar", class: "chat-quick-actions-bar--floating" },
   );
 
   const inputWrapper = createElement(
@@ -760,7 +777,7 @@ export function createChatContainer(
       display: "flex",
       flexDirection: "column",
       border: `1px solid ${theme.inputBorderColor}`,
-      borderRadius: "20px",
+      borderRadius: "16px",
       background: theme.inputBg,
       boxShadow: theme.composerShadow,
       overflow: "hidden",
@@ -913,9 +930,12 @@ export function createChatContainer(
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "8px 2px 0",
+    padding: "6px 12px 12px",
     gap: "12px",
     overflow: "visible",
+    position: "relative",
+    zIndex: "1",
+    flexShrink: "0",
   });
 
   const leftContainer = createElement(doc, "div", {
@@ -1252,9 +1272,12 @@ export function createChatContainer(
   inputBottomBar.appendChild(leftContainer);
   inputBottomBar.appendChild(rightContainer);
 
-  inputArea.appendChild(turnQueue);
-  inputArea.appendChild(inputWrapper);
-  inputArea.appendChild(inputBottomBar);
+  inputWrapper.appendChild(inputBottomBar);
+
+  composerFloat.appendChild(turnQueue);
+  composerFloat.appendChild(quickActionsBar);
+  composerFloat.appendChild(inputWrapper);
+  inputArea.appendChild(composerFloat);
 
   // History dropdown panel - append to container for proper positioning
   const historyDropdown = createElement(
@@ -1416,7 +1439,6 @@ export function createChatContainer(
   root.appendChild(userBar);
   root.appendChild(toolbar);
   chatViewport.appendChild(chatHistory);
-  chatViewport.appendChild(quickActionsBar);
   chatViewport.appendChild(executionPlanPanel);
   chatViewport.appendChild(executionApprovalPanel);
   chatViewport.appendChild(scrollBottomBtn);

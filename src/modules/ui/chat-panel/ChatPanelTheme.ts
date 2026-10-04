@@ -8,6 +8,7 @@ import { updateConversationNavigatorTheme } from "./ConversationNavigator";
 import { applyContextItemBannerTheme } from "./ContextItemBanner";
 import { applyAgentUiTheme } from "./AgentUiTheme";
 import { applyComposerChromeTheme } from "./ComposerTheme";
+import { applyOverlayPanelsShellTheme } from "./OverlayPanelsTheme";
 import { applyToolResultTheme } from "./ToolResultElement";
 
 // Light theme colors
@@ -15,7 +16,7 @@ export const lightTheme: ThemeColors = {
   containerBg: "#f7f7f8",
   chatHistoryBg: "#f7f7f8",
   toolbarBg: "#fff",
-  inputAreaBg: "#fff",
+  inputAreaBg: "transparent",
   inputBg: "#fff",
   assistantBubbleBg: "#fff",
   attachmentPreviewBg: "#f3f4f6",
@@ -28,7 +29,8 @@ export const lightTheme: ThemeColors = {
   inputBorderColor: "#d1d5db",
   inputFocusBorderColor: "#9ca3af",
   inputFocusRingColor: "rgba(17, 24, 39, 0.08)",
-  composerShadow: "0 1px 2px rgba(0,0,0,0.04)",
+  composerShadow:
+    "0 10px 38px rgba(15, 23, 42, 0.12), 0 2px 10px rgba(15, 23, 42, 0.06)",
   textPrimary: "#333",
   textSecondary: "#555",
   textMuted: "#888",
@@ -49,7 +51,7 @@ export const darkTheme: ThemeColors = {
   containerBg: "#1e1e1e",
   chatHistoryBg: "#1e1e1e",
   toolbarBg: "#252525",
-  inputAreaBg: "#252525",
+  inputAreaBg: "transparent",
   inputBg: "#333",
   assistantBubbleBg: "#2d2d2d",
   attachmentPreviewBg: "#252525",
@@ -62,7 +64,8 @@ export const darkTheme: ThemeColors = {
   inputBorderColor: "#4b5563",
   inputFocusBorderColor: "#9ca3af",
   inputFocusRingColor: "rgba(243, 244, 246, 0.12)",
-  composerShadow: "0 1px 2px rgba(0,0,0,0.18)",
+  composerShadow:
+    "0 12px 40px rgba(0, 0, 0, 0.42), 0 2px 10px rgba(0, 0, 0, 0.28)",
   textPrimary: "#e0e0e0",
   textSecondary: "#ccc",
   textMuted: "#999",
@@ -429,6 +432,7 @@ export function applyThemeToContainer(container: HTMLElement): void {
 
   applyAgentUiTheme(container, theme);
   applyComposerChromeTheme(container, theme);
+  applyOverlayPanelsShellTheme(container, theme);
 }
 
 /**

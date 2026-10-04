@@ -480,8 +480,8 @@ export class SessionStorageService {
 
         await db.queryAsync(
           `INSERT INTO messages
-           (id, session_id, seq, role, content, reasoning, images, files, quoted_messages, timestamp, pdf_context, selected_text, tool_calls, tool_call_id, evidence, source_item_keys, streaming_state, api_only, is_system_notice, search_text, search_index_version, presentation_artifacts)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, session_id, seq, role, content, reasoning, images, files, quoted_messages, timestamp, pdf_context, selected_text, tool_calls, tool_call_id, evidence, source_item_keys, streaming_state, api_only, is_system_notice, search_text, search_index_version, presentation_artifacts, turn_started_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             message.id,
             sessionId,
@@ -505,6 +505,7 @@ export class SessionStorageService {
             searchProjection.searchText,
             searchProjection.searchIndexVersion,
             serializePresentationArtifacts(message.presentationArtifacts),
+            message.turnStartedAt ?? null,
           ],
         );
 
@@ -630,6 +631,7 @@ export class SessionStorageService {
       evidence?: EvidenceRecord[];
       sourceItemKeys?: string[];
       presentationArtifacts?: PresentationToolCardArtifact[];
+      turnStartedAt?: number;
     },
   ): Promise<void> {
     await this.init();
@@ -674,6 +676,8 @@ export class SessionStorageService {
           content,
           reasoning,
           timestamp: now,
+          turnStartedAt:
+            options?.turnStartedAt ?? previousMessage.turnStartedAt ?? undefined,
           streamingState: options?.streamingState ?? undefined,
           evidence: nextEvidence,
           sourceItemKeys:
@@ -698,7 +702,8 @@ export class SessionStorageService {
         await db.queryAsync(
           `UPDATE messages SET
             content = ?, reasoning = ?, timestamp = ?, streaming_state = ?, evidence = ?, source_item_keys = ?,
-            search_text = ?, search_index_version = ?, presentation_artifacts = ?
+            search_text = ?, search_index_version = ?, presentation_artifacts = ?,
+            turn_started_at = COALESCE(?, turn_started_at)
           WHERE id = ? AND session_id = ?`,
           [
             content,
@@ -710,6 +715,7 @@ export class SessionStorageService {
             nextProjection.searchText,
             nextProjection.searchIndexVersion,
             serializePresentationArtifacts(nextPresentationArtifacts),
+            nextMessage.turnStartedAt ?? null,
             messageId,
             sessionId,
           ],
@@ -1210,8 +1216,8 @@ export class SessionStorageService {
             } = messagesForStorage[seq];
             await db.queryAsync(
               `INSERT INTO messages
-               (id, session_id, seq, role, content, reasoning, images, files, quoted_messages, timestamp, pdf_context, selected_text, tool_calls, tool_call_id, evidence, source_item_keys, streaming_state, api_only, is_system_notice, search_text, search_index_version, presentation_artifacts)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+               (id, session_id, seq, role, content, reasoning, images, files, quoted_messages, timestamp, pdf_context, selected_text, tool_calls, tool_call_id, evidence, source_item_keys, streaming_state, api_only, is_system_notice, search_text, search_index_version, presentation_artifacts, turn_started_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
               [
                 msg.id,
                 session.id,
@@ -1235,6 +1241,7 @@ export class SessionStorageService {
                 searchProjection.searchText,
                 searchProjection.searchIndexVersion,
                 serializePresentationArtifacts(msg.presentationArtifacts),
+                msg.turnStartedAt ?? null,
               ],
             );
           }

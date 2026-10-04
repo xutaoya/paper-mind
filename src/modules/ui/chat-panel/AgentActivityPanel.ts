@@ -27,6 +27,7 @@ import {
 
 const ACTIVITY_MAX_HEIGHT_PX = 180;
 const ACTIVITY_STARTED_AT_ATTR = "data-agent-activity-started-at";
+const ACTIVITY_ENDED_AT_ATTR = "data-agent-activity-ended-at";
 const ACTIVITY_TURN_USAGE_ATTR = "data-agent-turn-usage";
 const AGENT_ACTIVITY_THINKING_LABEL = "Thinking...";
 const MAX_REASONING_LINES_WHILE_WORKING = 12;
@@ -153,7 +154,10 @@ export interface AgentActivityPanelOptions {
   reasoning: string;
   content: string;
   isWorking: boolean;
-  startedAt?: number;
+  /** Wall-clock start of this turn (e.g. preceding user message time). */
+  activityStartedAt?: number;
+  /** Wall-clock end when the assistant turn finished (assistant message timestamp). */
+  activityEndedAt?: number;
   turnUsage?: ChatMessageTurnUsage;
 }
 
@@ -215,8 +219,49 @@ function extractToolEntries(content: string): ParsedToolCallEntry[] {
     .filter((entry) => !isPresentationToolCallEntry(entry));
 }
 
-function formatDurationSeconds(startedAt: number, endedAt = Date.now()): number {
-  return Math.max(1, Math.round((endedAt - startedAt) / 1000));
+function formatActivityDuration(seconds: number): string {
+  const safe = Math.max(1, Math.round(seconds));
+  if (safe < 60) {
+    return getString("chat-agent-activity-duration-sec", {
+      args: { n: String(safe) },
+    });
+  }
+  const totalMinutes = Math.floor(safe / 60);
+  if (totalMinutes < 60) {
+    return getString("chat-agent-activity-duration-min", {
+      args: { n: String(totalMinutes) },
+    });
+  }
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (minutes === 0) {
+    return getString("chat-agent-activity-duration-hour", {
+      args: { n: String(hours) },
+    });
+  }
+  return getString("chat-agent-activity-duration-hour-min", {
+    args: { h: String(hours), m: String(minutes) },
+  });
+}
+
+function resolveActivityDurationSeconds(
+  startedAt: number,
+  endedAt: number | undefined,
+  isWorking: boolean,
+): number {
+  let end = isWorking ? Date.now() : endedAt;
+  if (end == null || !Number.isFinite(end)) {
+    end = Date.now();
+  }
+  if (!Number.isFinite(startedAt)) {
+    return 1;
+  }
+  if (end < startedAt) {
+    // Historical render without a reliable start time — avoid showing "1s" forever.
+    end = startedAt;
+  }
+  const seconds = Math.round((end - startedAt) / 1000);
+  return Math.max(1, seconds);
 }
 
 function formatActivitySummary(
@@ -225,18 +270,19 @@ function formatActivitySummary(
   durationSeconds: number,
   turnUsage?: ChatMessageTurnUsage,
 ): string {
+  const duration = formatActivityDuration(durationSeconds);
   let summary: string;
   if (reasoningLineCount > 0 && toolCount > 0) {
     summary = getString("chat-agent-activity-summary-mixed", {
-      args: { seconds: durationSeconds, tools: toolCount },
+      args: { duration, tools: toolCount },
     });
   } else if (toolCount > 0) {
     summary = getString("chat-agent-activity-summary-tools", {
-      args: { count: toolCount, seconds: durationSeconds },
+      args: { count: toolCount, duration },
     });
   } else {
     summary = getString("chat-agent-activity-summary-thought", {
-      args: { seconds: durationSeconds },
+      args: { duration },
     });
   }
 
@@ -727,7 +773,8 @@ export function createAgentActivityPanel(
   theme: ThemeColors,
   options: AgentActivityPanelOptions,
 ): HTMLElement {
-  const startedAt = options.startedAt ?? Date.now();
+  const startedAt = options.activityStartedAt ?? Date.now();
+  const endedAt = options.activityEndedAt;
   const container = createElement(
     doc,
     "div",
@@ -740,6 +787,9 @@ export function createAgentActivityPanel(
       "data-agent-activity-for": options.messageId,
       "data-streaming-reasoning-container-for": options.messageId,
       [ACTIVITY_STARTED_AT_ATTR]: String(startedAt),
+      ...(endedAt != null
+        ? { [ACTIVITY_ENDED_AT_ATTR]: String(endedAt) }
+        : {}),
     },
   );
 
@@ -869,7 +919,7 @@ export function createAgentActivityPanel(
     summaryText.textContent = formatActivitySummary(
       stats.reasoningLines,
       stats.toolCount,
-      formatDurationSeconds(startedAt),
+      resolveActivityDurationSeconds(startedAt, endedAt, false),
       options.turnUsage,
     );
     expanded = false;
@@ -887,8 +937,13 @@ export function createAgentActivityPanel(
       container.getAttribute("data-agent-content") || options.content,
       isWorkingNow,
     );
-    const duration = formatDurationSeconds(
-      Number(container.getAttribute(ACTIVITY_STARTED_AT_ATTR)) || startedAt,
+    const started = Number(container.getAttribute(ACTIVITY_STARTED_AT_ATTR)) || startedAt;
+    const endedRaw = container.getAttribute(ACTIVITY_ENDED_AT_ATTR);
+    const ended = endedRaw ? Number(endedRaw) : endedAt;
+    const duration = resolveActivityDurationSeconds(
+      started,
+      Number.isFinite(ended) ? ended : undefined,
+      isWorkingNow,
     );
     summaryText.textContent = formatActivitySummary(
       currentStats.reasoningLines,
@@ -1007,6 +1062,9 @@ export function updateAgentActivityPanel(
       setDisclosureOpen(disclosure, viewport, true, true);
     }
   } else {
+    if (!activityPanel.hasAttribute(ACTIVITY_ENDED_AT_ATTR)) {
+      activityPanel.setAttribute(ACTIVITY_ENDED_AT_ATTR, String(Date.now()));
+    }
     workingLabel && (workingLabel.style.display = "none");
     summaryButton && (summaryButton.style.display = "inline-flex");
     activityPanel.classList.add("paperchat-agent-activity--complete");
@@ -1041,6 +1099,7 @@ export function finalizeAgentActivityPanel(
   activityPanel.setAttribute("data-agent-reasoning", reasoning);
   activityPanel.setAttribute("data-agent-content", content);
   activityPanel.setAttribute("data-agent-working", "false");
+  activityPanel.setAttribute(ACTIVITY_ENDED_AT_ATTR, String(Date.now()));
   setTurnUsageAttribute(activityPanel, turnUsage);
 
   const workingLabel = activityPanel.querySelector(

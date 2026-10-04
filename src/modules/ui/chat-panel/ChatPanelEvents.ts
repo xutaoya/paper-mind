@@ -28,6 +28,7 @@ import {
   formatModelLabel,
 } from "../../preferences/ModelsFetcher";
 import {
+  attachBookmarkManagerActions,
   createBookmarkManagerPanel,
   getBookmarkManagerPanel,
   isBookmarkManagerVisible,
@@ -1170,12 +1171,14 @@ export function setupEventHandlers(context: ChatPanelContext): () => void {
 
   let bookmarkPanel = getBookmarkManagerPanel(container);
   if (!bookmarkPanel && chatViewport) {
+    const bookmarkActions = createBookmarkManagerActions();
     bookmarkPanel = createBookmarkManagerPanel(
       container.ownerDocument!,
       getCurrentTheme(),
-      createBookmarkManagerActions(),
+      bookmarkActions,
     );
     chatViewport.appendChild(bookmarkPanel);
+    attachBookmarkManagerActions(bookmarkPanel, bookmarkActions);
   }
 
   bookmarksBtn?.addEventListener("click", async () => {
@@ -1189,10 +1192,12 @@ export function setupEventHandlers(context: ChatPanelContext): () => void {
       historyDropdown.style.display = "none";
     }
     if (willShow) {
+      const bookmarkActions = createBookmarkManagerActions();
+      attachBookmarkManagerActions(bookmarkPanel, bookmarkActions);
       await refreshBookmarkManagerPanel(
         container,
         getCurrentTheme(),
-        createBookmarkManagerActions(),
+        bookmarkActions,
       );
     }
   });

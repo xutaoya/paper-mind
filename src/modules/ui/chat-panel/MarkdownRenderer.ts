@@ -47,6 +47,8 @@ import {
   isSearchToolName,
 } from "./SearchActivityElement";
 
+const SVG_NS = "http://www.w3.org/2000/svg";
+
 // Initialize markdown-it with XHTML output
 const md = new MarkdownIt({
   html: true,
@@ -1394,39 +1396,109 @@ export function extractSourceGroupFragments(
 function getSourceGroupPalette(
   type: string,
   dark: boolean,
-): { badgeBg: string; badgeText: string; accent: string } {
+): { badgeBg: string; badgeText: string; accent: string; wash: string } {
   const normalizedType = type.toLowerCase() as SourceGroupType;
   switch (normalizedType) {
     case "paper":
     case "item":
       return dark
-        ? { badgeBg: "#1f6feb33", badgeText: "#79c0ff", accent: "#1f6feb" }
-        : { badgeBg: "#dbeafe", badgeText: "#1d4ed8", accent: "#60a5fa" };
+        ? {
+            badgeBg: "#1f6feb33",
+            badgeText: "#79c0ff",
+            accent: "#58a6ff",
+            wash: "rgba(56, 139, 253, 0.1)",
+          }
+        : {
+            badgeBg: "#dbeafe",
+            badgeText: "#1d4ed8",
+            accent: "#2563eb",
+            wash: "#f4f8ff",
+          };
     case "note":
       return dark
-        ? { badgeBg: "#9a670033", badgeText: "#e3b341", accent: "#d29922" }
-        : { badgeBg: "#fef3c7", badgeText: "#b45309", accent: "#f59e0b" };
+        ? {
+            badgeBg: "#9a670033",
+            badgeText: "#e3b341",
+            accent: "#d29922",
+            wash: "rgba(210, 153, 34, 0.1)",
+          }
+        : {
+            badgeBg: "#fef3c7",
+            badgeText: "#b45309",
+            accent: "#d97706",
+            wash: "#fffbeb",
+          };
     case "annotation":
       return dark
-        ? { badgeBg: "#bc4c0033", badgeText: "#ffb77c", accent: "#fb8500" }
-        : { badgeBg: "#ffedd5", badgeText: "#c2410c", accent: "#f97316" };
+        ? {
+            badgeBg: "#bc4c0033",
+            badgeText: "#ffb77c",
+            accent: "#fb8500",
+            wash: "rgba(251, 133, 0, 0.1)",
+          }
+        : {
+            badgeBg: "#ffedd5",
+            badgeText: "#c2410c",
+            accent: "#ea580c",
+            wash: "#fff7ed",
+          };
     case "web":
       return dark
-        ? { badgeBg: "#0f766e33", badgeText: "#5eead4", accent: "#14b8a6" }
-        : { badgeBg: "#ccfbf1", badgeText: "#0f766e", accent: "#2dd4bf" };
+        ? {
+            badgeBg: "#0f766e33",
+            badgeText: "#5eead4",
+            accent: "#14b8a6",
+            wash: "rgba(20, 184, 166, 0.1)",
+          }
+        : {
+            badgeBg: "#ccfbf1",
+            badgeText: "#0f766e",
+            accent: "#0d9488",
+            wash: "#f0fdfa",
+          };
     case "collection":
       return dark
-        ? { badgeBg: "#7e22ce33", badgeText: "#d8b4fe", accent: "#a855f7" }
-        : { badgeBg: "#f3e8ff", badgeText: "#7e22ce", accent: "#c084fc" };
+        ? {
+            badgeBg: "#7e22ce33",
+            badgeText: "#d8b4fe",
+            accent: "#a855f7",
+            wash: "rgba(168, 85, 247, 0.1)",
+          }
+        : {
+            badgeBg: "#f3e8ff",
+            badgeText: "#7e22ce",
+            accent: "#7c3aed",
+            wash: "#faf5ff",
+          };
     case "memory":
       return dark
-        ? { badgeBg: "#16653433", badgeText: "#86efac", accent: "#22c55e" }
-        : { badgeBg: "#dcfce7", badgeText: "#15803d", accent: "#4ade80" };
+        ? {
+            badgeBg: "#16653433",
+            badgeText: "#86efac",
+            accent: "#22c55e",
+            wash: "rgba(34, 197, 94, 0.1)",
+          }
+        : {
+            badgeBg: "#dcfce7",
+            badgeText: "#15803d",
+            accent: "#16a34a",
+            wash: "#f0fdf4",
+          };
     case "library":
     default:
       return dark
-        ? { badgeBg: "#6e768133", badgeText: "#c9d1d9", accent: "#8b949e" }
-        : { badgeBg: "#e5e7eb", badgeText: "#475569", accent: "#94a3b8" };
+        ? {
+            badgeBg: "#6e768133",
+            badgeText: "#c9d1d9",
+            accent: "#8b949e",
+            wash: "rgba(139, 148, 158, 0.1)",
+          }
+        : {
+            badgeBg: "#e5e7eb",
+            badgeText: "#475569",
+            accent: "#64748b",
+            wash: "#f8fafc",
+          };
   }
 }
 
@@ -1439,6 +1511,95 @@ function formatSourceGroupType(type: string): string {
     .split(/[_\s-]+/)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function formatSourceGroupTypeLabel(type: string): string {
+  const normalized = type.trim().toLowerCase();
+  const keys: Record<string, string> = {
+    paper: "chat-source-group-type-paper",
+    item: "chat-source-group-type-item",
+    note: "chat-source-group-type-note",
+    annotation: "chat-source-group-type-annotation",
+    web: "chat-source-group-type-web",
+    collection: "chat-source-group-type-collection",
+    library: "chat-source-group-type-library",
+    memory: "chat-source-group-type-memory",
+  };
+  const key = keys[normalized];
+  if (!key) {
+    return formatSourceGroupType(type);
+  }
+  try {
+    return getString(key);
+  } catch {
+    return formatSourceGroupType(type);
+  }
+}
+
+function createSourceGroupIcon(doc: Document, color: string): SVGSVGElement {
+  const svg = doc.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("width", "14");
+  svg.setAttribute("height", "14");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", "chat-source-group__icon");
+  Object.assign(svg.style, {
+    flexShrink: "0",
+    display: "block",
+    color,
+  });
+  const page = doc.createElementNS(SVG_NS, "path");
+  page.setAttribute(
+    "d",
+    "M4.25 2.4h5.1L12.1 5.15V13.1a.65.65 0 0 1-.65.65H4.9a.65.65 0 0 1-.65-.65V3.05c0-.36.29-.65.65-.65Z",
+  );
+  page.setAttribute("fill", "none");
+  page.setAttribute("stroke", "currentColor");
+  page.setAttribute("stroke-width", "1.25");
+  page.setAttribute("stroke-linejoin", "round");
+  const fold = doc.createElementNS(SVG_NS, "path");
+  fold.setAttribute("d", "M9.2 2.5v2.55h2.7");
+  fold.setAttribute("fill", "none");
+  fold.setAttribute("stroke", "currentColor");
+  fold.setAttribute("stroke-width", "1.25");
+  fold.setAttribute("stroke-linejoin", "round");
+  const line1 = doc.createElementNS(SVG_NS, "path");
+  line1.setAttribute("d", "M6 8.15h4.2");
+  line1.setAttribute("stroke", "currentColor");
+  line1.setAttribute("stroke-width", "1.2");
+  line1.setAttribute("stroke-linecap", "round");
+  const line2 = doc.createElementNS(SVG_NS, "path");
+  line2.setAttribute("d", "M6 10.45h3.2");
+  line2.setAttribute("stroke", "currentColor");
+  line2.setAttribute("stroke-width", "1.2");
+  line2.setAttribute("stroke-linecap", "round");
+  svg.appendChild(page);
+  svg.appendChild(fold);
+  svg.appendChild(line1);
+  svg.appendChild(line2);
+  return svg;
+}
+
+function setSourceGroupCollapsed(
+  card: HTMLElement,
+  body: HTMLElement,
+  toggle: HTMLElement,
+  chevron: HTMLElement,
+  collapsed: boolean,
+): void {
+  card.classList.toggle("chat-source-group--collapsed", collapsed);
+  card.classList.toggle("chat-source-group--expanded", !collapsed);
+  body.hidden = collapsed;
+  toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  chevron.style.transform = collapsed ? "rotate(0deg)" : "rotate(180deg)";
+  const header = card.querySelector(
+    ".chat-source-group__header",
+  ) as HTMLElement | null;
+  if (header) {
+    header.style.borderBottom = collapsed
+      ? "none"
+      : "1px dashed rgba(128, 128, 128, 0.28)";
+  }
 }
 
 function renderSourceGroupCard(
@@ -1454,52 +1615,168 @@ function renderSourceGroupCard(
   const actionTitle = sourceGroupAction?.getTitle(group) || null;
 
   const card = doc.createElementNS(HTML_NS, "div") as HTMLElement;
-  card.style.margin = "10px 0";
-  card.style.border = `1px solid ${colors.cardBorder}`;
-  card.style.borderLeft = `3px solid ${palette.accent}`;
-  card.style.borderRadius = "10px";
-  card.style.background = colors.cardBg;
-  card.style.overflow = "hidden";
+  card.className = "chat-source-group chat-source-group--collapsed";
+  card.setAttribute("data-source-group-type", group.type);
+  Object.assign(card.style, {
+    margin: "10px 0 6px",
+    border: `1px solid ${colors.cardBorder}`,
+    borderLeft: `3px solid ${palette.accent}`,
+    borderRadius: "8px",
+    background: palette.wash,
+    overflow: "hidden",
+    fontSize: "12px",
+    lineHeight: "1.4",
+    boxSizing: "border-box",
+  });
 
-  const header = doc.createElementNS(
-    HTML_NS,
-    actionTitle ? "button" : "div",
-  ) as HTMLElement;
-  header.style.display = "flex";
-  header.style.alignItems = "center";
-  header.style.gap = "8px";
-  header.style.width = "100%";
-  header.style.boxSizing = "border-box";
-  header.style.padding = "16px 10px";
-  header.style.background = colors.headerBg;
-  header.style.borderBottom = `1px solid ${colors.cardBorder}`;
-  header.style.borderTop = "none";
-  header.style.borderLeft = "none";
-  header.style.borderRight = "none";
-  header.style.borderRadius = "0";
-  header.style.margin = "0";
-  header.style.appearance = "none";
-  header.style.fontFamily = "inherit";
-  header.style.textAlign = "left";
+  const header = doc.createElementNS(HTML_NS, "div") as HTMLElement;
+  header.className = "chat-source-group__header";
+  Object.assign(header.style, {
+    display: "flex",
+    flexDirection: "row",
+    flexWrap: "nowrap",
+    alignItems: "stretch",
+    gap: "0",
+    minWidth: "0",
+    width: "100%",
+    boxSizing: "border-box",
+  });
+
+  const toggle = doc.createElementNS(HTML_NS, "div") as HTMLElement;
+  toggle.className = "chat-source-group__toggle";
+  toggle.setAttribute("role", "button");
+  toggle.tabIndex = 0;
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.setAttribute("aria-label", getString("chat-source-group-toggle"));
+  Object.assign(toggle.style, {
+    display: "flex",
+    flexDirection: "row",
+    flexWrap: "nowrap",
+    alignItems: "center",
+    gap: "8px",
+    flex: "1 1 auto",
+    minWidth: "0",
+    margin: "0",
+    padding: "7px 8px 7px 10px",
+    border: "none",
+    background: "transparent",
+    cursor: "pointer",
+    boxSizing: "border-box",
+  });
+
+  toggle.appendChild(createSourceGroupIcon(doc, palette.accent));
+
+  const kicker = doc.createElementNS(HTML_NS, "span") as HTMLElement;
+  kicker.className = "chat-source-group__kicker";
+  Object.assign(kicker.style, {
+    fontSize: "10px",
+    fontWeight: "700",
+    letterSpacing: "0.06em",
+    textTransform: "uppercase",
+    color: palette.badgeText,
+    whiteSpace: "nowrap",
+    flexShrink: "0",
+  });
+  kicker.textContent = getString("chat-source-group-caption");
+  toggle.appendChild(kicker);
+
+  const badge = doc.createElementNS(HTML_NS, "span") as HTMLElement;
+  badge.className = "chat-source-group__badge";
+  Object.assign(badge.style, {
+    display: "inline-flex",
+    alignItems: "center",
+    flexShrink: "0",
+    padding: "0 6px",
+    height: "16px",
+    borderRadius: "4px",
+    fontSize: "10px",
+    fontWeight: "600",
+    lineHeight: "16px",
+    whiteSpace: "nowrap",
+    background: palette.badgeBg,
+    color: palette.badgeText,
+  });
+  badge.textContent = formatSourceGroupTypeLabel(group.type);
+  toggle.appendChild(badge);
+
+  const label = doc.createElementNS(HTML_NS, "span") as HTMLElement;
+  label.className = "chat-source-group__label";
+  Object.assign(label.style, {
+    minWidth: "0",
+    flex: "1 1 auto",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    fontSize: "12px",
+    fontWeight: "600",
+    lineHeight: "1.35",
+    color: colors.labelText,
+  });
+  label.setAttribute("title", group.label);
+  label.textContent = group.label;
+  toggle.appendChild(label);
+
+  if (group.page) {
+    const pageEl = doc.createElementNS(HTML_NS, "span") as HTMLElement;
+    pageEl.className = "chat-source-group__page";
+    Object.assign(pageEl.style, {
+      fontSize: "10px",
+      fontWeight: "550",
+      color: colors.bodyText,
+      opacity: "0.78",
+      whiteSpace: "nowrap",
+      flexShrink: "0",
+    });
+    pageEl.textContent = getString("chat-source-group-page", {
+      args: { page: String(group.page) },
+    });
+    toggle.appendChild(pageEl);
+  }
+
+  const chevron = doc.createElementNS(HTML_NS, "span") as HTMLElement;
+  chevron.className = "chat-source-group__chevron";
+  chevron.setAttribute("aria-hidden", "true");
+  Object.assign(chevron.style, {
+    flexShrink: "0",
+    width: "14px",
+    fontSize: "11px",
+    lineHeight: "1",
+    textAlign: "center",
+    opacity: "0.5",
+    transform: "rotate(0deg)",
+  });
+  chevron.textContent = "⌄";
+  toggle.appendChild(chevron);
+  header.appendChild(toggle);
 
   if (actionTitle && sourceGroupAction) {
-    header.setAttribute("type", "button");
-    header.setAttribute("title", `${actionTitle}: ${group.label}`);
-    header.setAttribute("aria-label", `${actionTitle}: ${group.label}`);
-    header.style.cursor = "pointer";
-    header.addEventListener("mouseenter", () => {
-      header.style.background = dark ? "#2d333b" : "#eef2f6";
+    const openBtn = doc.createElementNS(HTML_NS, "div") as HTMLElement;
+    openBtn.className = "chat-source-group__open";
+    openBtn.setAttribute("role", "button");
+    openBtn.tabIndex = 0;
+    openBtn.setAttribute("title", `${actionTitle}: ${group.label}`);
+    openBtn.setAttribute("aria-label", `${actionTitle}: ${group.label}`);
+    Object.assign(openBtn.style, {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      flexShrink: "0",
+      width: "28px",
+      height: "28px",
+      margin: "0 4px 0 0",
+      padding: "0",
+      border: "none",
+      borderRadius: "6px",
+      background: "transparent",
+      cursor: "pointer",
+      fontSize: "13px",
+      lineHeight: "1",
+      color: colors.bodyText,
+      opacity: "0.7",
+      boxSizing: "border-box",
     });
-    header.addEventListener("mouseleave", () => {
-      header.style.background = colors.headerBg;
-    });
-    header.addEventListener("focus", () => {
-      header.style.boxShadow = `inset 0 0 0 2px ${palette.accent}`;
-    });
-    header.addEventListener("blur", () => {
-      header.style.boxShadow = "none";
-    });
-    header.addEventListener("click", (event) => {
+    openBtn.textContent = "↗";
+    const openSource = (event: Event): void => {
       event.preventDefault();
       event.stopPropagation();
       void Promise.resolve()
@@ -1509,58 +1786,113 @@ function renderSourceGroupCard(
             error instanceof Error ? error : new Error(String(error)),
           );
         });
+    };
+    openBtn.addEventListener("click", openSource);
+    openBtn.addEventListener("keydown", (event: KeyboardEvent) => {
+      if (event.key === "Enter" || event.key === " ") {
+        openSource(event);
+      }
     });
-  }
-
-  const badge = doc.createElementNS(HTML_NS, "span") as HTMLElement;
-  badge.style.display = "inline-flex";
-  badge.style.alignItems = "center";
-  badge.style.padding = "2px 8px";
-  badge.style.borderRadius = "999px";
-  badge.style.fontSize = "11px";
-  badge.style.fontWeight = "600";
-  badge.style.flexShrink = "0";
-  badge.style.background = palette.badgeBg;
-  badge.style.color = palette.badgeText;
-  badge.textContent = formatSourceGroupType(group.type);
-  header.appendChild(badge);
-
-  const label = doc.createElementNS(HTML_NS, "span") as HTMLElement;
-  label.style.fontSize = "13px";
-  label.style.fontWeight = "600";
-  label.style.color = colors.labelText;
-  label.style.flex = "1";
-  label.style.minWidth = "0";
-  label.style.whiteSpace = "nowrap";
-  label.style.overflow = "hidden";
-  label.style.textOverflow = "ellipsis";
-  label.style.lineHeight = "1.4";
-  label.setAttribute("title", group.label);
-  label.textContent = group.label;
-  header.appendChild(label);
-
-  if (actionTitle) {
-    const openIndicator = doc.createElementNS(HTML_NS, "span") as HTMLElement;
-    openIndicator.setAttribute("aria-hidden", "true");
-    openIndicator.style.color = colors.bodyText;
-    openIndicator.style.fontSize = "12px";
-    openIndicator.style.flexShrink = "0";
-    openIndicator.textContent = "↗";
-    header.appendChild(openIndicator);
+    openBtn.addEventListener("mouseenter", () => {
+      openBtn.style.background = dark
+        ? "rgba(255, 255, 255, 0.08)"
+        : "rgba(15, 23, 42, 0.06)";
+      openBtn.style.opacity = "1";
+    });
+    openBtn.addEventListener("mouseleave", () => {
+      openBtn.style.background = "transparent";
+      openBtn.style.opacity = "0.7";
+    });
+    header.appendChild(openBtn);
   }
 
   card.appendChild(header);
 
   const body = doc.createElementNS(HTML_NS, "div") as HTMLElement;
-  body.style.padding = "10px 12px";
-  body.style.color = colors.bodyText;
-  renderMarkdownFragment(doc, body, group.content, {
+  body.className = "chat-source-group__body";
+  body.hidden = true;
+  Object.assign(body.style, {
+    color: colors.bodyText,
+    background: "transparent",
+  });
+
+  const content = doc.createElementNS(HTML_NS, "div") as HTMLElement;
+  content.className = "chat-source-group__content";
+  Object.assign(content.style, {
+    padding: "2px 12px 10px",
+    maxHeight: "min(200px, 40vh)",
+    overflow: "auto",
+  });
+  renderMarkdownFragment(doc, content, group.content, {
     ...options,
     sourceGroupContext: group,
   });
+  body.appendChild(content);
   card.appendChild(body);
 
+  const toggleCollapsed = (event: Event): void => {
+    event.preventDefault();
+    event.stopPropagation();
+    const collapsed = card.classList.contains("chat-source-group--collapsed");
+    setSourceGroupCollapsed(card, body, toggle, chevron, !collapsed);
+  };
+  toggle.addEventListener("click", toggleCollapsed);
+  toggle.addEventListener("keydown", (event: KeyboardEvent) => {
+    if (event.key === "Enter" || event.key === " ") {
+      toggleCollapsed(event);
+    }
+  });
+  toggle.addEventListener("mouseenter", () => {
+    toggle.style.background = dark
+      ? "rgba(255, 255, 255, 0.04)"
+      : "rgba(15, 23, 42, 0.04)";
+  });
+  toggle.addEventListener("mouseleave", () => {
+    toggle.style.background = "transparent";
+  });
+
   parent.appendChild(card);
+}
+
+function sourceGroupMergeKey(
+  group: Extract<SourceGroupFragment, { kind: "source-group" }>,
+): string {
+  const type = group.type.trim().toLowerCase();
+  if (group.key) {
+    return `${type}::key:${group.key}`;
+  }
+  if (group.url) {
+    return `${type}::url:${group.url}`;
+  }
+  return `${type}::label:${group.label.trim().toLowerCase()}`;
+}
+
+function mergeAdjacentSourceGroupFragments(
+  fragments: SourceGroupFragment[],
+): SourceGroupFragment[] {
+  const merged: SourceGroupFragment[] = [];
+  for (const fragment of fragments) {
+    if (fragment.kind === "markdown") {
+      merged.push(fragment);
+      continue;
+    }
+    const last = merged[merged.length - 1];
+    if (
+      last?.kind === "source-group" &&
+      sourceGroupMergeKey(last) === sourceGroupMergeKey(fragment)
+    ) {
+      const chunks = [last.content.trim(), fragment.content.trim()].filter(
+        Boolean,
+      );
+      last.content = [...new Set(chunks)].join("\n\n");
+      if (last.page !== fragment.page) {
+        last.page = undefined;
+      }
+      continue;
+    }
+    merged.push({ ...fragment });
+  }
+  return merged;
 }
 
 function renderSourceGroupBlocks(
@@ -1569,7 +1901,9 @@ function renderSourceGroupBlocks(
   content: string,
   options: MarkdownRenderOptions = {},
 ): boolean {
-  const fragments = extractSourceGroupFragments(content);
+  const fragments = mergeAdjacentSourceGroupFragments(
+    extractSourceGroupFragments(content),
+  );
   const hasSourceGroups = fragments.some(
     (fragment) => fragment.kind === "source-group",
   );

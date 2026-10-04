@@ -56,6 +56,8 @@ import {
   setupThemeListener,
 } from "./ChatPanelTheme";
 import { createChatContainer } from "./ChatPanelBuilder";
+import { reapplyBookmarkManagerPanelTheme } from "./BookmarkManagerPanel";
+import { reapplyReadingStatsPanelTheme } from "./ReadingStatsPanel";
 import {
   finalizeAgentActivityPanel,
   updateAgentActivityPanel,
@@ -3330,6 +3332,9 @@ async function continueInNewChatFromMessage(
 
 function reapplyChatContainerTheme(container: HTMLElement): void {
   applyThemeToContainer(container);
+  const theme = getCurrentTheme();
+  void reapplyReadingStatsPanelTheme(container, theme);
+  void reapplyBookmarkManagerPanelTheme(container, theme);
   const manager = getChatManager();
   const session = manager.getActiveSession();
   if (!session) {

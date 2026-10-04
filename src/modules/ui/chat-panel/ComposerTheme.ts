@@ -13,26 +13,19 @@ function composerIconFilter(isDark: boolean): string {
   return isDark ? "brightness(0) invert(0.88)" : "brightness(0) invert(0.42)";
 }
 
-export function applyDockedQuickActionsBarSurface(
+export function applyFloatingQuickActionsBarSurface(
   bar: HTMLElement,
-  theme: ThemeColors,
+  _theme: ThemeColors,
 ): void {
-  const isDark = isDarkTheme(theme);
   bar.style.flexWrap = "nowrap";
   bar.style.overflowX = "auto";
   bar.style.overflowY = "hidden";
   bar.style.gap = "6px";
-  bar.style.padding = "10px 52px 12px 14px";
-  bar.style.borderTop = isDark
-    ? "1px solid rgba(255, 255, 255, 0.08)"
-    : "1px solid rgba(15, 23, 42, 0.07)";
-  bar.style.background = isDark
-    ? `linear-gradient(180deg, rgba(36, 36, 36, 0.55) 0%, ${theme.chatHistoryBg} 38%)`
-    : `linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, ${theme.chatHistoryBg} 42%)`;
-  bar.style.boxShadow = isDark
-    ? "0 -10px 28px rgba(0, 0, 0, 0.28)"
-    : "0 -12px 32px rgba(15, 23, 42, 0.07)";
-  bar.style.backdropFilter = "blur(10px)";
+  bar.style.padding = "0 4px 0 2px";
+  bar.style.borderTop = "none";
+  bar.style.background = "transparent";
+  bar.style.boxShadow = "none";
+  bar.style.backdropFilter = "none";
 }
 
 function applyDockedQuickActionChipTheme(
@@ -105,17 +98,17 @@ export function applyQuickActionsTheme(
   const chipShadow = isDark ? "none" : "0 1px 2px rgba(0,0,0,0.04)";
   const iconFilter = composerIconFilter(isDark);
 
-  const dockedBar = container.querySelector(
-    "#chat-quick-actions-bar.chat-quick-actions-bar--docked",
+  const floatingBar = container.querySelector(
+    "#chat-quick-actions-bar.chat-quick-actions-bar--floating",
   ) as HTMLElement | null;
-  if (dockedBar?.classList.contains("is-visible")) {
-    applyDockedQuickActionsBarSurface(dockedBar, theme);
+  if (floatingBar?.classList.contains("is-visible")) {
+    applyFloatingQuickActionsBarSurface(floatingBar, theme);
   }
 
   container.querySelectorAll(".chat-quick-action-chip").forEach((node) => {
     const chip = node as HTMLElement;
-    const isDocked = Boolean(dockedBar?.contains(chip));
-    if (isDocked) {
+    const isFloating = Boolean(floatingBar?.contains(chip));
+    if (isFloating) {
       applyDockedQuickActionChipTheme(chip, theme, iconFilter);
     } else {
       chip.style.background = chipBackground;
@@ -139,8 +132,8 @@ export function applyQuickActionsTheme(
 
   container.querySelectorAll(".chat-quick-action-add").forEach((node) => {
     const button = node as HTMLElement;
-    const isDocked = Boolean(dockedBar?.contains(button));
-    if (isDocked) {
+    const isFloating = Boolean(floatingBar?.contains(button));
+    if (isFloating) {
       applyDockedQuickActionAddTheme(button, theme, iconFilter);
     } else {
       button.style.background = chipBackground;
@@ -244,10 +237,21 @@ export function applyComposerChromeTheme(
   const inputWrapper = container.querySelector(
     "#chat-input-wrapper",
   ) as HTMLElement | null;
-  if (inputWrapper?.parentElement) {
-    const inputArea = inputWrapper.parentElement as HTMLElement;
+  const inputArea = container.querySelector(
+    "#chat-input-area",
+  ) as HTMLElement | null;
+  if (inputArea) {
     inputArea.style.background = theme.inputAreaBg;
-    inputArea.style.borderTopColor = theme.borderColor;
+    inputArea.style.borderTop = "none";
+    inputArea.style.setProperty(
+      "--chat-composer-fade-color",
+      theme.chatHistoryBg,
+    );
+  }
+
+  if (inputWrapper) {
+    inputWrapper.style.boxShadow = theme.composerShadow;
+    inputWrapper.style.setProperty("--composer-shadow-idle", theme.composerShadow);
   }
 
   const editBanner = container.querySelector(

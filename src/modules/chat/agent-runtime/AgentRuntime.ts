@@ -384,6 +384,7 @@ export class AgentRuntime {
           evidence: groundedDisplay.evidence || [],
           sourceItemKeys,
           presentationArtifacts: message.presentationArtifacts || [],
+          turnStartedAt: message.turnStartedAt,
         },
       );
     },

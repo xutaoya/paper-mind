@@ -240,6 +240,18 @@ paperchat-chat-evidence-citation-title = 查看支持这条陈述的证据
 
 paperchat-chat-evidence-view-source = 查看原文
 
+paperchat-chat-source-group-toggle = 展开或收起引用依据
+paperchat-chat-source-group-caption = 来源
+paperchat-chat-source-group-type-paper = 论文
+paperchat-chat-source-group-type-item = 条目
+paperchat-chat-source-group-type-note = 笔记
+paperchat-chat-source-group-type-annotation = 批注
+paperchat-chat-source-group-type-web = 网页
+paperchat-chat-source-group-type-collection = 分类
+paperchat-chat-source-group-type-library = 文库
+paperchat-chat-source-group-type-memory = 记忆
+paperchat-chat-source-group-page = 第 { $page } 页
+
 paperchat-chat-interrupted = 已中断
 
 paperchat-chat-turn-in-progress = 当前回复仍在生成中。
@@ -252,11 +264,16 @@ paperchat-chat-thinking-tokens = { $tokens } tokens
 
 paperchat-chat-agent-activity-thinking = 思考中…
 
-paperchat-chat-agent-activity-summary-thought = 思考了 { $seconds } 秒
+paperchat-chat-agent-activity-duration-sec = { $n } 秒
+paperchat-chat-agent-activity-duration-min = { $n } 分钟
+paperchat-chat-agent-activity-duration-hour = { $n } 小时
+paperchat-chat-agent-activity-duration-hour-min = { $h } 小时 { $m } 分
 
-paperchat-chat-agent-activity-summary-tools = 调用了 { $count } 个工具 · { $seconds } 秒
+paperchat-chat-agent-activity-summary-thought = 思考了 { $duration }
 
-paperchat-chat-agent-activity-summary-mixed = 思考并调用 { $tools } 个工具 · { $seconds } 秒
+paperchat-chat-agent-activity-summary-tools = 调用了 { $count } 个工具 · { $duration }
+
+paperchat-chat-agent-activity-summary-mixed = 思考并调用 { $tools } 个工具 · { $duration }
 
 paperchat-chat-agent-activity-searching-web = 正在搜索网页…
 paperchat-chat-agent-activity-searching-scholarly = 正在搜索学术资料…
@@ -487,6 +504,7 @@ paperchat-chat-stats-streak-days = 连续 { $count } 天
 paperchat-chat-stats-last-reading-day = 最近在 { $date } 阅读 { $duration }
 paperchat-chat-stats-tracking-active = 正在记录阅读时间
 paperchat-chat-stats-tracking-idle = 未在记录（请聚焦 Zotero 并打开 PDF 阅读器）
+paperchat-chat-stats-header-subtitle-tokens = 模型接口返回的输入与输出 Token
 
 paperchat-chat-stats-view-reading = 阅读
 

@@ -15,7 +15,8 @@ import { createElement } from "./ChatPanelBuilder";
 import { HTML_NS } from "./types";
 import type { ThemeColors } from "./types";
 import { isBookmarkManagerVisible } from "./BookmarkManagerPanel";
-import { isDarkMode } from "./ChatPanelTheme";
+import { darkTheme, getCurrentTheme, isDarkMode } from "./ChatPanelTheme";
+import { overlayPanelIconFilter } from "./OverlayPanelsTheme";
 import {
   formatCompactTokenCount,
   formatTokenCount,
@@ -28,13 +29,14 @@ import {
 } from "../../token-stats/TokenStatsStore";
 import {
   createCollapsibleSection,
-  createReadingTrackerStatus,
+  createStatsToolbarIconButton,
   formatBarAxisDayLabel,
   formatWeekDeltaHint,
   getLocalizedWeekdayLabels,
   shouldShowMonthOnBarAxis,
   bindStatsPanelResponsive,
   applyStatsPanelLayout,
+  updateStatsPanelSubtitle,
 } from "./stats/StatsPanelUi";
 import {
   getChatActivitySnapshot,
@@ -44,6 +46,10 @@ import {
 const SVG_NS = "http://www.w3.org/2000/svg";
 
 const PANEL_ID = "chat-reading-stats-panel";
+const STATS_TOOLBAR_ID = "paperchat-stats-panel-toolbar";
+const STATS_SUBTITLE_ID = "paperchat-stats-panel-subtitle";
+const STATS_SWITCHER_HOST_ID = "paperchat-stats-view-switcher-host";
+const STATS_CLOSE_BTN_ID = "chat-stats-close-btn";
 const VIEW_HOST_READING = "stats-view-reading";
 const VIEW_HOST_TOKEN = "stats-view-tokens";
 
@@ -473,19 +479,30 @@ function createSectionTitle(
   options?: { first?: boolean },
 ): HTMLElement {
   const title = createElement(doc, "div", {
-    fontSize: "12px",
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    fontSize: "13px",
     fontWeight: "650",
-    color: theme.textSecondary,
-    marginTop: options?.first ? "4px" : "18px",
-    marginBottom: "8px",
-    paddingBottom: "6px",
-    borderBottom: isDarkMode()
-      ? "1px solid rgba(255, 255, 255, 0.08)"
-      : `1px solid ${theme.borderColor}`,
-    letterSpacing: "0.01em",
+    color: theme.textPrimary,
+    marginTop: options?.first ? "2px" : "20px",
+    marginBottom: "10px",
+    letterSpacing: "-0.01em",
   });
   title.className = "paperchat-stats-section-title";
-  title.textContent = text;
+  const mark = createElement(doc, "span", {
+    width: "3px",
+    height: "14px",
+    borderRadius: "999px",
+    flexShrink: "0",
+    background: getReadingAccent(theme),
+    opacity: isDarkMode() ? "0.9" : "0.85",
+  });
+  mark.className = "paperchat-stats-section-mark";
+  const label = createElement(doc, "span", { minWidth: "0" });
+  label.textContent = text;
+  title.appendChild(mark);
+  title.appendChild(label);
   return title;
 }
 
@@ -645,7 +662,7 @@ function createReadingRankRow(
   head.appendChild(durationEl);
 
   const track = createElement(doc, "div", {
-    height: "8px",
+    height: "5px",
     borderRadius: "999px",
     background: isDarkMode()
       ? "rgba(255, 255, 255, 0.06)"
@@ -658,6 +675,7 @@ function createReadingRankRow(
     width: "0%",
     borderRadius: "999px",
     background: readingBarColor(rank),
+    opacity: isDarkMode() ? "0.88" : "0.72",
   });
   fill.className = "paperchat-stats-read-bar-fill";
   track.appendChild(fill);
@@ -1738,8 +1756,8 @@ function createViewSwitcher(
     display: "grid",
     gridTemplateColumns: "1fr 1fr",
     gap: "2px",
-    padding: "2px",
-    marginBottom: "14px",
+    padding: "3px",
+    marginBottom: "0",
     borderRadius: "10px",
     border: `1px solid ${theme.borderColor}`,
     background: isDarkMode()
@@ -2589,13 +2607,6 @@ async function renderReadingStatsContent(
 ): Promise<void> {
   host.textContent = "";
   const snapshot = await getReadingStatsSnapshot();
-  host.appendChild(
-    createReadingTrackerStatus(
-      doc,
-      theme,
-      isReadingTimeAccumulatingNow(),
-    ),
-  );
   const cards = createElement(doc, "div", {
     display: "grid",
     gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
@@ -2683,6 +2694,19 @@ async function renderReadingStatsContent(
   host.appendChild(footnote);
 }
 
+export async function reapplyReadingStatsPanelTheme(
+  container: HTMLElement,
+  theme: ThemeColors,
+): Promise<void> {
+  const panel = getReadingStatsPanel(container);
+  if (!panel || !isReadingStatsPanelVisible(container)) {
+    return;
+  }
+  panel.dataset.theme = theme === darkTheme ? "dark" : "light";
+  invalidateStatsViewCache(panel);
+  await refreshReadingStatsPanel(panel, theme, { force: true });
+}
+
 export async function refreshReadingStatsPanel(
   panel: HTMLElement,
   theme: ThemeColors,
@@ -2701,13 +2725,20 @@ export async function refreshReadingStatsPanel(
     invalidateStatsViewCache(panel);
   }
 
-  let switcher = body.querySelector(
+  const switcherHost = panel.querySelector(
+    `#${STATS_SWITCHER_HOST_ID}`,
+  ) as HTMLElement | null;
+  let switcher = switcherHost?.querySelector(
     ".paperchat-stats-view-switcher",
   ) as HTMLElement | null;
-  if (!switcher) {
-    body.textContent = "";
-    switcher = createViewSwitcher(doc, theme, panel, view);
-    body.appendChild(switcher);
+  if (switcherHost) {
+    body.querySelector(".paperchat-stats-view-switcher")?.remove();
+    if (!switcher) {
+      switcher = createViewSwitcher(doc, theme, panel, view);
+      switcherHost.appendChild(switcher);
+    } else {
+      syncStatsViewSwitcher(panel, theme, view);
+    }
   }
 
   let readingHost = body.querySelector(
@@ -2738,6 +2769,19 @@ export async function refreshReadingStatsPanel(
     readingHost.dataset.built = "1";
   }
 
+  const subtitle = panel.querySelector(
+    `#${STATS_SUBTITLE_ID}`,
+  ) as HTMLElement | null;
+  if (subtitle) {
+    updateStatsPanelSubtitle(
+      subtitle,
+      doc,
+      theme,
+      view,
+      isReadingTimeAccumulatingNow(),
+    );
+  }
+
   bindStatsPanelResponsive(panel);
   applyStatsPanelLayout(panel);
 }
@@ -2761,29 +2805,122 @@ export function createReadingStatsPanel(
     { id: PANEL_ID },
   );
   panel.dataset.statsLayout = "wide";
+  panel.dataset.theme = isDarkMode() ? "dark" : "light";
 
-  const header = createElement(doc, "div", {
+  const toolbar = createElement(
+    doc,
+    "div",
+    {
+      display: "flex",
+      flexDirection: "column",
+      gap: "10px",
+      padding: "12px 14px 11px",
+      borderBottom: `1px solid ${theme.borderColor}`,
+      background: theme.toolbarBg,
+      flexShrink: "0",
+      minWidth: "0",
+    },
+    { id: STATS_TOOLBAR_ID },
+  );
+  toolbar.className = "paperchat-stats-panel-toolbar";
+
+  const headerRow = createElement(doc, "div", {
+    display: "flex",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: "10px",
+    minWidth: "0",
+  });
+
+  const brand = createElement(doc, "div", {
+    display: "flex",
+    alignItems: "flex-start",
+    gap: "10px",
+    minWidth: "0",
+    flex: "1",
+  });
+  const iconWrap = createElement(doc, "div", {
+    width: "36px",
+    height: "36px",
+    borderRadius: "10px",
     display: "flex",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: "8px",
-    padding: "12px 14px",
-    borderBottom: `1px solid ${theme.borderColor}`,
-    background: theme.toolbarBg,
+    justifyContent: "center",
     flexShrink: "0",
+    background: isDarkMode()
+      ? "rgba(96, 165, 250, 0.14)"
+      : "rgba(37, 99, 235, 0.1)",
+    border: metricCardBorder(theme),
+  });
+  iconWrap.className = "paperchat-stats-panel-brand-icon";
+  const brandIcon = doc.createElementNS(HTML_NS, "img") as HTMLImageElement;
+  brandIcon.src = `chrome://${config.addonRef}/content/icons/chart.svg`;
+  brandIcon.alt = "";
+  brandIcon.setAttribute("aria-hidden", "true");
+  Object.assign(brandIcon.style, {
+    width: "18px",
+    height: "18px",
+    display: "block",
+    opacity: "0.9",
+    filter: overlayPanelIconFilter(theme),
+  });
+  iconWrap.appendChild(brandIcon);
+
+  const titleStack = createElement(doc, "div", {
+    display: "flex",
+    flexDirection: "column",
+    gap: "3px",
     minWidth: "0",
+    flex: "1",
+    paddingTop: "1px",
   });
   const title = createElement(doc, "div", {
     fontSize: "15px",
     fontWeight: "650",
     color: theme.textPrimary,
-    flex: "1",
-    minWidth: "0",
+    letterSpacing: "-0.01em",
+    lineHeight: "1.2",
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   });
   title.textContent = getString("chat-stats-title");
+  const subtitle = createElement(
+    doc,
+    "div",
+    {
+      fontSize: "12px",
+      lineHeight: "1.35",
+      color: theme.textMuted,
+      minWidth: "0",
+    },
+    { id: STATS_SUBTITLE_ID },
+  );
+  titleStack.appendChild(title);
+  titleStack.appendChild(subtitle);
+  brand.appendChild(iconWrap);
+  brand.appendChild(titleStack);
+
+  const actions = createElement(doc, "div", {
+    display: "flex",
+    alignItems: "center",
+    gap: "2px",
+    flexShrink: "0",
+  });
+  actions.className = "paperchat-stats-header-actions";
+
+  const refreshPanel = (): void => {
+    void refreshReadingStatsPanel(panel, getCurrentTheme(), { force: true });
+  };
+  actions.appendChild(
+    createStatsToolbarIconButton(
+      doc,
+      theme,
+      "refresh.svg",
+      getString("chat-stats-refresh"),
+      refreshPanel,
+    ),
+  );
 
   const closeBtn = createElement(
     doc,
@@ -2791,6 +2928,7 @@ export function createReadingStatsPanel(
     {
       width: "32px",
       height: "32px",
+      minWidth: "32px",
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
@@ -2799,10 +2937,12 @@ export function createReadingStatsPanel(
       background: "transparent",
       cursor: "pointer",
       padding: "0",
+      appearance: "none",
       color: theme.textMuted,
     },
     {
       type: "button",
+      id: STATS_CLOSE_BTN_ID,
       title: getString("chat-bookmark-close"),
       "aria-label": getString("chat-bookmark-close"),
     },
@@ -2810,12 +2950,40 @@ export function createReadingStatsPanel(
   const closeIcon = doc.createElementNS(HTML_NS, "img") as HTMLImageElement;
   closeIcon.src = `chrome://${config.addonRef}/content/icons/close.svg`;
   closeIcon.alt = "";
-  Object.assign(closeIcon.style, { width: "14px", height: "14px" });
+  closeIcon.setAttribute("aria-hidden", "true");
+  Object.assign(closeIcon.style, {
+    width: "14px",
+    height: "14px",
+    display: "block",
+    opacity: "0.82",
+    filter: overlayPanelIconFilter(theme),
+  });
   closeBtn.appendChild(closeIcon);
   closeBtn.addEventListener("click", onClose);
+  closeBtn.addEventListener("mouseenter", () => {
+    closeBtn.style.background = theme.buttonHoverBg;
+    closeBtn.style.color = theme.textPrimary;
+  });
+  closeBtn.addEventListener("mouseleave", () => {
+    closeBtn.style.background = "transparent";
+    closeBtn.style.color = theme.textMuted;
+  });
 
-  header.appendChild(title);
-  header.appendChild(closeBtn);
+  actions.appendChild(closeBtn);
+  headerRow.appendChild(brand);
+  headerRow.appendChild(actions);
+
+  const switcherHost = createElement(
+    doc,
+    "div",
+    { minWidth: "0" },
+    { id: STATS_SWITCHER_HOST_ID },
+  );
+  switcherHost.className = "paperchat-stats-view-switcher-host";
+
+  toolbar.appendChild(headerRow);
+  toolbar.appendChild(switcherHost);
+  panel.appendChild(toolbar);
 
   const body = createElement(
     doc,
@@ -2824,13 +2992,20 @@ export function createReadingStatsPanel(
       flex: "1",
       minHeight: "0",
       overflow: "auto",
-      padding: "12px 12px 16px",
+      padding: "10px 12px 16px",
       position: "relative",
     },
     { id: "chat-reading-stats-panel-body" },
   );
-
-  panel.appendChild(header);
   panel.appendChild(body);
+
+  updateStatsPanelSubtitle(
+    subtitle,
+    doc,
+    theme,
+    "reading",
+    isReadingTimeAccumulatingNow(),
+  );
+
   return panel;
 }

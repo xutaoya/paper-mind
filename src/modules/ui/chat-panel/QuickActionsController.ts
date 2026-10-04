@@ -53,7 +53,7 @@ export async function renderQuickActionsBar(
     "#chat-scroll-bottom-btn",
   ) as HTMLElement | null;
   if (scrollBottomBtn) {
-    scrollBottomBtn.style.bottom = hasShortcuts ? "62px" : "16px";
+    scrollBottomBtn.style.bottom = hasShortcuts ? "148px" : "120px";
   }
 
   if (hasShortcuts) {

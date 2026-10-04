@@ -151,14 +151,6 @@ function bindHistoryClickDelegation(chatHistory: HTMLElement): void {
     if (!bubble || !wrapper.contains(bubble)) {
       return;
     }
-    if (bubble.dataset.openReader === "true") {
-      void Promise.resolve(actions?.onOpenMessageReader?.(messageId)).catch(
-        (error: unknown) => {
-          ztoolkit.log("[MessageRenderer] Open message reader failed:", error);
-        },
-      );
-      return;
-    }
     if (bubble.dataset.editable === "true") {
       actions?.onEditUserMessage?.(messageId);
     }
@@ -621,6 +613,8 @@ export interface MessageRenderOptions {
   onEditUserMessage?: (userMessageId: string) => void;
   editingUserMessageId?: string | null;
   onRenderComplete?: () => void;
+  /** Start of the assistant turn (typically the preceding user message time). */
+  activityStartedAt?: number;
 }
 
 export function getMessageMarkdownRenderOptions(
@@ -1142,7 +1136,8 @@ export function createMessageElement(
         reasoning: msg.reasoning || "",
         content: msg.content,
         isWorking: isReasoningStreaming,
-        startedAt: msg.timestamp,
+        activityStartedAt: renderOptions.activityStartedAt,
+        activityEndedAt: isReasoningStreaming ? undefined : msg.timestamp,
         turnUsage: msg.turnUsage,
       });
       if (isReasoningStreaming && !msg.reasoning && !msg.content.includes("<tool-call")) {
@@ -1190,15 +1185,6 @@ export function createMessageElement(
     bubble.appendChild(
       createInterruptedFooter(doc, theme, attachedError, attachedNotices),
     );
-  }
-
-  if (
-    msg.role === "assistant" &&
-    msg.streamingState === undefined &&
-    renderOptions.onOpenMessageReader
-  ) {
-    bubble.style.cursor = "pointer";
-    bubble.dataset.openReader = "true";
   }
 
   if (msg.role === "user" && msg.streamingState === undefined && !msg.isSystemNotice) {
@@ -1846,6 +1832,19 @@ function appendPresentationRange(
       );
     }
     previousTimestamp = msg.timestamp;
+    let activityStartedAt: number | undefined;
+    if (msg.role === "assistant") {
+      activityStartedAt = msg.turnStartedAt;
+      if (activityStartedAt == null) {
+        for (let prev = index - 1; prev >= 0; prev -= 1) {
+          const prior = presentations[prev].message;
+          if (prior.role === "user") {
+            activityStartedAt = prior.timestamp;
+            break;
+          }
+        }
+      }
+    }
     target.appendChild(
       createMessageElement(
         doc,
@@ -1856,7 +1855,10 @@ function appendPresentationRange(
           (!!attachedError && retryableErrorMessageId === attachedError.id),
         onReroll,
         onRerollError,
-        renderOptions,
+        {
+          ...renderOptions,
+          activityStartedAt,
+        },
         attachedError,
         attachedNotices,
       ),

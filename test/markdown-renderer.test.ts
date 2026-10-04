@@ -19,6 +19,7 @@ class FakeElement {
   readonly children: FakeElement[] = [];
   readonly listeners = new Map<string, (event: any) => void>();
   parentNode: FakeElement | null = null;
+  className = "";
   private value = "";
 
   constructor(
@@ -1096,6 +1097,50 @@ Missing label should not be parsed.
     }
     assert.equal(fragments[0].label, "Accuracy > Speed");
     assert.equal(fragments[0].key, "PAPER123");
+  });
+
+  it("merges adjacent source groups for the same paper into one card", function () {
+    const originalZotero = (globalThis as { Zotero?: unknown }).Zotero;
+    const originalAddon = (globalThis as { addon?: unknown }).addon;
+    (globalThis as { Zotero?: unknown }).Zotero = {
+      getMainWindow: () => null,
+    };
+    (globalThis as { addon?: unknown }).addon = {
+      data: {
+        locale: {
+          current: {
+            formatMessagesSync: (messages: Array<{ id: string }>) =>
+              messages.map((message) => ({
+                value: message.id,
+                attributes: null,
+              })),
+          },
+        },
+      },
+    };
+    const doc = new FakeDocument();
+    const root = new FakeElement(doc, "div");
+    try {
+      renderMarkdownToElement(
+        root as unknown as HTMLElement,
+        `<source-group label="MambaDFuse" type="paper" key="ABCD1234">
+- First passage.
+</source-group>
+<source-group label="MambaDFuse" type="paper" key="ABCD1234">
+- Second passage.
+</source-group>`,
+        "message-merge-source",
+      );
+      const cards = root.children.filter((child) =>
+        child.className.includes("chat-source-group"),
+      );
+      assert.equal(cards.length, 1);
+      assert.include(collectRenderedText(cards[0]!), "First passage");
+      assert.include(collectRenderedText(cards[0]!), "Second passage");
+    } finally {
+      (globalThis as { Zotero?: unknown }).Zotero = originalZotero;
+      (globalThis as { addon?: unknown }).addon = originalAddon;
+    }
   });
 
   it("does not reinterpret attribute-like label text as navigation targets", function () {

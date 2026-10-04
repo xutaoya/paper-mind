@@ -42,6 +42,7 @@ export interface MessageStorageRow {
   search_text?: string | null;
   search_index_version?: number | null;
   edited_at?: number | null;
+  turn_started_at?: number | null;
 }
 
 const MAX_STORED_EVIDENCE_JSON_CHARACTERS = 600_000;
@@ -189,6 +190,10 @@ export function mapMessageRowToChatMessage(
   const editedAt = readOptionalMessageColumn(row, "edited_at");
   if (editedAt) {
     message.editedAt = editedAt;
+  }
+  const turnStartedAt = readOptionalMessageColumn(row, "turn_started_at");
+  if (turnStartedAt) {
+    message.turnStartedAt = turnStartedAt;
   }
   return message;
 }

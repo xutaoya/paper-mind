@@ -58,6 +58,8 @@ export interface ChatMessage {
   files?: FileAttachment[];
   quotedMessages?: QuotedMessageRef[];
   timestamp: number;
+  /** Wall-clock start of an assistant turn (placeholder creation); completion stays in `timestamp`. */
+  turnStartedAt?: number;
   /** Set when the user edits and resends an existing user message. */
   editedAt?: number;
   pdfContext?: boolean; // 是否包含PDF上下文

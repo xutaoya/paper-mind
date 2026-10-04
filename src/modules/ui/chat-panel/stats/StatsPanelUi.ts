@@ -1,6 +1,8 @@
 import { config } from "../../../../../package.json";
 import { getString } from "../../../../utils/locale";
 import { createElement } from "../ChatPanelBuilder";
+import { overlayPanelIconFilter } from "../OverlayPanelsTheme";
+import { HTML_NS } from "../types";
 import type { ThemeColors } from "../types";
 
 const STATS_READING_FILE = "paperchat-reading-stats.json";
@@ -188,21 +190,21 @@ function createIconToolButton(
 
 const STATS_HELP_ID = "paperchat-stats-help-popover";
 
-function toggleStatsHelpPopover(
-  header: HTMLElement,
+export function toggleStatsHelpPopover(
+  anchor: HTMLElement,
   doc: Document,
   theme: ThemeColors,
   text: string,
 ): void {
-  const existing = header.querySelector(`#${STATS_HELP_ID}`);
+  const existing = anchor.querySelector(`#${STATS_HELP_ID}`);
   if (existing) {
     existing.remove();
     return;
   }
   const pop = createElement(doc, "div", {
     position: "absolute",
-    top: "48px",
-    right: "12px",
+    top: "calc(100% + 6px)",
+    right: "0",
     zIndex: "8",
     maxWidth: "min(320px, calc(100% - 24px))",
     padding: "10px 12px",
@@ -217,8 +219,11 @@ function toggleStatsHelpPopover(
   });
   pop.id = STATS_HELP_ID;
   pop.textContent = text;
-  header.style.position = "relative";
-  header.appendChild(pop);
+  const mount =
+    (anchor.querySelector(".paperchat-stats-header-actions") as HTMLElement) ||
+    anchor;
+  mount.style.position = "relative";
+  mount.appendChild(pop);
   const dismiss = (event: MouseEvent): void => {
     const target = event.target as HTMLElement | null;
     if (target?.closest(`#${STATS_HELP_ID}`) || target?.closest("button")) {
@@ -361,6 +366,20 @@ export function createReadingTrackerStatus(
     color: active ? (theme.sendButtonBg || "#16a34a") : theme.textMuted,
   });
   row.className = "paperchat-stats-tracker-status";
+  fillReadingTrackerStatus(row, doc, theme, active);
+  return row;
+}
+
+export function fillReadingTrackerStatus(
+  host: HTMLElement,
+  doc: Document,
+  theme: ThemeColors,
+  active: boolean,
+): void {
+  host.textContent = "";
+  host.style.color = active
+    ? theme.sendButtonBg || "#16a34a"
+    : theme.textMuted;
   const dot = createElement(doc, "span", {
     width: "6px",
     height: "6px",
@@ -369,13 +388,96 @@ export function createReadingTrackerStatus(
     background: active ? "#22c55e" : theme.textMuted,
     opacity: active ? "1" : "0.55",
   });
-  row.appendChild(dot);
+  host.appendChild(dot);
   const text = createElement(doc, "span", {});
   text.textContent = active
     ? getString("chat-stats-tracking-active")
     : getString("chat-stats-tracking-idle");
-  row.appendChild(text);
-  return row;
+  host.appendChild(text);
+}
+
+export type StatsPanelView = "reading" | "tokens";
+
+export function updateStatsPanelSubtitle(
+  subtitle: HTMLElement,
+  doc: Document,
+  theme: ThemeColors,
+  view: StatsPanelView,
+  trackingActive: boolean,
+): void {
+  subtitle.className = "paperchat-stats-panel-subtitle";
+  if (view === "tokens") {
+    subtitle.textContent = getString("chat-stats-header-subtitle-tokens");
+    subtitle.style.color = theme.textMuted;
+    subtitle.style.display = "block";
+    return;
+  }
+  Object.assign(subtitle.style, {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    fontSize: "12px",
+    lineHeight: "1.35",
+    minWidth: "0",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  });
+  fillReadingTrackerStatus(subtitle, doc, theme, trackingActive);
+}
+
+export function createStatsToolbarIconButton(
+  doc: Document,
+  theme: ThemeColors,
+  iconFile: string,
+  label: string,
+  onClick: () => void,
+): HTMLButtonElement {
+  const button = createElement(
+    doc,
+    "button",
+    {
+      width: "32px",
+      height: "32px",
+      minWidth: "32px",
+      display: "inline-flex",
+      alignItems: "center",
+      justifyContent: "center",
+      border: "none",
+      borderRadius: "8px",
+      background: "transparent",
+      cursor: "pointer",
+      padding: "0",
+      appearance: "none",
+      color: theme.textMuted,
+      flexShrink: "0",
+    },
+    { type: "button", title: label, "aria-label": label },
+  ) as HTMLButtonElement;
+  const icon = doc.createElementNS(HTML_NS, "img") as HTMLImageElement;
+  icon.src = `chrome://${config.addonRef}/content/icons/${iconFile}`;
+  icon.alt = "";
+  icon.setAttribute("aria-hidden", "true");
+  Object.assign(icon.style, {
+    width: "15px",
+    height: "15px",
+    display: "block",
+    opacity: "0.82",
+    filter: overlayPanelIconFilter(theme),
+  });
+  button.appendChild(icon);
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    onClick();
+  });
+  button.addEventListener("mouseenter", () => {
+    button.style.background = theme.buttonHoverBg;
+    button.style.color = theme.textPrimary;
+  });
+  button.addEventListener("mouseleave", () => {
+    button.style.background = "transparent";
+    button.style.color = theme.textMuted;
+  });
+  return button;
 }
 
 const STATS_LAYOUT_MEDIUM_MAX = 340;

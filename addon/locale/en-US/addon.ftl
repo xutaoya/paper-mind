@@ -240,6 +240,18 @@ paperchat-chat-evidence-citation-title = View supporting evidence
 
 paperchat-chat-evidence-view-source = View source
 
+paperchat-chat-source-group-toggle = Expand or collapse cited passages
+paperchat-chat-source-group-caption = Source
+paperchat-chat-source-group-type-paper = Paper
+paperchat-chat-source-group-type-item = Item
+paperchat-chat-source-group-type-note = Note
+paperchat-chat-source-group-type-annotation = Annotation
+paperchat-chat-source-group-type-web = Web
+paperchat-chat-source-group-type-collection = Collection
+paperchat-chat-source-group-type-library = Library
+paperchat-chat-source-group-type-memory = Memory
+paperchat-chat-source-group-page = p.{ $page }
+
 paperchat-chat-interrupted = Interrupted
 
 paperchat-chat-turn-in-progress = A response is already in progress.
@@ -252,11 +264,16 @@ paperchat-chat-thinking-tokens = { $tokens } tokens
 
 paperchat-chat-agent-activity-thinking = Thinking…
 
-paperchat-chat-agent-activity-summary-thought = Thought for { $seconds }s
+paperchat-chat-agent-activity-duration-sec = { $n }s
+paperchat-chat-agent-activity-duration-min = { $n } min
+paperchat-chat-agent-activity-duration-hour = { $n } h
+paperchat-chat-agent-activity-duration-hour-min = { $h } h { $m } min
 
-paperchat-chat-agent-activity-summary-tools = Ran { $count } tools · { $seconds }s
+paperchat-chat-agent-activity-summary-thought = Thought for { $duration }
 
-paperchat-chat-agent-activity-summary-mixed = Thought and ran { $tools } tools · { $seconds }s
+paperchat-chat-agent-activity-summary-tools = Ran { $count } tools · { $duration }
+
+paperchat-chat-agent-activity-summary-mixed = Thought and ran { $tools } tools · { $duration }
 
 paperchat-chat-agent-activity-searching-web = Searching the web...
 paperchat-chat-agent-activity-searching-scholarly = Searching scholarly sources...
@@ -487,6 +504,7 @@ paperchat-chat-stats-streak-days = { $count }-day streak
 paperchat-chat-stats-last-reading-day = Last read { $duration } on { $date }
 paperchat-chat-stats-tracking-active = Recording reading time
 paperchat-chat-stats-tracking-idle = Not recording (focus Zotero with PDF reader open)
+paperchat-chat-stats-header-subtitle-tokens = Input and output tokens from the model API
 
 paperchat-chat-stats-view-reading = Reading
 
