@@ -41,6 +41,8 @@ import {
   type ChatActivitySnapshot,
   type ChatDayCell,
 } from "../../workflow-stats";
+const SVG_NS = "http://www.w3.org/2000/svg";
+
 const PANEL_ID = "chat-reading-stats-panel";
 const VIEW_HOST_READING = "stats-view-reading";
 const VIEW_HOST_TOKEN = "stats-view-tokens";
@@ -507,6 +509,43 @@ function attachLiteratureRowAction(
   });
 }
 
+function createStatsEmptyIcon(doc: Document, theme: ThemeColors): HTMLElement {
+  const wrap = createElement(doc, "div", {
+    display: "flex",
+    justifyContent: "center",
+    marginBottom: "10px",
+    color: theme.textMuted,
+    opacity: "0.5",
+  });
+  wrap.className = "paperchat-stats-empty-icon";
+  wrap.setAttribute("aria-hidden", "true");
+
+  const svg = doc.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("width", "28");
+  svg.setAttribute("height", "28");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("aria-hidden", "true");
+
+  const bars: Array<[string, string, string, string]> = [
+    ["1.5", "8", "3", "6.5"],
+    ["6.5", "4.5", "3", "10"],
+    ["11.5", "1.5", "3", "13"],
+  ];
+  for (const [x, y, width, height] of bars) {
+    const rect = doc.createElementNS(SVG_NS, "rect");
+    rect.setAttribute("x", x);
+    rect.setAttribute("y", y);
+    rect.setAttribute("width", width);
+    rect.setAttribute("height", height);
+    rect.setAttribute("rx", "0.8");
+    rect.setAttribute("fill", "currentColor");
+    svg.appendChild(rect);
+  }
+  wrap.appendChild(svg);
+  return wrap;
+}
+
 function createEmptyHint(doc: Document, theme: ThemeColors, text: string): HTMLElement {
   const wrap = createElement(doc, "div", {
     padding: "28px 16px 20px",
@@ -520,14 +559,7 @@ function createEmptyHint(doc: Document, theme: ThemeColors, text: string): HTMLE
       : "rgba(15, 23, 42, 0.02)",
   });
   wrap.className = "paperchat-stats-empty";
-  const icon = createElement(doc, "div", {
-    fontSize: "26px",
-    lineHeight: "1",
-    marginBottom: "10px",
-    opacity: "0.45",
-  });
-  icon.textContent = "📊";
-  icon.setAttribute("aria-hidden", "true");
+  wrap.appendChild(createStatsEmptyIcon(doc, theme));
   const hint = createElement(doc, "div", {
     color: theme.textMuted,
     fontSize: "12px",
@@ -537,7 +569,6 @@ function createEmptyHint(doc: Document, theme: ThemeColors, text: string): HTMLE
   });
   hint.className = "paperchat-stats-empty-hint";
   hint.textContent = text;
-  wrap.appendChild(icon);
   wrap.appendChild(hint);
   return wrap;
 }

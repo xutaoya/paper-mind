@@ -187,6 +187,10 @@
   margin: 4px 0 12px;
 }
 
+.paperchat-stats-empty-icon svg {
+  display: block;
+}
+
 .paperchat-stats-metric-hint {
   display: -webkit-box;
   -webkit-line-clamp: 2;
