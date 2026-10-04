@@ -75,6 +75,14 @@ function onTick(): void {
   );
 }
 
+export function isReadingStatsTrackerRunning(): boolean {
+  return timerId !== null;
+}
+
+export function isReadingTimeAccumulatingNow(): boolean {
+  return getActiveReaderLiteratureItem() !== null;
+}
+
 export function startReadingStatsTracker(): void {
   if (timerId !== null) {
     return;

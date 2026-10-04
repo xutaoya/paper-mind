@@ -4,6 +4,7 @@ export {
   formatReadingDurationCompact,
   getLiteratureCounts,
   getReadingStatsSnapshot,
+  getStartOfLocalWeek,
   recordReadingSeconds,
   readingSecondsToLevel,
   READING_HEATMAP_WEEKS,
@@ -16,6 +17,8 @@ export {
 } from "./ReadingStatsService";
 export { itemReadingStorageKey } from "./ReadingStatsStore";
 export {
+  isReadingTimeAccumulatingNow,
+  isReadingStatsTrackerRunning,
   startReadingStatsTracker,
   stopReadingStatsTracker,
 } from "./ReadingStatsTracker";

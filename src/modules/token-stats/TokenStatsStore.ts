@@ -1,5 +1,6 @@
 import type { ChatMessageTurnUsage } from "../../types/chat";
 import {
+  getStartOfLocalWeek,
   READING_HEATMAP_WEEKS,
   readingSecondsToLevel,
 } from "../reading-stats/ReadingStatsService";
@@ -18,9 +19,12 @@ export interface TokenModelRecord extends TokenDayRecord {
 }
 
 interface TokenStatsFile {
-  version: 1;
+  version: 2;
   daily: Record<string, TokenDayRecord>;
+  /** Lifetime totals per model. */
   models: Record<string, TokenModelRecord>;
+  /** Per calendar day, per model usage (for day detail popovers). */
+  dailyModels: Record<string, Record<string, TokenModelRecord>>;
 }
 
 export interface TokenBarDay {
@@ -28,6 +32,7 @@ export interface TokenBarDay {
   date: Date;
   inputTokens: number;
   outputTokens: number;
+  reasoningTokens: number;
   totalTokens: number;
 }
 
@@ -36,6 +41,7 @@ export interface TokenHeatCell {
   date: Date;
   inputTokens: number;
   outputTokens: number;
+  reasoningTokens: number;
   totalTokens: number;
   level: 0 | 1 | 2 | 3 | 4;
 }
@@ -46,15 +52,18 @@ export interface TokenStatsSnapshot {
   reasoningTokens: number;
   totalTokens: number;
   weekTokens: number;
+  lastWeekTokens: number;
+  tokenStreakDays: number;
   activeDays: number;
   weekCount: number;
   cells: TokenHeatCell[];
   recentDays: TokenBarDay[];
   models: TokenModelRecord[];
+  modelsByDay: Record<string, TokenModelRecord[]>;
 }
 
 function emptyStats(): TokenStatsFile {
-  return { version: 1, daily: {}, models: {} };
+  return { version: 2, daily: {}, models: {}, dailyModels: {} };
 }
 
 function emptyDay(): TokenDayRecord {
@@ -76,12 +85,55 @@ function normalize(raw: unknown): TokenStatsFile {
   if (!raw || typeof raw !== "object") {
     return emptyStats();
   }
-  const record = raw as Partial<TokenStatsFile>;
-  return {
-    version: 1,
-    daily: { ...(record.daily || {}) },
-    models: { ...(record.models || {}) },
+  const record = raw as {
+    version?: number;
+    daily?: Record<string, TokenDayRecord>;
+    models?: Record<string, TokenModelRecord>;
+    dailyModels?: Record<string, Record<string, TokenModelRecord>>;
   };
+  if (record.version === 2) {
+    return {
+      version: 2,
+      daily: { ...(record.daily || {}) },
+      models: { ...(record.models || {}) },
+      dailyModels: { ...(record.dailyModels || {}) },
+    };
+  }
+  if (record.version === 1) {
+    return {
+      version: 2,
+      daily: { ...(record.daily || {}) },
+      models: { ...(record.models || {}) },
+      dailyModels: {},
+    };
+  }
+  return emptyStats();
+}
+
+function sortModelsByTotal(
+  entries: TokenModelRecord[],
+): TokenModelRecord[] {
+  return entries
+    .filter((entry) => entry.inputTokens + entry.outputTokens > 0)
+    .sort(
+      (left, right) =>
+        right.inputTokens +
+        right.outputTokens -
+        (left.inputTokens + left.outputTokens),
+    );
+}
+
+function buildModelsByDay(
+  dailyModels: Record<string, Record<string, TokenModelRecord>>,
+): Record<string, TokenModelRecord[]> {
+  const modelsByDay: Record<string, TokenModelRecord[]> = {};
+  for (const [dayKey, models] of Object.entries(dailyModels)) {
+    const list = sortModelsByTotal(Object.values(models));
+    if (list.length) {
+      modelsByDay[dayKey] = list;
+    }
+  }
+  return modelsByDay;
 }
 
 async function loadTokenStats(): Promise<TokenStatsFile> {
@@ -102,6 +154,7 @@ async function saveTokenStats(data: TokenStatsFile): Promise<void> {
   if (keys.length > 400) {
     for (const key of keys.slice(0, keys.length - 400)) {
       delete data.daily[key];
+      delete data.dailyModels[key];
     }
   }
   try {
@@ -118,6 +171,17 @@ export function usageHasTokens(usage: ChatMessageTurnUsage): boolean {
     (usage.reasoningTokens ?? 0) > 0 ||
     (usage.totalTokens ?? 0) > 0
   );
+}
+
+function applyUsageToDayRecord(
+  existing: TokenDayRecord,
+  input: number | undefined,
+  output: number | undefined,
+  reasoning: number | undefined,
+): void {
+  existing.inputTokens = addCount(existing.inputTokens, input);
+  existing.outputTokens = addCount(existing.outputTokens, output);
+  existing.reasoningTokens = addCount(existing.reasoningTokens, reasoning);
 }
 
 export async function recordTokenUsage(
@@ -146,13 +210,27 @@ export async function recordTokenUsage(
       ...emptyDay(),
       model: modelName,
     };
-    existing.inputTokens = addCount(existing.inputTokens, input);
-    existing.outputTokens = addCount(existing.outputTokens, output);
-    existing.reasoningTokens = addCount(
-      existing.reasoningTokens,
+    applyUsageToDayRecord(
+      existing,
+      input,
+      output,
       usage.reasoningTokens,
     );
     data.models[modelName] = existing;
+
+    const dayModels = data.dailyModels[dayKey] || {};
+    const dayModel = dayModels[modelName] || {
+      ...emptyDay(),
+      model: modelName,
+    };
+    applyUsageToDayRecord(
+      dayModel,
+      input,
+      output,
+      usage.reasoningTokens,
+    );
+    dayModels[modelName] = dayModel;
+    data.dailyModels[dayKey] = dayModels;
   }
 
   await saveTokenStats(data);
@@ -168,20 +246,67 @@ function addLocalDays(date: Date, days: number): Date {
   return next;
 }
 
+function sumTokensInDayKeyRange(
+  daily: Record<string, TokenDayRecord>,
+  startKey: string,
+  endKey: string,
+): number {
+  let total = 0;
+  for (const [dayKey, day] of Object.entries(daily)) {
+    if (dayKey < startKey || dayKey > endKey) {
+      continue;
+    }
+    total += day.inputTokens + day.outputTokens;
+  }
+  return total;
+}
+
+function computeTokenStreak(
+  daily: Record<string, TokenDayRecord>,
+  now: Date,
+): number {
+  let cursor = startOfLocalDay(now);
+  const todayKey = formatLocalDayKey(cursor);
+  const todayTotal =
+    (daily[todayKey]?.inputTokens || 0) + (daily[todayKey]?.outputTokens || 0);
+  if (todayTotal <= 0) {
+    cursor = addLocalDays(cursor, -1);
+  }
+  let streak = 0;
+  for (let guard = 0; guard < 4000; guard += 1) {
+    const key = formatLocalDayKey(cursor);
+    const day = daily[key];
+    const total = (day?.inputTokens || 0) + (day?.outputTokens || 0);
+    if (total <= 0) {
+      break;
+    }
+    streak += 1;
+    cursor = addLocalDays(cursor, -1);
+  }
+  return streak;
+}
+
 export async function getTokenStatsSnapshot(
   now = new Date(),
   weekCount = READING_HEATMAP_WEEKS,
 ): Promise<TokenStatsSnapshot> {
   const data = await loadTokenStats();
+  const modelsByDay = buildModelsByDay(data.dailyModels);
   const end = startOfLocalDay(now);
-  const weekStart = addLocalDays(end, -end.getDay());
+  const weekStartKey = formatLocalDayKey(getStartOfLocalWeek(now));
+  const todayKey = formatLocalDayKey(now);
+  const prevWeekStart = formatLocalDayKey(
+    getStartOfLocalWeek(addLocalDays(getStartOfLocalWeek(now), -1)),
+  );
+  const prevWeekEnd = formatLocalDayKey(
+    addLocalDays(getStartOfLocalWeek(now), -1),
+  );
   let inputTokens = 0;
   let outputTokens = 0;
   let reasoningTokens = 0;
-  let weekTokens = 0;
   let activeDays = 0;
 
-  for (const [dayKey, day] of Object.entries(data.daily)) {
+  for (const [, day] of Object.entries(data.daily)) {
     const total = day.inputTokens + day.outputTokens;
     inputTokens += day.inputTokens;
     outputTokens += day.outputTokens;
@@ -189,15 +314,15 @@ export async function getTokenStatsSnapshot(
     if (total > 0) {
       activeDays += 1;
     }
-    const [year, month, dayOfMonth] = dayKey.split("-").map(Number);
-    if (!year || !month || !dayOfMonth) {
-      continue;
-    }
-    const date = new Date(year, month - 1, dayOfMonth);
-    if (date >= weekStart && date <= end) {
-      weekTokens += total;
-    }
   }
+
+  const weekTokens = sumTokensInDayKeyRange(data.daily, weekStartKey, todayKey);
+  const lastWeekTokens = sumTokensInDayKeyRange(
+    data.daily,
+    prevWeekStart,
+    prevWeekEnd,
+  );
+  const tokenStreakDays = computeTokenStreak(data.daily, now);
 
   const rangeStart = addLocalDays(end, -(weekCount * 7 - 1));
   const startSunday = addLocalDays(rangeStart, -rangeStart.getDay());
@@ -216,6 +341,7 @@ export async function getTokenStatsSnapshot(
       date,
       inputTokens: day.inputTokens,
       outputTokens: day.outputTokens,
+      reasoningTokens: day.reasoningTokens,
       totalTokens,
       level: readingSecondsToLevel(totalTokens, maxDayTokens),
     });
@@ -231,20 +357,12 @@ export async function getTokenStatsSnapshot(
       date,
       inputTokens: day.inputTokens,
       outputTokens: day.outputTokens,
+      reasoningTokens: day.reasoningTokens,
       totalTokens: day.inputTokens + day.outputTokens,
     });
   }
 
-  const models = Object.values(data.models)
-    .map((entry) => ({ ...entry }))
-    .filter((entry) => entry.inputTokens + entry.outputTokens > 0)
-    .sort(
-      (left, right) =>
-        right.inputTokens +
-        right.outputTokens -
-        (left.inputTokens + left.outputTokens),
-    )
-    .slice(0, 6);
+  const models = sortModelsByTotal(Object.values(data.models));
 
   return {
     inputTokens,
@@ -252,10 +370,13 @@ export async function getTokenStatsSnapshot(
     reasoningTokens,
     totalTokens: inputTokens + outputTokens,
     weekTokens,
+    lastWeekTokens,
+    tokenStreakDays,
     activeDays,
     weekCount,
     cells,
     recentDays,
     models,
+    modelsByDay,
   };
 }

@@ -337,6 +337,7 @@ function mergeStyleIntoStats(
     if (existing) {
       const nextTotal = Math.max(existing.totalSeconds, total);
       const nextLastRead = Math.max(existing.lastReadAt, lastReadAt);
+      const delta = nextTotal - existing.totalSeconds;
       if (
         nextTotal !== existing.totalSeconds ||
         nextLastRead !== existing.lastReadAt
@@ -346,6 +347,14 @@ function mergeStyleIntoStats(
           totalSeconds: nextTotal,
           lastReadAt: nextLastRead,
         };
+        changed = true;
+      }
+      if (delta > 0) {
+        const dayKey = formatLocalDayKey(new Date(nextLastRead));
+        data.dailySeconds[dayKey] = (data.dailySeconds[dayKey] || 0) + delta;
+        const dayItems = data.dailyItems[dayKey] || {};
+        dayItems[storageKey] = (dayItems[storageKey] || 0) + delta;
+        data.dailyItems[dayKey] = dayItems;
         changed = true;
       }
       continue;

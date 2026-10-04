@@ -1222,7 +1222,9 @@ export function setupEventHandlers(context: ChatPanelContext): () => void {
     }
     setReadingStatsPanelVisible(container, willShow);
     if (willShow) {
-      await refreshReadingStatsPanel(readingStatsPanel, getCurrentTheme());
+      await refreshReadingStatsPanel(readingStatsPanel, getCurrentTheme(), {
+        force: true,
+      });
     }
   });
 

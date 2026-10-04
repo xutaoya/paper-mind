@@ -470,6 +470,23 @@ paperchat-chat-bookmark = 书签
 paperchat-chat-bookmarks = 书签
 
 paperchat-chat-stats-title = 统计
+paperchat-chat-stats-refresh = 刷新
+paperchat-chat-stats-export-reading = 导出阅读
+paperchat-chat-stats-export-reading-short = 阅读
+paperchat-chat-stats-export-token = 导出 Token
+paperchat-chat-stats-export-token-short = Token
+paperchat-chat-stats-export-ok = 已复制 JSON 到剪贴板
+paperchat-chat-stats-export-fail = 导出失败或暂无数据
+paperchat-chat-stats-help = 说明
+paperchat-chat-stats-updated-at = 更新于 { $time }
+paperchat-chat-stats-help-reading = 近 6 个月累计 { $total }。在 PDF 阅读器中停留且 Zotero 窗口聚焦时累计阅读时间；可点击热力图格子查看当日文献明细。
+paperchat-chat-stats-help-token = 统计模型接口返回的输入与输出 Token。悬停看概览，点击看按模型明细；更早未保存用量的对话不会出现。
+paperchat-chat-stats-week-vs-last = 较上周 { $delta }
+paperchat-chat-stats-week-same-as-last = 与上周持平
+paperchat-chat-stats-streak-days = 连续 { $count } 天
+paperchat-chat-stats-last-reading-day = 最近在 { $date } 阅读 { $duration }
+paperchat-chat-stats-tracking-active = 正在记录阅读时间
+paperchat-chat-stats-tracking-idle = 未在记录（请聚焦 Zotero 并打开 PDF 阅读器）
 
 paperchat-chat-stats-view-reading = 阅读
 
@@ -479,6 +496,10 @@ paperchat-chat-stats-token-total = 累计 Token
 
 paperchat-chat-stats-token-week = 本周 { $total }
 
+paperchat-chat-stats-token-share = 占 { $percent }%
+paperchat-chat-stats-token-io-ratio-title = 输入 / 输出占比
+paperchat-chat-stats-token-io-legend-value = { $count }（{ $percent }%）
+paperchat-chat-stats-token-io-ratio-aria = 输入 { $input }%，输出 { $output }%
 paperchat-chat-stats-token-input = 输入
 
 paperchat-chat-stats-token-output = 输出
@@ -486,6 +507,11 @@ paperchat-chat-stats-token-output = 输出
 paperchat-chat-stats-token-daily-title = 近 6 个月
 
 paperchat-chat-stats-token-bars-title = 近 14 天
+paperchat-chat-stats-token-bars-hint = 悬停见概览；点击查看按模型明细（再次点击关闭）
+paperchat-chat-stats-token-day-models-title = 当日按模型
+paperchat-chat-stats-token-day-no-models = 暂无按模型明细。新产生的对话会从这里记录。
+paperchat-chat-stats-token-reasoning = 推理 { $count }
+paperchat-chat-stats-token-day-total = 合计 { $total } Token
 
 paperchat-chat-stats-token-day-tooltip = { $date } · { $total }
 
@@ -513,7 +539,8 @@ paperchat-chat-stats-literature-read-empty-hint = 在阅读器中打开 PDF 后�
 
 paperchat-chat-stats-reading-this-week = 本周阅读
 
-paperchat-chat-stats-reading-active-days = 近 { $count } 天有阅读
+paperchat-chat-stats-reading-active-days = 本周 { $count } 天有阅读
+paperchat-chat-stats-reading-active-days-none = 本周暂无阅读
 
 paperchat-chat-stats-daily-reading-title = 每日阅读时间
 
@@ -542,6 +569,31 @@ paperchat-chat-stats-recent-added-empty = 文库中还没有可统计的文献�
 paperchat-chat-stats-item-last-read = 最近阅读 { $date }
 
 paperchat-chat-stats-item-added = 加入于 { $date }
+
+paperchat-chat-stats-chat-activity-title = 对话活跃
+paperchat-chat-stats-chat-user-total = 用户消息
+paperchat-chat-stats-chat-assistant-total = 助手回复
+paperchat-chat-stats-chat-this-week = 本周消息
+paperchat-chat-stats-chat-week-messages = 本周 { $count } 条
+paperchat-chat-stats-chat-active-days = 本周 { $count } 天有对话
+paperchat-chat-stats-chat-heatmap-hint = 与上方阅读热力图对照，可看「读」与「聊」是否同步。点击格子查看当日用户/助手消息数。
+paperchat-chat-stats-chat-day-tooltip = { $date } · 共 { $total } 条（用户 { $user } · 助手 { $assistant }）
+paperchat-chat-stats-chat-day-tooltip-short = { $date } · { $total } 条消息
+paperchat-chat-stats-chat-day-detail = 共 { $total } 条 · 用户 { $user } · 助手 { $assistant }
+
+paperchat-chat-stats-bookmarks-overview-title = 书签与摘录
+paperchat-chat-stats-bookmarks-total = 书签数
+paperchat-chat-stats-bookmarks-folders = 文件夹
+paperchat-chat-stats-bookmarks-this-week = 本周新增
+paperchat-chat-stats-bookmarks-empty = 还没有书签。在助手回复上点击书签即可收藏摘录。
+
+paperchat-chat-stats-literature-engagement-title = 文献投入
+paperchat-chat-stats-literature-engagement-reading = 阅读 { $duration }
+paperchat-chat-stats-literature-engagement-tokens = Token { $total }
+paperchat-chat-stats-literature-engagement-sessions = { $count } 个相关会话
+paperchat-chat-stats-literature-engagement-empty-meta = 暂无明细
+paperchat-chat-stats-literature-engagement-empty = 还没有按文献汇总的阅读或对话数据。打开 PDF 并与该文献对话后会出现。
+paperchat-chat-stats-literature-engagement-footnote = 阅读时间为累计值；Token 自本功能上线起、在绑定该文献时发送的对话才会计入；会话数为曾将该文献设为上下文或范围的会话（约数）。
 
 paperchat-chat-bookmark-save-title = 保存书签
 

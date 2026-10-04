@@ -50,7 +50,13 @@ export interface ReadingStatsSnapshot {
   rangeEnd: Date;
   totalSecondsLastYear: number;
   totalSecondsThisWeek: number;
+  /** Days with reading time in the current local calendar week. */
+  activeDaysThisWeek: number;
   activeDaysLastYear: number;
+  totalSecondsLastWeek: number;
+  readingStreakDays: number;
+  /** Most recent day key (YYYY-MM-DD) with reading time in stored daily data. */
+  lastReadingDayKey: string | null;
   maxDaySeconds: number;
   topReadItems: ItemReadingEntry[];
   recentlyAdded: RecentlyAddedEntry[];
@@ -96,6 +102,89 @@ function addLocalDays(date: Date, days: number): Date {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
   return next;
+}
+
+/** First day of the local calendar week (Monday for zh/ja/de-style locales, else Sunday). */
+export function getStartOfLocalWeek(date: Date = new Date()): Date {
+  const day = startOfLocalDay(date);
+  let locale = "";
+  try {
+    locale = String(
+      (Zotero as { locale?: string }).locale ||
+        Services.locale.appLocaleAsBCP47 ||
+        "",
+    );
+  } catch {
+    // ignore
+  }
+  const weekStartsOnMonday = /^(zh|ja|de|ko|fr|sv|nb|da|fi|nl|pl|cs|sk|hu|ru)/i.test(
+    locale,
+  );
+  if (weekStartsOnMonday) {
+    const weekday = day.getDay();
+    return addLocalDays(day, weekday === 0 ? -6 : 1 - weekday);
+  }
+  return addLocalDays(day, -day.getDay());
+}
+
+function sumDailySecondsInDayKeyRange(
+  dailySeconds: Record<string, number>,
+  startKey: string,
+  endKey: string,
+): { totalSeconds: number; activeDays: number } {
+  let totalSeconds = 0;
+  let activeDays = 0;
+  for (const [dayKey, seconds] of Object.entries(dailySeconds)) {
+    if (seconds <= 0 || dayKey < startKey || dayKey > endKey) {
+      continue;
+    }
+    totalSeconds += seconds;
+    activeDays += 1;
+  }
+  return { totalSeconds, activeDays };
+}
+
+function getPreviousWeekDayKeyRange(now: Date): {
+  startKey: string;
+  endKey: string;
+} {
+  const weekStart = getStartOfLocalWeek(now);
+  const prevEnd = addLocalDays(weekStart, -1);
+  const prevStart = getStartOfLocalWeek(prevEnd);
+  return {
+    startKey: formatLocalDayKey(prevStart),
+    endKey: formatLocalDayKey(prevEnd),
+  };
+}
+
+function computeActiveDayStreak(
+  dailySeconds: Record<string, number>,
+  now: Date,
+): number {
+  let cursor = startOfLocalDay(now);
+  const todayKey = formatLocalDayKey(cursor);
+  if ((dailySeconds[todayKey] || 0) <= 0) {
+    cursor = addLocalDays(cursor, -1);
+  }
+  let streak = 0;
+  for (let guard = 0; guard < 4000; guard += 1) {
+    const key = formatLocalDayKey(cursor);
+    if ((dailySeconds[key] || 0) <= 0) {
+      break;
+    }
+    streak += 1;
+    cursor = addLocalDays(cursor, -1);
+  }
+  return streak;
+}
+
+function findLastActiveDayKey(
+  dailySeconds: Record<string, number>,
+): string | null {
+  const keys = Object.keys(dailySeconds)
+    .filter((key) => (dailySeconds[key] || 0) > 0)
+    .sort();
+  return keys.length ? keys[keys.length - 1] : null;
 }
 
 /** Map seconds to GitHub-style intensity levels. */
@@ -393,8 +482,21 @@ export async function getReadingStatsSnapshot(
   const { cells, rangeStart, rangeEnd, maxDaySeconds, weekCount } =
     buildHeatmapCells(data, now);
 
-  const weekStart = addLocalDays(startOfLocalDay(now), -now.getDay());
-  let totalSecondsThisWeek = 0;
+  const weekStartKey = formatLocalDayKey(getStartOfLocalWeek(now));
+  const todayKey = formatLocalDayKey(now);
+  const weekTotals = sumDailySecondsInDayKeyRange(
+    data.dailySeconds,
+    weekStartKey,
+    todayKey,
+  );
+  const prevWeek = getPreviousWeekDayKeyRange(now);
+  const lastWeekTotals = sumDailySecondsInDayKeyRange(
+    data.dailySeconds,
+    prevWeek.startKey,
+    prevWeek.endKey,
+  );
+  const readingStreakDays = computeActiveDayStreak(data.dailySeconds, now);
+  const lastReadingDayKey = findLastActiveDayKey(data.dailySeconds);
   let totalSecondsLastYear = 0;
   let activeDaysLastYear = 0;
 
@@ -404,9 +506,6 @@ export async function getReadingStatsSnapshot(
     }
     totalSecondsLastYear += cell.seconds;
     activeDaysLastYear += 1;
-    if (cell.date >= weekStart && cell.date <= startOfLocalDay(now)) {
-      totalSecondsThisWeek += cell.seconds;
-    }
   }
 
   return {
@@ -417,8 +516,12 @@ export async function getReadingStatsSnapshot(
     rangeStart,
     rangeEnd,
     totalSecondsLastYear,
-    totalSecondsThisWeek,
+    totalSecondsThisWeek: weekTotals.totalSeconds,
+    activeDaysThisWeek: weekTotals.activeDays,
     activeDaysLastYear,
+    totalSecondsLastWeek: lastWeekTotals.totalSeconds,
+    readingStreakDays,
+    lastReadingDayKey,
     maxDaySeconds,
     topReadItems,
     recentlyAdded,

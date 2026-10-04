@@ -470,6 +470,23 @@ paperchat-chat-bookmark = Bookmark
 paperchat-chat-bookmarks = Bookmarks
 
 paperchat-chat-stats-title = Statistics
+paperchat-chat-stats-refresh = Refresh
+paperchat-chat-stats-export-reading = Export reading
+paperchat-chat-stats-export-reading-short = Read
+paperchat-chat-stats-export-token = Export tokens
+paperchat-chat-stats-export-token-short = Token
+paperchat-chat-stats-export-ok = JSON copied to clipboard
+paperchat-chat-stats-export-fail = Export failed or no data yet
+paperchat-chat-stats-help = Help
+paperchat-chat-stats-updated-at = Updated { $time }
+paperchat-chat-stats-help-reading = { $total } read in the last 6 months. Time accrues in the PDF reader while Zotero is focused. Click a heatmap cell for papers that day.
+paperchat-chat-stats-help-token = Input/output tokens from the model API. Hover for a quick total; click for per-model breakdown. Older chats without saved usage are omitted.
+paperchat-chat-stats-week-vs-last = { $delta } vs last week
+paperchat-chat-stats-week-same-as-last = Same as last week
+paperchat-chat-stats-streak-days = { $count }-day streak
+paperchat-chat-stats-last-reading-day = Last read { $duration } on { $date }
+paperchat-chat-stats-tracking-active = Recording reading time
+paperchat-chat-stats-tracking-idle = Not recording (focus Zotero with PDF reader open)
 
 paperchat-chat-stats-view-reading = Reading
 
@@ -479,6 +496,10 @@ paperchat-chat-stats-token-total = Total tokens
 
 paperchat-chat-stats-token-week = { $total } this week
 
+paperchat-chat-stats-token-share = { $percent }% of total
+paperchat-chat-stats-token-io-ratio-title = Input vs output
+paperchat-chat-stats-token-io-legend-value = { $count } ({ $percent }%)
+paperchat-chat-stats-token-io-ratio-aria = Input { $input }%, output { $output }%
 paperchat-chat-stats-token-input = Input
 
 paperchat-chat-stats-token-output = Output
@@ -486,6 +507,11 @@ paperchat-chat-stats-token-output = Output
 paperchat-chat-stats-token-daily-title = Last 6 months
 
 paperchat-chat-stats-token-bars-title = Last 14 days
+paperchat-chat-stats-token-bars-hint = Hover for a quick total; click for per-model breakdown (click again to close)
+paperchat-chat-stats-token-day-models-title = By model this day
+paperchat-chat-stats-token-day-no-models = No per-model breakdown yet. New chats will be listed here.
+paperchat-chat-stats-token-reasoning = Reasoning { $count }
+paperchat-chat-stats-token-day-total = { $total } tokens total
 
 paperchat-chat-stats-token-day-tooltip = { $date } · { $total }
 
@@ -513,7 +539,8 @@ paperchat-chat-stats-literature-read-empty-hint = Open PDFs in the reader to tra
 
 paperchat-chat-stats-reading-this-week = This week
 
-paperchat-chat-stats-reading-active-days = { $count } days with reading (past 6 mo.)
+paperchat-chat-stats-reading-active-days = { $count } days with reading this week
+paperchat-chat-stats-reading-active-days-none = No reading this week yet
 
 paperchat-chat-stats-daily-reading-title = Daily reading time
 
@@ -542,6 +569,31 @@ paperchat-chat-stats-recent-added-empty = No literature items found in your libr
 paperchat-chat-stats-item-last-read = Last read { $date }
 
 paperchat-chat-stats-item-added = Added { $date }
+
+paperchat-chat-stats-chat-activity-title = Chat activity
+paperchat-chat-stats-chat-user-total = User messages
+paperchat-chat-stats-chat-assistant-total = Assistant replies
+paperchat-chat-stats-chat-this-week = Messages this week
+paperchat-chat-stats-chat-week-messages = { $count } this week
+paperchat-chat-stats-chat-active-days = Active { $count } days this week
+paperchat-chat-stats-chat-heatmap-hint = Compare with the reading heatmap above to see whether you read and chat on the same days. Click a cell for user vs assistant counts.
+paperchat-chat-stats-chat-day-tooltip = { $date } · { $total } total (user { $user } · assistant { $assistant })
+paperchat-chat-stats-chat-day-tooltip-short = { $date } · { $total } messages
+paperchat-chat-stats-chat-day-detail = { $total } total · user { $user } · assistant { $assistant }
+
+paperchat-chat-stats-bookmarks-overview-title = Bookmarks
+paperchat-chat-stats-bookmarks-total = Bookmarks
+paperchat-chat-stats-bookmarks-folders = Folders
+paperchat-chat-stats-bookmarks-this-week = New this week
+paperchat-chat-stats-bookmarks-empty = No bookmarks yet. Use the bookmark action on an assistant reply to save an excerpt.
+
+paperchat-chat-stats-literature-engagement-title = Per-paper effort
+paperchat-chat-stats-literature-engagement-reading = Read { $duration }
+paperchat-chat-stats-literature-engagement-tokens = { $total } tokens
+paperchat-chat-stats-literature-engagement-sessions = { $count } related chats
+paperchat-chat-stats-literature-engagement-empty-meta = No details yet
+paperchat-chat-stats-literature-engagement-empty = No per-paper reading or chat data yet. Open a PDF and chat with that paper in context.
+paperchat-chat-stats-literature-engagement-footnote = Reading time is cumulative. Tokens count from when this feature ships, only while that paper was the active context. Chat counts are approximate (papers in session scope or last active item).
 
 paperchat-chat-bookmark-save-title = Save bookmark
 

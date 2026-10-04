@@ -32,6 +32,14 @@ export function formatCompactTokenCount(tokens: number): string {
   return String(Math.round(tokens));
 }
 
+/** Exact token count for tooltips and detail popovers. */
+export function formatTokenCount(tokens: number): string {
+  if (!Number.isFinite(tokens) || tokens <= 0) {
+    return "0";
+  }
+  return Math.round(tokens).toLocaleString();
+}
+
 /** Prefer provider usage when higher; otherwise grow with streamed reasoning text. */
 export function resolveReasoningTokenCount(
   reasoning: string,
