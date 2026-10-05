@@ -397,6 +397,17 @@ async function countLiteratureWithReadingTime(
 /** Number of weeks shown in the reading heatmap (fits narrow chat sidebar). */
 export const READING_HEATMAP_WEEKS = 26;
 
+/** Full weeks ending with the week that contains `endDate`, so a new week always adds a column. */
+export function getHeatmapWeekRange(
+  endDate: Date,
+  weekCount = READING_HEATMAP_WEEKS,
+): { rangeStart: Date; rangeEnd: Date; weekCount: number } {
+  const end = startOfLocalDay(endDate);
+  const currentWeekStart = getStartOfLocalWeek(end);
+  const rangeStart = addLocalDays(currentWeekStart, -(weekCount - 1) * 7);
+  return { rangeStart, rangeEnd: end, weekCount };
+}
+
 function buildHeatmapCells(
   data: ReadingStatsFile,
   endDate: Date,
@@ -408,9 +419,7 @@ function buildHeatmapCells(
   maxDaySeconds: number;
   weekCount: number;
 } {
-  const end = startOfLocalDay(endDate);
-  const start = addLocalDays(end, -(weekCount * 7 - 1));
-  const startSunday = addLocalDays(start, -start.getDay());
+  const { rangeStart, rangeEnd } = getHeatmapWeekRange(endDate, weekCount);
 
   const maxDaySeconds = Object.values(data.dailySeconds).reduce(
     (max, value) => Math.max(max, value),
@@ -419,7 +428,7 @@ function buildHeatmapCells(
 
   const cells: ReadingDayCell[] = [];
   for (let offset = 0; offset < weekCount * 7; offset += 1) {
-    const date = addLocalDays(startSunday, offset);
+    const date = addLocalDays(rangeStart, offset);
     const dayKey = formatLocalDayKey(date);
     const seconds = data.dailySeconds[dayKey] || 0;
     cells.push({
@@ -432,8 +441,8 @@ function buildHeatmapCells(
 
   return {
     cells,
-    rangeStart: startSunday,
-    rangeEnd: end,
+    rangeStart,
+    rangeEnd,
     maxDaySeconds,
     weekCount,
   };

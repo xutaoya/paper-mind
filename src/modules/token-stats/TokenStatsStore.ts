@@ -1,5 +1,6 @@
 import type { ChatMessageTurnUsage } from "../../types/chat";
 import {
+  getHeatmapWeekRange,
   getStartOfLocalWeek,
   READING_HEATMAP_WEEKS,
   readingSecondsToLevel,
@@ -324,15 +325,14 @@ export async function getTokenStatsSnapshot(
   );
   const tokenStreakDays = computeTokenStreak(data.daily, now);
 
-  const rangeStart = addLocalDays(end, -(weekCount * 7 - 1));
-  const startSunday = addLocalDays(rangeStart, -rangeStart.getDay());
+  const { rangeStart } = getHeatmapWeekRange(now, weekCount);
   const maxDayTokens = Object.values(data.daily).reduce(
     (max, day) => Math.max(max, day.inputTokens + day.outputTokens),
     0,
   );
   const cells: TokenHeatCell[] = [];
   for (let offset = 0; offset < weekCount * 7; offset += 1) {
-    const date = addLocalDays(startSunday, offset);
+    const date = addLocalDays(rangeStart, offset);
     const dayKey = formatLocalDayKey(date);
     const day = data.daily[dayKey] || emptyDay();
     const totalTokens = day.inputTokens + day.outputTokens;

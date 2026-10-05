@@ -1,6 +1,7 @@
 import { assert } from "chai";
 import {
   formatReadingDuration,
+  getHeatmapWeekRange,
   readingSecondsToLevel,
 } from "../src/modules/reading-stats/ReadingStatsService.ts";
 import {
@@ -13,6 +14,20 @@ describe("reading stats helpers", function () {
     assert.equal(formatReadingDuration(45), "45s");
     assert.equal(formatReadingDuration(125), "2 min");
     assert.equal(formatReadingDuration(3720), "1 h 2 min");
+  });
+
+  it("heatmap range keeps the current week as the last column", function () {
+    const monday = new Date(2026, 9, 5, 12, 0, 0);
+    const { rangeStart, weekCount } = getHeatmapWeekRange(monday, 26);
+    const last = new Date(rangeStart);
+    last.setDate(last.getDate() + weekCount * 7 - 1);
+    assert.isAtMost(rangeStart.getTime(), monday.getTime());
+    assert.isAtLeast(last.getTime(), monday.getTime());
+    const offsetDays = Math.round(
+      (new Date(2026, 9, 5).getTime() - rangeStart.getTime()) / 86_400_000,
+    );
+    assert.isAtLeast(offsetDays, (weekCount - 1) * 7);
+    assert.isBelow(offsetDays, weekCount * 7);
   });
 
   it("maps reading seconds to heatmap levels", function () {

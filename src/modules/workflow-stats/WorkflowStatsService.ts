@@ -1,6 +1,7 @@
 import { getStorageDatabase } from "../chat/db/StorageDatabase";
 import { formatLocalDayKey } from "../reading-stats/ReadingStatsStore";
 import {
+  getHeatmapWeekRange,
   getStartOfLocalWeek,
   READING_HEATMAP_WEEKS,
   readingSecondsToLevel,
@@ -24,10 +25,6 @@ export interface ChatActivitySnapshot {
   activeDaysThisWeek: number;
   totalUserMessages: number;
   totalAssistantMessages: number;
-}
-
-function startOfLocalDay(date: Date): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
 }
 
 function addLocalDays(date: Date, days: number): Date {
@@ -91,10 +88,8 @@ export async function getChatActivitySnapshot(
   now = new Date(),
   weekCount = READING_HEATMAP_WEEKS,
 ): Promise<ChatActivitySnapshot> {
-  const end = startOfLocalDay(now);
-  const rangeStart = addLocalDays(end, -(weekCount * 7 - 1));
-  const startSunday = addLocalDays(rangeStart, -rangeStart.getDay());
-  const minTimestamp = startSunday.getTime();
+  const { rangeStart } = getHeatmapWeekRange(now, weekCount);
+  const minTimestamp = rangeStart.getTime();
 
   const daily = await loadDailyMessageCounts(minTimestamp);
   const maxDayMessages = Object.values(daily).reduce(
@@ -104,7 +99,7 @@ export async function getChatActivitySnapshot(
 
   const cells: ChatDayCell[] = [];
   for (let offset = 0; offset < weekCount * 7; offset += 1) {
-    const date = addLocalDays(startSunday, offset);
+    const date = addLocalDays(rangeStart, offset);
     const dayKey = formatLocalDayKey(date);
     const day = daily[dayKey] || { user: 0, assistant: 0, total: 0 };
     cells.push({

@@ -32,7 +32,6 @@ import {
   createStatsToolbarIconButton,
   formatBarAxisDayLabel,
   formatWeekDeltaHint,
-  getLocalizedWeekdayLabels,
   shouldShowMonthOnBarAxis,
   bindStatsPanelResponsive,
   applyStatsPanelLayout,
@@ -1511,7 +1510,6 @@ function renderContributionHeatmap(
   ) => void,
   onCellLeave?: (panel: HTMLElement) => void,
 ): HTMLElement {
-  const weekdayLabels = getLocalizedWeekdayLabels();
   const colors =
     levelColors ??
     (isDarkMode() ? HEATMAP_LEVEL_COLORS_DARK : HEATMAP_LEVEL_COLORS_LIGHT);
@@ -1544,8 +1542,21 @@ function renderContributionHeatmap(
       lineHeight: "1.1",
       alignSelf: "center",
     });
-    weekday.textContent =
-      row === 1 || row === 3 || row === 5 ? weekdayLabels[row] : "";
+    const weekdayDate = cells[row]?.date;
+    const weekdayNumber = weekdayDate?.getDay();
+    if (weekdayNumber === 1 || weekdayNumber === 3 || weekdayNumber === 5) {
+      try {
+        weekday.textContent = weekdayDate.toLocaleDateString(undefined, {
+          weekday: "narrow",
+        });
+      } catch {
+        weekday.textContent = ["日", "一", "二", "三", "四", "五", "六"][
+          weekdayNumber
+        ];
+      }
+    } else {
+      weekday.textContent = "";
+    }
     grid.appendChild(weekday);
     for (let week = 0; week < weekCount; week += 1) {
       const cellData = cells[week * 7 + row];
