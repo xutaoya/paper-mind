@@ -11,6 +11,12 @@ on:
   push:
     tags:
       - V**
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Git tag to publish (e.g. V3.3.5)
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -28,6 +34,7 @@ jobs:
         with:
           fetch-depth: 0
           submodules: false
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -41,7 +48,8 @@ jobs:
       - name: Build
         run: npm run build:release
 
-      - name: Release
-        run: npm run release
+      - name: Publish GitHub Release
+        run: npx zotero-plugin release as-is -y
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CI: true
