@@ -1406,6 +1406,55 @@ export function extractSourceGroupFragments(
   return fragments;
 }
 
+const SOURCE_GROUP_HOIST_MIN_CHARS = 700;
+const SOURCE_GROUP_HOIST_MIN_LINES = 6;
+const SOURCE_GROUP_HOIST_MIN_CHARS_WITH_LINES = 280;
+const SOURCE_GROUP_OUTSIDE_MARKDOWN_MAX = 150;
+
+export function isLongFormSourceGroupBody(content: string): boolean {
+  const trimmed = content.trim();
+  if (!trimmed) {
+    return false;
+  }
+  if (/^#{1,4}\s/m.test(trimmed)) {
+    return true;
+  }
+  const lines = trimmed.split("\n").filter((line) => line.trim().length > 0);
+  if (
+    lines.length >= SOURCE_GROUP_HOIST_MIN_LINES &&
+    trimmed.length >= SOURCE_GROUP_HOIST_MIN_CHARS_WITH_LINES
+  ) {
+    return true;
+  }
+  return trimmed.length >= SOURCE_GROUP_HOIST_MIN_CHARS;
+}
+
+export function shouldHoistSourceGroupBody(
+  fragments: SourceGroupFragment[],
+  group: Extract<SourceGroupFragment, { kind: "source-group" }>,
+): boolean {
+  const outsideMarkdown = fragments
+    .filter(
+      (
+        fragment,
+      ): fragment is Extract<SourceGroupFragment, { kind: "markdown" }> =>
+        fragment.kind === "markdown",
+    )
+    .map((fragment) => fragment.content.trim())
+    .filter(Boolean)
+    .join("\n\n");
+  if (outsideMarkdown.length > SOURCE_GROUP_OUTSIDE_MARKDOWN_MAX) {
+    return false;
+  }
+  const sourceGroupCount = fragments.filter(
+    (fragment) => fragment.kind === "source-group",
+  ).length;
+  if (sourceGroupCount !== 1) {
+    return false;
+  }
+  return isLongFormSourceGroupBody(group.content);
+}
+
 export function stripIncompleteTrailingSourceGroup(content: string): string {
   const marker = "<source-group";
   const lower = content.toLowerCase();
@@ -1425,22 +1474,28 @@ export function stripSourceGroupMarkup(content: string): string {
     return content;
   }
 
-  const fragments = extractSourceGroupFragments(content);
+  const fragments = mergeAdjacentSourceGroupFragments(
+    extractSourceGroupFragments(content),
+  );
   if (fragments.length === 1 && fragments[0].kind === "markdown") {
     return stripIncompleteTrailingSourceGroup(fragments[0].content);
   }
 
-  const markdownOnly = fragments
-    .filter(
-      (
-        fragment,
-      ): fragment is Extract<SourceGroupFragment, { kind: "markdown" }> =>
-        fragment.kind === "markdown",
-    )
-    .map((fragment) => fragment.content)
-    .join("");
+  const visibleParts: string[] = [];
+  for (const fragment of fragments) {
+    if (fragment.kind === "markdown") {
+      const text = fragment.content.trim();
+      if (text) {
+        visibleParts.push(fragment.content);
+      }
+      continue;
+    }
+    if (shouldHoistSourceGroupBody(fragments, fragment)) {
+      visibleParts.push(fragment.content);
+    }
+  }
 
-  return stripIncompleteTrailingSourceGroup(markdownOnly);
+  return stripIncompleteTrailingSourceGroup(visibleParts.join("\n\n"));
 }
 
 export function deltaContainsSourceGroupMarkup(delta: string): boolean {
@@ -1689,11 +1744,14 @@ function setSourceGroupCollapsed(
   }
 }
 
+type SourceGroupCardMode = "default" | "citation-only";
+
 function renderSourceGroupCard(
   doc: Document,
   parent: HTMLElement,
   group: Extract<SourceGroupFragment, { kind: "source-group" }>,
   options: MarkdownRenderOptions = {},
+  cardMode: SourceGroupCardMode = "default",
 ): void {
   const dark = isDarkMode();
   const colors = dark ? sourceGroupStyles.dark : sourceGroupStyles.light;
@@ -1702,8 +1760,14 @@ function renderSourceGroupCard(
   const actionTitle = sourceGroupAction?.getTitle(group) || null;
 
   const card = doc.createElementNS(HTML_NS, "div") as HTMLElement;
-  card.className =
-    "chat-source-group chat-source-group--collapsed chat-source-group--enter";
+  card.className = [
+    "chat-source-group",
+    "chat-source-group--collapsed",
+    "chat-source-group--enter",
+    cardMode === "citation-only" ? "chat-source-group--citation-only" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   card.setAttribute("data-source-group-type", group.type);
   Object.assign(card.style, {
     margin: "10px 0 6px",
@@ -1821,14 +1885,18 @@ function renderSourceGroupCard(
     toggle.appendChild(pageEl);
   }
 
-  const chevron = createUiChevron(doc, {
-    className: "chat-source-group__chevron",
-    size: 16,
-    color: colors.bodyText,
-    opacity: 0.52,
-  });
-  setUiChevronExpanded(chevron, false);
-  toggle.appendChild(chevron);
+  if (cardMode !== "citation-only") {
+    const chevron = createUiChevron(doc, {
+      className: "chat-source-group__chevron",
+      size: 16,
+      color: colors.bodyText,
+      opacity: 0.52,
+    });
+    setUiChevronExpanded(chevron, false);
+    toggle.appendChild(chevron);
+  } else {
+    toggle.style.cursor = "default";
+  }
   header.appendChild(toggle);
 
   if (actionTitle && sourceGroupAction) {
@@ -1890,41 +1958,52 @@ function renderSourceGroupCard(
 
   card.appendChild(header);
 
-  const body = doc.createElementNS(HTML_NS, "div") as HTMLElement;
-  body.className = "chat-source-group__body";
-  body.hidden = true;
-  Object.assign(body.style, {
-    color: colors.bodyText,
-    background: "transparent",
-  });
+  if (cardMode === "default") {
+    const body = doc.createElementNS(HTML_NS, "div") as HTMLElement;
+    body.className = "chat-source-group__body";
+    body.hidden = true;
+    Object.assign(body.style, {
+      color: colors.bodyText,
+      background: "transparent",
+    });
 
-  const content = doc.createElementNS(HTML_NS, "div") as HTMLElement;
-  content.className = "chat-source-group__content";
-  Object.assign(content.style, {
-    padding: "2px 12px 10px",
-    maxHeight: "min(200px, 40vh)",
-    overflow: "auto",
-  });
-  renderMarkdownFragment(doc, content, group.content, {
-    ...options,
-    sourceGroupContext: group,
-  });
-  body.appendChild(content);
-  card.appendChild(body);
+    const content = doc.createElementNS(HTML_NS, "div") as HTMLElement;
+    content.className = "chat-source-group__content";
+    Object.assign(content.style, {
+      padding: "2px 12px 10px",
+      maxHeight: "min(200px, 40vh)",
+      overflow: "auto",
+    });
+    renderMarkdownFragment(doc, content, group.content, {
+      ...options,
+      sourceGroupContext: group,
+    });
+    body.appendChild(content);
+    card.appendChild(body);
 
-  const toggleCollapsed = (event: Event): void => {
-    event.preventDefault();
-    event.stopPropagation();
-    const collapsed = card.classList.contains("chat-source-group--collapsed");
-    setSourceGroupCollapsed(card, body, toggle, chevron, !collapsed);
-  };
-  toggle.addEventListener("click", toggleCollapsed);
-  toggle.addEventListener("keydown", (event: KeyboardEvent) => {
-    if (event.key === "Enter" || event.key === " ") {
-      toggleCollapsed(event);
-    }
-  });
+    const chevron = toggle.querySelector(
+      ".chat-source-group__chevron",
+    ) as HTMLElement | null;
+    const toggleCollapsed = (event: Event): void => {
+      event.preventDefault();
+      event.stopPropagation();
+      const collapsed = card.classList.contains("chat-source-group--collapsed");
+      if (body && chevron) {
+        setSourceGroupCollapsed(card, body, toggle, chevron, !collapsed);
+      }
+    };
+    toggle.addEventListener("click", toggleCollapsed);
+    toggle.addEventListener("keydown", (event: KeyboardEvent) => {
+      if (event.key === "Enter" || event.key === " ") {
+        toggleCollapsed(event);
+      }
+    });
+  }
+
   toggle.addEventListener("mouseenter", () => {
+    if (cardMode === "citation-only") {
+      return;
+    }
     toggle.style.background = dark
       ? "rgba(255, 255, 255, 0.04)"
       : "rgba(15, 23, 42, 0.04)";
@@ -2009,7 +2088,20 @@ function renderSourceGroupBlocks(
       continue;
     }
 
-    renderSourceGroupCard(doc, parent, fragment, options);
+    const hoistMainAnswer = shouldHoistSourceGroupBody(fragments, fragment);
+    renderSourceGroupCard(
+      doc,
+      parent,
+      fragment,
+      options,
+      hoistMainAnswer ? "citation-only" : "default",
+    );
+    if (hoistMainAnswer) {
+      renderMarkdownFragment(doc, parent, fragment.content, {
+        ...options,
+        sourceGroupContext: fragment,
+      });
+    }
   }
 
   return true;

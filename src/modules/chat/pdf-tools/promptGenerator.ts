@@ -440,7 +440,8 @@ function formatAgentPromptContext(agentContext?: AgentPromptContext): string {
   section += `- For annotations, use one source group per annotation and include its exact annotation key: <source-group label="Highlighted passage" type="annotation" key="ABCD1234">.\n`;
   section += `- For web sources, include the exact result URL: <source-group label="Source title" type="web" url="https://example.com/source">.\n`;
   section += `- For Zotero collections, include the exact collection key: <source-group label="Collection name" type="collection" key="ABCD1234">.\n`;
-  section += `- Use normal markdown outside the source-group blocks for the short conclusion or overall synthesis.\n`;
+  section += `- Use normal markdown outside the source-group blocks for conclusions, paper walkthroughs, and any multi-paragraph explanation.\n`;
+  section += `- Never put a full paper summary, section-by-section guide, or long-form answer inside source-group. Keep source-group bodies to brief bullet evidence (usually under 6 bullets or 400 characters).\n`;
   section += `- If a tool was denied or failed and evidence is incomplete, state that limitation instead of guessing.\n`;
 
   return section ? `${section}\n` : "";

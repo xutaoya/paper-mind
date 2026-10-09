@@ -3,7 +3,9 @@ import { assert } from "chai";
 import {
   extractSourceGroupFragments,
   formatMarkdownForMessageCopy,
+  isLongFormSourceGroupBody,
   renderMarkdownToElement,
+  shouldHoistSourceGroupBody,
   stripIncompleteTrailingToolCall,
   getAssistantVisibleAnswerMarkdown,
   getStreamingAssistantTextTail,
@@ -1166,6 +1168,63 @@ Missing label should not be parsed.
     }
     assert.equal(fragments[0].label, "Accuracy > Speed");
     assert.equal(fragments[0].key, "PAPER123");
+  });
+
+  it("hoists long-form paper explanations out of a single source-group card", function () {
+    const originalZotero = (globalThis as { Zotero?: unknown }).Zotero;
+    const originalAddon = (globalThis as { addon?: unknown }).addon;
+    (globalThis as { Zotero?: unknown }).Zotero = {
+      getMainWindow: () => null,
+    };
+    (globalThis as { addon?: unknown }).addon = {
+      data: {
+        locale: {
+          current: {
+            formatMessagesSync: (messages: Array<{ id: string }>) =>
+              messages.map((message) => ({
+                value: message.id,
+                attributes: null,
+              })),
+          },
+        },
+      },
+    };
+    const longBody = [
+      "## 核心内容总结",
+      "这是一段足够长的论文讲解正文，用于验证不会被锁在来源卡片的小滚动框里。",
+      "",
+      "### 1. 引言",
+      "第二段继续展开方法、实验与结论，让总长度超过提升阈值。",
+      "第三段补充实现细节与图表引用说明。",
+      "第四段继续补充背景与相关工作。",
+      "第五段描述数据集与评价指标。",
+      "第六段总结主要贡献。",
+    ].join("\n");
+    const markdown = `<source-group label="Dynamic scheduling paper" type="paper" key="ABCD1234">\n${longBody}\n</source-group>`;
+    const fragments = extractSourceGroupFragments(markdown);
+    const group = fragments[0];
+    if (group?.kind !== "source-group") {
+      assert.fail("expected a single source-group fragment");
+    }
+    assert.equal(shouldHoistSourceGroupBody(fragments, group), true);
+    assert.isTrue(isLongFormSourceGroupBody(longBody));
+
+    const doc = new FakeDocument();
+    const root = new FakeElement(doc, "div");
+    try {
+      renderMarkdownToElement(root as unknown as HTMLElement, markdown, "hoist-msg");
+      const cards = root.children.filter((child) =>
+        child.className.includes("chat-source-group"),
+      );
+      assert.equal(cards.length, 1);
+      assert.include(cards[0]!.className, "chat-source-group--citation-only");
+      const rendered = collectRenderedText(root);
+      assert.include(rendered, "核心内容总结");
+      assert.include(rendered, "第六段总结主要贡献");
+    } finally {
+      (globalThis as { Zotero?: unknown }).Zotero = originalZotero;
+      (globalThis as { addon?: unknown }).addon = originalAddon;
+    }
   });
 
   it("merges adjacent source groups for the same paper into one card", function () {

@@ -577,6 +577,10 @@ function createChatMarkdownRenderOptions(
         ? undefined
         : {
             getTitle: (group) => {
+              const type = group.type?.trim().toLowerCase();
+              if (type === "paper") {
+                return null;
+              }
               const target = getSourceTarget(group);
               if (!target) {
                 return null;
