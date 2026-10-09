@@ -1,22 +1,12 @@
 name: Release
 
-# This workflow is intentionally inlined instead of using
-# zotero-plugin-dev/workflows/.github/workflows/release-plugin.yml because that
-# reusable workflow checks out submodules recursively through setup-js.
-# When updating this workflow, compare against:
-# https://github.com/zotero-plugin-dev/workflows/blob/main/.github/workflows/release-plugin.yml
-# https://github.com/zotero-plugin-dev/workflows/blob/main/setup-js/action.yml
+# Inlined from zotero-plugin-dev/workflows (no recursive submodules).
+# Compare: https://github.com/zotero-plugin-dev/workflows/blob/main/.github/workflows/release-plugin.yml
 
 on:
   push:
     tags:
       - V**
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Git tag to publish (e.g. V3.3.5)
-        required: true
-        type: string
 
 permissions:
   contents: write
@@ -34,7 +24,6 @@ jobs:
         with:
           fetch-depth: 0
           submodules: false
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -48,8 +37,8 @@ jobs:
       - name: Build
         run: npm run build:release
 
-      - name: Publish GitHub Release
-        run: npx zotero-plugin release -y
+      - name: Release
+        run: npm run release -- -y
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CI: true
