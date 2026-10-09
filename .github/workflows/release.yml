@@ -49,7 +49,7 @@ jobs:
         run: npm run build:release
 
       - name: Publish GitHub Release
-        run: npx zotero-plugin release as-is -y
+        run: npx zotero-plugin release -y
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CI: true

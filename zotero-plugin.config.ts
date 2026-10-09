@@ -200,6 +200,7 @@ export default defineConfig({
     bumpp: {
       commit: "chore(publish): release V%s",
       tag: "V%s",
+      execute: "npm run build:release",
     },
   },
 
