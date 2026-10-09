@@ -80,6 +80,7 @@ paperchat-chat-context-item-no-pdf = 该条目暂无 PDF
 
 paperchat-chat-context-item-open = 在 Zotero 中打开「{ $title }」
 
+paperchat-chat-next-question-hint-label = 猜你想问
 paperchat-chat-next-question-hint-tab = Tab 填入
 
 paperchat-chat-send = 发送

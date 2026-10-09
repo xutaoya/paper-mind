@@ -3,6 +3,7 @@ import { getString } from "../../../../utils/locale";
 import { createElement } from "../ChatPanelBuilder";
 import { overlayPanelIconFilter } from "../OverlayPanelsTheme";
 import { HTML_NS } from "../types";
+import { createUiChevron, setUiChevronExpanded } from "../UiChevron";
 import type { ThemeColors } from "../types";
 
 const STATS_READING_FILE = "paperchat-reading-stats.json";
@@ -270,14 +271,13 @@ export function createCollapsibleSection(
 
   const titleEl = createElement(doc, "span", {});
   titleEl.textContent = title;
-  const chevron = createElement(doc, "span", {
-    fontSize: "11px",
+  const chevron = createUiChevron(doc, {
+    className: "paperchat-stats-collapsible-chevron",
+    kind: "right",
+    size: 16,
     color: theme.textMuted,
-    transform: "rotate(0deg)",
-    transition: "transform 0.15s ease",
+    opacity: 0.55,
   });
-  chevron.textContent = "▾";
-  chevron.className = "paperchat-stats-collapsible-chevron";
   head.appendChild(titleEl);
   head.appendChild(chevron);
 
@@ -303,7 +303,7 @@ export function createCollapsibleSection(
 
   const apply = (): void => {
     body.style.display = collapsed ? "none" : "block";
-    chevron.style.transform = collapsed ? "rotate(-90deg)" : "rotate(0deg)";
+    setUiChevronExpanded(chevron, !collapsed);
   };
   apply();
 

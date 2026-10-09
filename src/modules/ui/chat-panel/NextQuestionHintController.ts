@@ -115,6 +115,7 @@ export class NextQuestionHintController {
   };
 
   private readonly onFocus = () => {
+    this.hintLayer?.classList.add("is-composer-focused");
     this.syncVisibility();
     const doc = this.input?.ownerDocument;
     if (!doc) {
@@ -125,6 +126,51 @@ export class NextQuestionHintController {
         this.syncVisibility();
       }
     }, doc);
+  };
+
+  private readonly onBlur = () => {
+    const doc = this.input?.ownerDocument;
+    if (!doc) {
+      return;
+    }
+    scheduleNextFrame(() => {
+      if (this.disposed || !this.input) {
+        return;
+      }
+      if (doc.activeElement === this.input) {
+        return;
+      }
+      this.hintLayer?.classList.remove("is-composer-focused");
+      this.syncVisibility();
+    }, doc);
+  };
+
+  private readonly onHintActivate = (event: Event) => {
+    if (!this.isHintActive()) {
+      return;
+    }
+    if (event instanceof MouseEvent && event.button !== 0) {
+      return;
+    }
+    if (event instanceof KeyboardEvent) {
+      if (event.key !== "Enter" && event.key !== " ") {
+        return;
+      }
+      event.preventDefault();
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    this.acceptHint();
+  };
+
+  /** Zotero/Firefox sometimes skip `click` after focus changes; `mousedown` is reliable. */
+  private readonly onHintMouseDown = (event: MouseEvent) => {
+    if (event.button !== 0 || !this.isHintActive()) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    this.acceptHint();
   };
 
   constructor(private context: ChatPanelContext) {
@@ -149,7 +195,7 @@ export class NextQuestionHintController {
     this.hintActionEl = this.hintLayer.querySelector(
       "[data-next-question-hint-action]",
     ) as HTMLElement | null;
-    this.wrapper.appendChild(this.hintLayer);
+    this.mountHintLayer();
     syncComposerHintOffset(this.context.container);
     this.bindEvents();
     this.restoreHintFromHost();
@@ -345,12 +391,11 @@ export class NextQuestionHintController {
         "[data-next-question-hint-action]",
       ) as HTMLElement | null;
     }
-    if (this.hintLayer.parentNode !== wrapper) {
-      wrapper.appendChild(this.hintLayer);
-    }
+    this.mountHintLayer();
     if (this.hint) {
       if (this.hintTextEl) {
         this.hintTextEl.textContent = this.hint.text;
+        this.hintTextEl.setAttribute("title", this.hint.text);
       }
       if (this.hintActionEl) {
         this.hintActionEl.textContent = getString("chat-next-question-hint-tab");
@@ -396,6 +441,10 @@ export class NextQuestionHintController {
     this.input?.addEventListener("compositionstart", this.onCompositionStart);
     this.input?.addEventListener("compositionend", this.onCompositionEnd);
     this.input?.addEventListener("focus", this.onFocus);
+    this.input?.addEventListener("blur", this.onBlur);
+    this.hintLayer?.addEventListener("mousedown", this.onHintMouseDown);
+    this.hintLayer?.addEventListener("click", this.onHintActivate);
+    this.hintLayer?.addEventListener("keydown", this.onHintActivate);
     this.wrapper?.addEventListener("keydown", this.onWrapperKeyDown, true);
   }
 
@@ -409,7 +458,36 @@ export class NextQuestionHintController {
     );
     this.input?.removeEventListener("compositionend", this.onCompositionEnd);
     this.input?.removeEventListener("focus", this.onFocus);
+    this.input?.removeEventListener("blur", this.onBlur);
+    this.hintLayer?.removeEventListener("mousedown", this.onHintMouseDown);
+    this.hintLayer?.removeEventListener("click", this.onHintActivate);
+    this.hintLayer?.removeEventListener("keydown", this.onHintActivate);
     this.wrapper?.removeEventListener("keydown", this.onWrapperKeyDown, true);
+  }
+
+  private getHintMountParent(): HTMLElement | null {
+    const composerFloat = this.context.container.querySelector(
+      "#chat-composer-float",
+    ) as HTMLElement | null;
+    return composerFloat || this.wrapper;
+  }
+
+  private mountHintLayer(): void {
+    if (!this.hintLayer || !this.wrapper) {
+      return;
+    }
+    const parent = this.getHintMountParent();
+    if (!parent) {
+      return;
+    }
+    const anchor = this.wrapper;
+    if (this.hintLayer.parentNode !== parent) {
+      parent.insertBefore(this.hintLayer, anchor);
+      return;
+    }
+    if (this.hintLayer.nextElementSibling !== anchor) {
+      parent.insertBefore(this.hintLayer, anchor);
+    }
   }
 
   private persistHintOnHost(): void {
@@ -443,7 +521,14 @@ export class NextQuestionHintController {
     }
     this.hint = hint;
     this.hintTextEl.textContent = hint.text;
+    this.hintTextEl.setAttribute("title", hint.text);
     this.hintActionEl.textContent = getString("chat-next-question-hint-tab");
+    if (this.hintLayer) {
+      this.hintLayer.setAttribute(
+        "aria-label",
+        `${getString("chat-next-question-hint-label")}: ${hint.text}`,
+      );
+    }
     this.persistHintOnHost();
     this.syncVisibility();
   }
@@ -474,7 +559,9 @@ export class NextQuestionHintController {
     this.clearPersistedHintOnHost();
     if (this.hintTextEl) {
       this.hintTextEl.textContent = "";
+      this.hintTextEl.removeAttribute("title");
     }
+    this.hintLayer?.removeAttribute("aria-label");
     this.syncVisibility();
   }
 
@@ -494,6 +581,8 @@ export class NextQuestionHintController {
       !this.isMentionPopupVisible();
     this.hintLayer.style.display = visible ? "flex" : "none";
     this.hintLayer.setAttribute("aria-hidden", visible ? "false" : "true");
+    this.hintLayer.setAttribute("data-visible", visible ? "true" : "false");
+    this.hintLayer.tabIndex = visible ? 0 : -1;
     if (visible) {
       syncComposerHintOffset(this.context.container);
     }
@@ -522,60 +611,57 @@ export class NextQuestionHintController {
     const layer = doc.createElement("div");
     layer.id = "chat-next-question-hint";
     layer.setAttribute("aria-hidden", "true");
+    layer.setAttribute("data-visible", "false");
+    layer.setAttribute("role", "button");
+    layer.setAttribute("tabindex", "0");
     Object.assign(layer.style, {
       display: "none",
-      position: "absolute",
-      left: "14px",
-      right: "12px",
-      top: "var(--chat-composer-hint-top, 12px)",
-      height: "18px",
-      alignItems: "center",
-      gap: "8px",
-      pointerEvents: "none",
-      zIndex: "3",
+      flexDirection: "column",
+      alignItems: "stretch",
+      gap: "4px",
       color: theme.textMuted,
-      fontSize: "14px",
-      lineHeight: "18px",
-      opacity: "0.72",
     });
 
-    const text = doc.createElement("span");
-    text.setAttribute("data-next-question-hint-text", "true");
-    Object.assign(text.style, {
-      flex: "1",
+    const header = doc.createElement("div");
+    header.className = "chat-next-question-hint-header";
+    Object.assign(header.style, {
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: "8px",
       minWidth: "0",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
     });
+
+    const label = doc.createElement("span");
+    label.className = "chat-next-question-hint-label";
+    label.textContent = getString("chat-next-question-hint-label");
 
     const action = doc.createElement("span");
+    action.className = "chat-next-question-hint-action";
     action.setAttribute("data-next-question-hint-action", "true");
-    Object.assign(action.style, {
-      flexShrink: "0",
-      fontSize: "11px",
-      lineHeight: "16px",
-      color: theme.textSecondary,
-      opacity: "0.85",
+    action.style.color = theme.textSecondary;
+
+    header.appendChild(label);
+    header.appendChild(action);
+
+    const text = doc.createElement("div");
+    text.className = "chat-next-question-hint-text";
+    text.setAttribute("data-next-question-hint-text", "true");
+    Object.assign(text.style, {
+      color: theme.textPrimary,
+      wordBreak: "break-word",
     });
 
+    layer.appendChild(header);
     layer.appendChild(text);
-    layer.appendChild(action);
     return layer;
-  }
-
-  private shouldHideNativePlaceholder(): boolean {
-    return !!this.hint && !this.input?.value.trim();
   }
 
   private syncNativePlaceholder(): void {
     if (!this.input) {
       return;
     }
-    setInputPlaceholder(
-      this.input,
-      this.shouldHideNativePlaceholder() ? "" : this.originalPlaceholder,
-    );
+    setInputPlaceholder(this.input, this.originalPlaceholder);
   }
 
   private restorePlaceholder(): void {

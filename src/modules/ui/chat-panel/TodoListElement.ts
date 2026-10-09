@@ -1,11 +1,16 @@
 import type {
   ExecutionPlan,
+  ExecutionPlanStatus,
   ExecutionPlanStep,
   ExecutionPlanStepStatus,
 } from "../../../types/chat";
 import { getString } from "../../../utils/locale";
-import { getAgentUiSemanticColors } from "./AgentUiTheme";
+import {
+  getAgentUiSemanticColors,
+  getExecutionPlanCardSurface,
+} from "./AgentUiTheme";
 import { HTML_NS } from "./types";
+import { createUiChevron, setUiChevronExpanded } from "./UiChevron";
 import type { ThemeColors } from "./types";
 
 export type TodoItemStatus =
@@ -279,13 +284,22 @@ function resolvePlanTitle(plan: ExecutionPlan): string {
   return getString("chat-todo-list-title");
 }
 
+export function collapseTodoListElement(root: HTMLElement): void {
+  if (root.getAttribute("data-open") === "false") {
+    return;
+  }
+  root.setAttribute("data-user-open", "false");
+  root.setAttribute("data-open", "false");
+  applyTodoListOpenUi(root);
+}
+
 function applyTodoListOpenUi(root: HTMLElement): void {
   const open = root.getAttribute("data-open") !== "false";
   const chevron = root.querySelector(
     ".paperchat-todo-list-chevron",
   ) as HTMLElement | null;
   if (chevron) {
-    chevron.style.transform = open ? "rotate(180deg)" : "rotate(0deg)";
+    setUiChevronExpanded(chevron, open);
   }
 
   const body = root.querySelector(
@@ -306,6 +320,7 @@ function syncTodoListOpenState(
   root: HTMLElement,
   allComplete: boolean,
   collapseOnComplete: boolean,
+  planStatus: ExecutionPlanStatus,
 ): void {
   const wasComplete = root.getAttribute("data-all-complete") === "true";
   const userOpen = root.getAttribute("data-user-open");
@@ -316,7 +331,9 @@ function syncTodoListOpenState(
         ? false
         : root.getAttribute("data-open") !== "false";
 
-  if (!wasComplete && allComplete && collapseOnComplete) {
+  const shouldCollapse =
+    allComplete && collapseOnComplete && planStatus === "completed";
+  if (!wasComplete && shouldCollapse) {
     open = false;
     root.setAttribute("data-user-open", "false");
   }
@@ -385,7 +402,7 @@ function syncTodoListContent(
     }
   }
 
-  syncTodoListOpenState(root, allComplete, collapseOnComplete);
+  syncTodoListOpenState(root, allComplete, collapseOnComplete, plan.status);
 }
 
 export function createTodoListElement(
@@ -402,6 +419,7 @@ export function createTodoListElement(
   const items = mapExecutionPlanToTodoItems(plan);
   const completed = items.filter((item) => item.status === "completed").length;
   const allComplete = items.length > 0 && completed === items.length;
+  const surface = getExecutionPlanCardSurface(theme);
 
   const root = createElement(
     doc,
@@ -410,14 +428,15 @@ export function createTodoListElement(
       display: "block",
       width: "100%",
       minWidth: "0",
-      borderRadius: "16px",
-      border: `1px solid ${theme.borderColor}`,
-      background: theme.inputAreaBg,
+      borderRadius: "12px",
+      border: `1px solid ${surface.border}`,
+      background: surface.background,
+      boxShadow: surface.boxShadow,
       boxSizing: "border-box",
       overflow: "hidden",
     },
     {
-      class: `paperchat-todo-list ${TODO_LIST_ROOT_CLASS}`,
+      class: `paperchat-todo-list paperchat-todo-list--docked ${TODO_LIST_ROOT_CLASS}`,
       "data-open": defaultOpen && !(allComplete && collapseOnComplete) ? "true" : "false",
       "data-collapse-on-complete": collapseOnComplete ? "true" : "false",
       "data-all-complete": allComplete ? "true" : "false",
@@ -485,20 +504,16 @@ export function createTodoListElement(
   count.textContent = `${completed}/${items.length}`;
   trigger.appendChild(count);
 
-  const chevron = createElement(doc, "span", {
-    flexShrink: "0",
-    fontSize: "12px",
-    lineHeight: "1",
+  const chevron = createUiChevron(doc, {
+    className: "paperchat-todo-list-chevron",
+    size: 16,
     color: theme.textMuted,
-    opacity: "0.55",
-    transition: "transform 0.18s ease",
-    transform:
-      defaultOpen && !(allComplete && collapseOnComplete)
-        ? "rotate(180deg)"
-        : "rotate(0deg)",
+    opacity: 0.55,
   });
-  chevron.className = "paperchat-todo-list-chevron";
-  chevron.textContent = "⌄";
+  setUiChevronExpanded(
+    chevron,
+    defaultOpen && !(allComplete && collapseOnComplete),
+  );
   trigger.appendChild(chevron);
 
   trigger.addEventListener("click", (event) => {

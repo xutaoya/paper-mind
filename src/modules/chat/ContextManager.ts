@@ -245,6 +245,58 @@ export interface SessionContextUsageSnapshot {
   remainingPercent: number;
 }
 
+function isEmptyStreamingAssistantPlaceholder(message: ChatMessage): boolean {
+  return (
+    message.role === "assistant" &&
+    message.streamingState === "in_progress" &&
+    !message.content.trim() &&
+    !message.reasoning?.trim() &&
+    !message.tool_calls?.length
+  );
+}
+
+/**
+ * Messages that mirror the conversation payload used for compaction checks
+ * and API history (excluding provider-specific prefixes such as paper context).
+ */
+export function buildSessionContextUsageMessages(
+  session: ChatSession,
+): ChatMessage[] {
+  const { messages } = getContextManager().filterMessages(session);
+  return applyQuotedMessagesToModelRequest(
+    messages.filter((message) => !isEmptyStreamingAssistantPlaceholder(message)),
+  );
+}
+
+function collectCompactionCoveredMessageIds(
+  conversationMessages: ChatMessage[],
+  actualSummarizedMessages: ChatMessage[],
+  alreadyCoveredIds: ReadonlySet<string>,
+): string[] {
+  if (actualSummarizedMessages.length === 0) {
+    return [...alreadyCoveredIds];
+  }
+
+  const lastSummarized =
+    actualSummarizedMessages[actualSummarizedMessages.length - 1];
+  const lastIndex = conversationMessages.findIndex(
+    (message) => message.id === lastSummarized.id,
+  );
+  if (lastIndex < 0) {
+    return [
+      ...new Set([
+        ...alreadyCoveredIds,
+        ...actualSummarizedMessages.map((message) => message.id),
+      ]),
+    ];
+  }
+
+  const throughBoundary = conversationMessages
+    .slice(0, lastIndex + 1)
+    .map((message) => message.id);
+  return [...new Set([...alreadyCoveredIds, ...throughBoundary])];
+}
+
 export function getSessionContextUsage(
   session: ChatSession | null | undefined,
 ): SessionContextUsageSnapshot | null {
@@ -252,9 +304,8 @@ export function getSessionContextUsage(
     return null;
   }
 
-  const { messages } = getContextManager().filterMessages(session);
   const usedTokens = estimateMessagesTokens(
-    applyQuotedMessagesToModelRequest(messages),
+    buildSessionContextUsageMessages(session),
   );
   const totalTokens = getSessionDeclaredContextWindow(session);
   if (totalTokens <= 0) {
@@ -363,7 +414,9 @@ class ContextManager {
           ) - 1;
       }
       if (lastCoveredIndex >= 0) {
-        messagesAfterSummary = conversationMessages.slice(lastCoveredIndex + 1);
+        messagesAfterSummary = conversationMessages
+          .slice(lastCoveredIndex + 1)
+          .filter((message) => !coveredIds.has(message.id));
       }
     }
 
@@ -565,10 +618,11 @@ class ContextManager {
         const summary: ContextSummary = {
           id: `summary-${Date.now()}`,
           content: summaryContent,
-          coveredMessageIds: [
-            ...alreadyCoveredIds,
-            ...actualSummarizedMessages.map((m) => m.id),
-          ],
+          coveredMessageIds: collectCompactionCoveredMessageIds(
+            conversationMessages,
+            actualSummarizedMessages,
+            alreadyCoveredIds,
+          ),
           createdAt: Date.now(),
           messageCountAtCreation: conversationMessages.length,
           estimatedTokensAtCreation:

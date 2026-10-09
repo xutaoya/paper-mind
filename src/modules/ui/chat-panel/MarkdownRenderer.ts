@@ -18,6 +18,7 @@ import katex from "katex";
 import { chatColors } from "../../../utils/colors";
 import { getString } from "../../../utils/locale";
 import { HTML_NS } from "./types";
+import { createUiChevron, setUiChevronExpanded } from "./UiChevron";
 import { isDarkMode, getCurrentTheme } from "./ChatPanelTheme";
 import type { EvidenceRecord } from "../../../types/evidence";
 import type { PresentationToolCardArtifact } from "../../../types/chat";
@@ -472,6 +473,8 @@ export interface MarkdownRenderOptions {
   };
   /** Hide tool-call cards; render them in Agent Activity instead. */
   suppressToolCallCards?: boolean;
+  /** Hide source citation cards until the assistant message finishes streaming. */
+  suppressSourceGroupCards?: boolean;
   sourceGroupContext?: SourceGroupActionContext;
 }
 
@@ -601,6 +604,18 @@ export function stripToolCallMarkupFromContent(content: string): string {
     .map((fragment) => fragment.content)
     .join("")
     .trim();
+}
+
+/** Markdown answer text outside tool-call / source-group blocks (for stream UI). */
+export function getAssistantVisibleAnswerMarkdown(content: string): string {
+  const withoutTools = stripToolCallMarkupFromContent(
+    stripIncompleteTrailingToolCall(content),
+  );
+  return stripSourceGroupMarkup(withoutTools).trim();
+}
+
+export function assistantContentHasVisibleAnswer(content: string): boolean {
+  return getAssistantVisibleAnswerMarkdown(content).length > 0;
 }
 
 export function messageHasAgentActivityContent(
@@ -879,15 +894,13 @@ function buildToolCallCardElement(
 
   let chevron: HTMLElement | null = null;
   if (canToggle) {
-    chevron = doc.createElementNS(HTML_NS, "span") as HTMLElement;
-    chevron.className = "paperchat-tool-call-chevron";
-    chevron.style.fontSize = "11px";
-    chevron.style.color = colors.argsText;
-    chevron.style.transition = "transform 0.18s ease";
-    chevron.style.display = "inline-block";
-    chevron.style.flexShrink = "0";
-    chevron.style.opacity = "0.72";
-    chevron.textContent = "›";
+    chevron = createUiChevron(doc, {
+      className: "paperchat-tool-call-chevron",
+      kind: "right",
+      size: 14,
+      color: colors.argsText,
+      opacity: 0.72,
+    });
     header.appendChild(chevron);
   }
 
@@ -937,12 +950,12 @@ function buildToolCallCardElement(
     const chev = chevron;
 
     details.style.display = isExpanded ? "block" : "none";
-    chev.style.transform = isExpanded ? "rotate(90deg)" : "rotate(0deg)";
+    setUiChevronExpanded(chev, isExpanded);
 
     header.addEventListener("click", () => {
       isExpanded = !isExpanded;
       details.style.display = isExpanded ? "block" : "none";
-      chev.style.transform = isExpanded ? "rotate(90deg)" : "rotate(0deg)";
+      setUiChevronExpanded(chev, isExpanded);
       setToolCallGroupExpanded(expandStateKey, isExpanded);
     });
 
@@ -1393,6 +1406,80 @@ export function extractSourceGroupFragments(
   return fragments;
 }
 
+export function stripIncompleteTrailingSourceGroup(content: string): string {
+  const marker = "<source-group";
+  const lower = content.toLowerCase();
+  const idx = lower.lastIndexOf(marker);
+  if (idx < 0) {
+    return content;
+  }
+  const tail = lower.slice(idx);
+  if (tail.includes("</source-group>")) {
+    return content;
+  }
+  return content.slice(0, idx).trimEnd();
+}
+
+export function stripSourceGroupMarkup(content: string): string {
+  if (!/<source-group\b/i.test(content)) {
+    return content;
+  }
+
+  const fragments = extractSourceGroupFragments(content);
+  if (fragments.length === 1 && fragments[0].kind === "markdown") {
+    return stripIncompleteTrailingSourceGroup(fragments[0].content);
+  }
+
+  const markdownOnly = fragments
+    .filter(
+      (
+        fragment,
+      ): fragment is Extract<SourceGroupFragment, { kind: "markdown" }> =>
+        fragment.kind === "markdown",
+    )
+    .map((fragment) => fragment.content)
+    .join("");
+
+  return stripIncompleteTrailingSourceGroup(markdownOnly);
+}
+
+export function deltaContainsSourceGroupMarkup(delta: string): boolean {
+  const lower = delta.toLowerCase();
+  return /<source-group\b/i.test(delta) || lower.includes("</source-group>");
+}
+
+/**
+ * Text appended after the last full markdown render during streaming.
+ * Strips source-group blocks so citation cards never stream in as raw tags.
+ */
+export function getStreamingAssistantTextTail(
+  content: string,
+  lastMarkdownContent: string,
+  suppressSourceGroupCards: boolean,
+): string {
+  if (!suppressSourceGroupCards) {
+    if (!lastMarkdownContent) {
+      return content;
+    }
+    return content.startsWith(lastMarkdownContent)
+      ? content.slice(lastMarkdownContent.length)
+      : content;
+  }
+
+  const visible = stripSourceGroupMarkup(content);
+  if (!lastMarkdownContent) {
+    return visible;
+  }
+  if (!content.startsWith(lastMarkdownContent)) {
+    return visible;
+  }
+  const visibleLast = stripSourceGroupMarkup(lastMarkdownContent);
+  if (!visible.startsWith(visibleLast)) {
+    return "";
+  }
+  return visible.slice(visibleLast.length);
+}
+
 function getSourceGroupPalette(
   type: string,
   dark: boolean,
@@ -1591,7 +1678,7 @@ function setSourceGroupCollapsed(
   card.classList.toggle("chat-source-group--expanded", !collapsed);
   body.hidden = collapsed;
   toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
-  chevron.style.transform = collapsed ? "rotate(0deg)" : "rotate(180deg)";
+  setUiChevronExpanded(chevron, !collapsed);
   const header = card.querySelector(
     ".chat-source-group__header",
   ) as HTMLElement | null;
@@ -1615,7 +1702,8 @@ function renderSourceGroupCard(
   const actionTitle = sourceGroupAction?.getTitle(group) || null;
 
   const card = doc.createElementNS(HTML_NS, "div") as HTMLElement;
-  card.className = "chat-source-group chat-source-group--collapsed";
+  card.className =
+    "chat-source-group chat-source-group--collapsed chat-source-group--enter";
   card.setAttribute("data-source-group-type", group.type);
   Object.assign(card.style, {
     margin: "10px 0 6px",
@@ -1733,19 +1821,13 @@ function renderSourceGroupCard(
     toggle.appendChild(pageEl);
   }
 
-  const chevron = doc.createElementNS(HTML_NS, "span") as HTMLElement;
-  chevron.className = "chat-source-group__chevron";
-  chevron.setAttribute("aria-hidden", "true");
-  Object.assign(chevron.style, {
-    flexShrink: "0",
-    width: "14px",
-    fontSize: "11px",
-    lineHeight: "1",
-    textAlign: "center",
-    opacity: "0.5",
-    transform: "rotate(0deg)",
+  const chevron = createUiChevron(doc, {
+    className: "chat-source-group__chevron",
+    size: 16,
+    color: colors.bodyText,
+    opacity: 0.52,
   });
-  chevron.textContent = "⌄";
+  setUiChevronExpanded(chevron, false);
   toggle.appendChild(chevron);
   header.appendChild(toggle);
 
@@ -1901,6 +1983,15 @@ function renderSourceGroupBlocks(
   content: string,
   options: MarkdownRenderOptions = {},
 ): boolean {
+  if (options.suppressSourceGroupCards) {
+    const stripped = stripSourceGroupMarkup(content);
+    if (!stripped.trim()) {
+      return /<source-group\b/i.test(content);
+    }
+    renderMarkdownFragment(doc, parent, stripped, options);
+    return true;
+  }
+
   const fragments = mergeAdjacentSourceGroupFragments(
     extractSourceGroupFragments(content),
   );
@@ -2273,12 +2364,16 @@ export function renderMarkdownToElement(
   closeActiveEvidencePopover(doc);
   element.textContent = "";
 
+  const preparedContent = options.suppressSourceGroupCards
+    ? stripSourceGroupMarkup(markdownContent)
+    : markdownContent;
+
   // First, check for and render tool call cards
   const renderedPresentationArtifactKeys = new Set<string>();
   const remainingContent = renderToolCallCards(
     doc,
     element,
-    markdownContent,
+    preparedContent,
     messageId,
     options,
     renderedPresentationArtifactKeys,

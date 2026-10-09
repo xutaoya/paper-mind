@@ -13,6 +13,7 @@ import { applyModelSelectorTheme } from "./ComposerTheme";
 import type { ThemeColors } from "./types";
 import { HTML_NS } from "./types";
 import { monitorChatPanelRoot } from "./chatUIFontScale";
+import { createUiChevron } from "./UiChevron";
 
 /**
  * Helper to create an element with styles (using proper HTML namespace for XHTML)
@@ -384,8 +385,8 @@ export function createChatContainer(
       opacity: "0",
       transform: "translateY(-6px)",
       overflow: "hidden",
-      padding: "0 14px",
-      background: theme.chatHistoryBg,
+      padding: "6px 12px 8px",
+      background: "transparent",
       pointerEvents: "none",
       zIndex: "2",
       transition: "height 180ms ease, opacity 180ms ease, transform 180ms ease",
@@ -1153,12 +1154,11 @@ export function createChatContainer(
   );
   modelSelectorText.textContent = getString("chat-select-model");
 
-  const modelSelectorArrow = createElement(doc, "span", {
-    fontSize: "9px",
-    opacity: "0.55",
-    flexShrink: "0",
+  const modelSelectorArrow = createUiChevron(doc, {
+    className: "chat-model-selector-chevron",
+    size: 14,
+    opacity: 0.5,
   });
-  modelSelectorArrow.textContent = "▼";
 
   modelSelectorBtn.appendChild(modelSelectorText);
   modelSelectorBtn.appendChild(modelSelectorArrow);

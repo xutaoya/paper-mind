@@ -324,6 +324,33 @@ type RuntimeToolIterationEntry =
       toolCall: ToolCall;
     };
 
+function collectPlannedToolsFromIterationEntries(
+  entries: RuntimeToolIterationEntry[],
+  presentationLocalIds: Map<ToolCall, string>,
+): Array<{ id: string; toolName: string }> {
+  const planned: Array<{ id: string; toolName: string }> = [];
+  for (const entry of entries) {
+    if (entry.kind === "execute") {
+      for (const request of entry.requests) {
+        const toolCall = request.toolCall;
+        planned.push({
+          id: presentationLocalIds.get(toolCall) || toolCall.id,
+          toolName: toolCall.function.name,
+        });
+      }
+      continue;
+    }
+    if (entry.kind === "user_input" || entry.kind === "search_scope") {
+      const toolCall = entry.toolCall;
+      planned.push({
+        id: presentationLocalIds.get(toolCall) || toolCall.id,
+        toolName: toolCall.function.name,
+      });
+    }
+  }
+  return planned;
+}
+
 function createUnavailableToolResult(toolCall: ToolCall): ToolExecutionResult {
   return {
     toolCall,
@@ -1726,6 +1753,21 @@ export class AgentRuntime {
       invalidSummaryCreateNoteCallIds,
       executionContext,
     );
+
+    const plannedTools = collectPlannedToolsFromIterationEntries(
+      executionEntries,
+      presentationLocalIds,
+    );
+    if (plannedTools.length > 0) {
+      this.executionPlanManager.registerPendingToolSteps(
+        sendingSession,
+        currentMessages,
+        plannedTools,
+      );
+      this.ensureSessionTracked(sendingSession, sessionRunId);
+      await this.sessionStorage.updateSessionMeta(sendingSession);
+      this.emitPlanUpdate(sendingSession, sessionRunId);
+    }
 
     // Reused exchanges already live in the previous turn's retained apiOnly
     // transcript. Re-recording them under the new assistant id would duplicate

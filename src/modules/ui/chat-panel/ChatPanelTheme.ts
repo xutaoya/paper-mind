@@ -148,8 +148,9 @@ export function applyThemeToContainer(container: HTMLElement): void {
     "#chat-execution-plan-panel",
   ) as HTMLElement;
   if (executionPlanPanel) {
-    executionPlanPanel.style.background = theme.chatHistoryBg;
-    executionPlanPanel.style.borderBottomColor = theme.borderColor;
+    executionPlanPanel.style.background = "transparent";
+    executionPlanPanel.style.borderBottom = "none";
+    executionPlanPanel.style.boxShadow = "none";
   }
 
   const executionApprovalPanel = container.querySelector(

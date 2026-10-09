@@ -178,6 +178,7 @@ export type FluentMessageId =
   | 'paperchat-chat-message-count'
   | 'paperchat-chat-message-edited'
   | 'paperchat-chat-new-chat'
+  | 'paperchat-chat-next-question-hint-label'
   | 'paperchat-chat-next-question-hint-tab'
   | 'paperchat-chat-no-history'
   | 'paperchat-chat-no-messages'

@@ -80,6 +80,7 @@ paperchat-chat-context-item-no-pdf = No PDF attached to this item
 
 paperchat-chat-context-item-open = Open "{ $title }" in Zotero
 
+paperchat-chat-next-question-hint-label = You might ask
 paperchat-chat-next-question-hint-tab = Tab to fill
 
 paperchat-chat-send = Send

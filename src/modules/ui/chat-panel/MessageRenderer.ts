@@ -33,6 +33,7 @@ import {
 import { createAgentActivityPanel } from "./AgentActivityPanel";
 import { createToolApprovalCardElement, type ToolApprovalCardBanner } from "./ApprovalCardElement";
 import {
+  collapseTodoListElement,
   createTodoListElement,
   updateTodoListElement,
 } from "./TodoListElement";
@@ -672,6 +673,7 @@ export function getMessageMarkdownRenderOptions(
     presentationArtifacts: artifactsByToolCallId,
     presentationActiveToolCallIds,
     presentationInterruption,
+    suppressSourceGroupCards: streamingState === "in_progress",
     blockquoteAction: undefined,
     sourceGroupAction: undefined,
     evidenceAction: undefined,
@@ -1131,6 +1133,7 @@ export function createMessageElement(
     }
 
     if (hasAgentActivity) {
+      const chatContainer = resolveChatPanelContainer(bubble);
       const activityPanel = createAgentActivityPanel(doc, theme, {
         messageId: msg.id,
         reasoning: msg.reasoning || "",
@@ -1139,6 +1142,9 @@ export function createMessageElement(
         activityStartedAt: renderOptions.activityStartedAt,
         activityEndedAt: isReasoningStreaming ? undefined : msg.timestamp,
         turnUsage: msg.turnUsage,
+        hideToolActivityRows: chatContainer
+          ? isDockedExecutionPlanVisible(chatContainer)
+          : false,
       });
       if (isReasoningStreaming && !msg.reasoning && !msg.content.includes("<tool-call")) {
         activityPanel.style.display = "none";
@@ -2176,6 +2182,34 @@ export function renderMessages(
     shouldScrollToBottom,
     renderOptions.onRenderComplete,
   );
+}
+
+export function isDockedExecutionPlanVisible(container: HTMLElement): boolean {
+  const panel = container.querySelector(
+    "#chat-execution-plan-panel",
+  ) as HTMLElement | null;
+  if (!panel || panel.style.pointerEvents === "none") {
+    return false;
+  }
+  const height = Number(panel.dataset.visibleHeight || 0);
+  return height > 0;
+}
+
+export function collapseDockedExecutionPlan(container: HTMLElement): void {
+  const panel = container.querySelector(
+    "#chat-execution-plan-panel",
+  ) as HTMLElement | null;
+  const todoRoot = panel?.querySelector(
+    ".paperchat-todo-list-root",
+  ) as HTMLElement | null;
+  if (!todoRoot) {
+    return;
+  }
+  collapseTodoListElement(todoRoot);
+  if (panel) {
+    syncExecutionInsetHeight(panel, todoRoot);
+    syncExecutionInsets(panel);
+  }
 }
 
 export function updateExecutionPlanView(

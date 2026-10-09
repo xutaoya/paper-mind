@@ -3583,7 +3583,59 @@ describe("agent runtime plan semantics", function () {
 
     assert.deepEqual(
       session.executionPlan?.steps.map((step) => step.title),
-      ["Find relevant papers in Zotero", "Review notes and annotations"],
+      [
+        "Understand your request",
+        "Find relevant papers in Zotero",
+        "Review notes and annotations",
+      ],
+    );
+  });
+
+  it("ignores runtime context when deriving execution plan summary", function () {
+    const manager = new ExecutionPlanManager();
+    const session = createSession();
+    session.messages.push({
+      id: "runtime-context",
+      role: "user",
+      content:
+        "[Agent runtime context — not a user message]\n\niteration 2",
+      timestamp: Date.now(),
+    });
+    session.messages.push({
+      id: "user-2",
+      role: "user",
+      content: "Summarize the methods section",
+      timestamp: Date.now(),
+    });
+
+    manager.startPlan(session, session.messages);
+
+    assert.equal(
+      session.executionPlan?.summary,
+      "Summarize the methods section",
+    );
+  });
+
+  it("registers pending tool steps before execution starts", function () {
+    const manager = new ExecutionPlanManager();
+    const session = createSession();
+
+    manager.startPlan(session, session.messages);
+    manager.registerPendingToolSteps(session, session.messages, [
+      { id: "tool-1", toolName: "get_outline" },
+      { id: "tool-2", toolName: "search_paper_content" },
+    ]);
+
+    assert.deepEqual(
+      session.executionPlan?.steps.map((step) => ({
+        title: step.title,
+        status: step.status,
+      })),
+      [
+        { title: "Understand your request", status: "completed" },
+        { title: "Read paper evidence", status: "pending" },
+        { title: "Read paper evidence", status: "pending" },
+      ],
     );
   });
 

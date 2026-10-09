@@ -167,15 +167,38 @@ export function applySearchActivityTheme(
     });
 }
 
+export function getExecutionPlanCardSurface(theme: ThemeColors): {
+  background: string;
+  border: string;
+  boxShadow: string;
+} {
+  const dark = isDarkMode() || theme.containerBg === "#1e1e1e";
+  if (dark) {
+    return {
+      background: "rgba(255, 255, 255, 0.05)",
+      border: "rgba(255, 255, 255, 0.12)",
+      boxShadow: "inset 0 1px 0 rgba(255, 255, 255, 0.06)",
+    };
+  }
+  return {
+    background: theme.toolbarBg,
+    border: "rgba(15, 23, 42, 0.1)",
+    boxShadow:
+      "0 1px 2px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.03)",
+  };
+}
+
 export function applyTodoListTheme(
   container: HTMLElement,
   theme: ThemeColors,
 ): void {
   const semantic = getAgentUiSemanticColors();
+  const surface = getExecutionPlanCardSurface(theme);
   container.querySelectorAll(".paperchat-todo-list-root").forEach((node) => {
     const root = node as HTMLElement;
-    root.style.background = theme.inputAreaBg;
-    root.style.borderColor = theme.borderColor;
+    root.style.background = surface.background;
+    root.style.borderColor = surface.border;
+    root.style.boxShadow = surface.boxShadow;
 
     const title = root.querySelector(".paperchat-todo-list-title") as
       | HTMLElement

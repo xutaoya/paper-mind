@@ -12,6 +12,7 @@ import {
 } from "./ToolCallGroupExpandState";
 import { getString } from "../../../utils/locale";
 import { HTML_NS } from "./types";
+import { createUiChevron, setUiChevronExpanded } from "./UiChevron";
 import type { ThemeColors } from "./types";
 
 export type ToolResultActivityStatus = "complete" | "active";
@@ -182,7 +183,7 @@ function applyToolResultOpenUi(root: HTMLElement, open: boolean): void {
     disclosure.style.pointerEvents = open ? "auto" : "none";
   }
   if (chevron) {
-    chevron.style.transform = open ? "rotate(180deg)" : "rotate(0deg)";
+    setUiChevronExpanded(chevron, open);
   }
   trigger?.setAttribute("aria-expanded", open ? "true" : "false");
   root.setAttribute("data-open", open ? "true" : "false");
@@ -519,16 +520,13 @@ function populateToolResultElement(
   trigger.appendChild(statusBadge);
 
   if (canToggle) {
-    const chevron = createElement(doc, "span", {
-      flexShrink: "0",
-      fontSize: "12px",
+    const chevron = createUiChevron(doc, {
+      className: "paperchat-tool-result-chevron",
+      size: 16,
       color: theme.textMuted,
-      opacity: "0.55",
-      transition: "transform 0.18s ease, color 0.18s ease",
-      lineHeight: "1",
+      opacity: 0.55,
     });
-    chevron.className = "paperchat-tool-result-chevron";
-    chevron.textContent = "⌄";
+    setUiChevronExpanded(chevron, open);
     trigger.appendChild(chevron);
   }
 

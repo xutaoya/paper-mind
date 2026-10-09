@@ -518,6 +518,27 @@
 }
 
 /* Source-group evidence (compact citation card) */
+@keyframes chat-source-group-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-source-group--enter {
+  animation: chat-source-group-enter 0.42s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-source-group--enter {
+    animation: none;
+  }
+}
+
 .chat-source-group {
   margin: 10px 0 6px;
   border-radius: 8px;
@@ -549,15 +570,29 @@
   flex-shrink: 0;
 }
 
+.paperchat-ui-chevron {
+  flex: 0 0 auto;
+}
+
+.paperchat-ui-chevron svg {
+  display: block;
+}
+
 .chat-source-group__chevron {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 16px;
-  height: 16px;
   flex: 0 0 16px;
-  font-size: 10px;
-  opacity: 0.5;
+}
+
+.chat-source-group--expanded .chat-source-group__chevron {
+  opacity: 0.72 !important;
+}
+
+.paperchat-tool-result-chevron,
+.paperchat-todo-list-chevron {
+  flex: 0 0 16px;
+}
+
+.paperchat-agent-activity-summary .paperchat-ui-chevron {
+  opacity: 0.52;
 }
 
 .chat-source-group__badge {
@@ -1287,8 +1322,71 @@
   z-index: 1;
 }
 
+#chat-composer-float #chat-next-question-hint {
+  position: relative;
+  z-index: 8;
+}
+
 #chat-next-question-hint {
-  z-index: 3;
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0 8px 2px;
+  box-sizing: border-box;
+  cursor: pointer;
+  pointer-events: auto;
+  user-select: none;
+}
+
+#chat-next-question-hint[data-visible="true"] {
+  display: flex !important;
+}
+
+#chat-next-question-hint .chat-next-question-hint-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+#chat-next-question-hint .chat-next-question-hint-label {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  letter-spacing: 0.02em;
+  opacity: 0.72;
+}
+
+#chat-next-question-hint .chat-next-question-hint-text {
+  font-size: 13px;
+  line-height: 1.45;
+  font-weight: 500;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  word-break: break-word;
+}
+
+#chat-next-question-hint .chat-next-question-hint-action {
+  flex-shrink: 0;
+  font-size: 11px;
+  line-height: 16px;
+  opacity: 0.78;
+}
+
+#chat-next-question-hint:hover .chat-next-question-hint-text {
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+#chat-next-question-hint.is-composer-focused {
+  opacity: 1;
 }
 
 #chat-context-item-badge {
@@ -1453,7 +1551,7 @@
 }
 
 #chat-quick-actions-bar.chat-quick-actions-bar--floating.is-visible {
-  flex-shrink: 0;
+  flex: 0 0 auto;
   scrollbar-width: none;
 }
 
@@ -1571,8 +1669,57 @@
   color: #4ade80;
 }
 
+#chat-execution-plan-panel {
+  background: transparent !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+
+#chat-execution-plan-panel::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 1px;
+  pointer-events: none;
+  opacity: 0.55;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--paperchat-execution-plan-divider, rgba(15, 23, 42, 0.1)) 18%,
+    var(--paperchat-execution-plan-divider, rgba(15, 23, 42, 0.1)) 82%,
+    transparent 100%
+  );
+}
+
+.chat-container[data-theme="dark"] #chat-execution-plan-panel::after {
+  --paperchat-execution-plan-divider: rgba(255, 255, 255, 0.12);
+  opacity: 0.7;
+}
+
+.paperchat-todo-list--docked.paperchat-todo-list-root {
+  backdrop-filter: none;
+}
+
+.paperchat-todo-list--docked .paperchat-todo-list-body {
+  border-top: 1px solid var(--paperchat-todo-list-divider, rgba(15, 23, 42, 0.08));
+}
+
+.chat-container[data-theme="dark"] .paperchat-todo-list--docked .paperchat-todo-list-body {
+  --paperchat-todo-list-divider: rgba(255, 255, 255, 0.1);
+}
+
+.paperchat-todo-list--docked .paperchat-todo-item:hover {
+  background: rgba(100, 116, 139, 0.05);
+}
+
+.chat-container[data-theme="dark"] .paperchat-todo-list--docked .paperchat-todo-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
 .paperchat-todo-list-trigger:hover {
-  background: rgba(100, 116, 139, 0.06);
+  background: rgba(100, 116, 139, 0.05);
 }
 
 .chat-container[data-theme="dark"] .paperchat-todo-list-trigger:hover,

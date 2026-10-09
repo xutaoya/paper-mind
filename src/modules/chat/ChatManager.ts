@@ -37,7 +37,10 @@ import {
   SessionStorageService,
 } from "./SessionStorageService";
 import { PdfExtractor } from "./PdfExtractor";
-import { getContextManager } from "./ContextManager";
+import {
+  buildSessionContextUsageMessages,
+  getContextManager,
+} from "./ContextManager";
 import {
   generateAgentRuntimeContextPrompt,
   getPdfToolManager,
@@ -752,19 +755,7 @@ export class ChatManager {
         ? providerConfig.systemPrompt
         : undefined;
 
-    const contextManager = getContextManager();
-    const { messages: filteredMessages } =
-      contextManager.filterMessages(session);
-    const messagesForApi = applyQuotedMessagesToModelRequest(
-      filteredMessages.filter(
-        (message) =>
-          !(
-            message.role === "assistant" &&
-            message.streamingState === "in_progress" &&
-            !message.content
-          ),
-      ),
-    );
+    const messagesForApi = buildSessionContextUsageMessages(session);
 
     const withProviderSystemPrompt = (
       messages: ChatMessage[],

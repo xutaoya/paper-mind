@@ -7,9 +7,12 @@ import type {
   ExecutionPlanStepStatus,
 } from "../../../types/chat";
 import type { ToolExecutionResult } from "../../../types/tool";
+import { isRuntimeContextMessage } from "../prompt-cache-messages";
 import { parseToolError } from "../tool-errors/ToolErrorFormatter";
 
 const RECOVERY_STEP_PREFIX = "replan:";
+const PLANNING_STEP_ID = "planning";
+const PLANNING_STEP_TITLE = "Understand your request";
 
 function createStepId(): string {
   return `step-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -92,6 +95,17 @@ function summarizeRecoveryResult(result: ToolExecutionResult): string {
   return `${result.toolCall.function.name}: ${truncate(issue, 100)}`;
 }
 
+function findLastUserRequestMessage(
+  messages: ChatMessage[],
+): ChatMessage | undefined {
+  return [...messages]
+    .reverse()
+    .find(
+      (message) =>
+        message.role === "user" && !isRuntimeContextMessage(message),
+    );
+}
+
 function getRecoveryStepTitle(results: ToolExecutionResult[]): string {
   const deniedCount = results.filter(
     (result) => result.status === "denied",
@@ -112,9 +126,7 @@ function getRecoveryStepTitle(results: ToolExecutionResult[]): string {
 export class ExecutionPlanManager {
   createInitialPlan(currentMessages: ChatMessage[]): ExecutionPlan {
     const now = Date.now();
-    const lastUserMessage = [...currentMessages]
-      .reverse()
-      .find((message) => message.role === "user");
+    const lastUserMessage = findLastUserRequestMessage(currentMessages);
 
     return {
       id: `plan-${now}`,
@@ -124,10 +136,52 @@ export class ExecutionPlanManager {
         120,
       ),
       status: "in_progress",
-      steps: [],
+      steps: [
+        {
+          id: PLANNING_STEP_ID,
+          title: PLANNING_STEP_TITLE,
+          status: "in_progress",
+          startedAt: now,
+        },
+      ],
+      activeStepId: PLANNING_STEP_ID,
       createdAt: now,
       updatedAt: now,
     };
+  }
+
+  registerPendingToolSteps(
+    session: ChatSession,
+    currentMessages: ChatMessage[],
+    plannedTools: Array<{ id: string; toolName: string }>,
+  ): ExecutionPlan {
+    const plan = this.ensurePlan(session, currentMessages);
+    if (plannedTools.length === 0) {
+      return plan;
+    }
+
+    const now = Date.now();
+    this.completePlanningStep(plan, now);
+
+    for (const { id, toolName } of plannedTools) {
+      const existingStep = plan.steps.find((step) => step.id === id);
+      if (existingStep) {
+        existingStep.title = getToolIntentTitle(toolName);
+        existingStep.toolName = toolName;
+        continue;
+      }
+
+      plan.steps.push({
+        id,
+        title: getToolIntentTitle(toolName),
+        status: "pending",
+        toolName,
+      });
+    }
+
+    plan.updatedAt = now;
+    plan.status = "in_progress";
+    return plan;
   }
 
   startPlan(
@@ -161,6 +215,7 @@ export class ExecutionPlanManager {
     const now = Date.now();
 
     if (status === "in_progress") {
+      this.completePlanningStep(plan, now);
       this.completeActiveRecoveryStep(plan, now);
     }
 
@@ -303,6 +358,19 @@ export class ExecutionPlanManager {
     plan.status = status;
     plan.updatedAt = Date.now();
     return plan;
+  }
+
+  private completePlanningStep(plan: ExecutionPlan, now: number): void {
+    const planningStep = plan.steps.find((step) => step.id === PLANNING_STEP_ID);
+    if (!planningStep || planningStep.status !== "in_progress") {
+      return;
+    }
+
+    planningStep.status = "completed";
+    planningStep.completedAt = now;
+    if (plan.activeStepId === PLANNING_STEP_ID) {
+      plan.activeStepId = undefined;
+    }
   }
 
   private completeActiveRecoveryStep(plan: ExecutionPlan, now: number): void {

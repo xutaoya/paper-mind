@@ -73,6 +73,8 @@ import {
   scrollToAndHighlightMessage,
   shouldAutoScrollChatHistory,
   updateChatHistoryScrollBottomButton,
+  collapseDockedExecutionPlan,
+  isDockedExecutionPlanVisible,
   updateExecutionPlanView,
   updateApprovalView,
   updateUserInputRequestView,
@@ -84,8 +86,13 @@ import {
   type SourceGroupActionContext,
   formatMarkdownForMessageCopy,
   messageHasAgentActivityContent,
+  assistantContentHasVisibleAnswer,
+  deltaContainsSourceGroupMarkup,
+  getStreamingAssistantTextTail,
   renderMarkdownToElement,
+  stripIncompleteTrailingSourceGroup,
   stripIncompleteTrailingToolCall,
+  stripSourceGroupMarkup,
 } from "./MarkdownRenderer";
 import { getDataPath } from "../../../utils/common";
 import { markdownToNoteHtml } from "../../../utils/markdownToNoteHtml";
@@ -210,21 +217,29 @@ function shouldForceStreamingMarkdownRender(
   content: string,
   state: StreamingTextRenderState,
 ): boolean {
-  if (!content.includes("<tool-call")) {
-    return false;
+  if (stripIncompleteTrailingSourceGroup(content) !== content) {
+    return true;
   }
 
   if (stripIncompleteTrailingToolCall(content) !== content) {
     return true;
   }
 
-  if (!state.lastMarkdownContent) {
-    return true;
-  }
-
   const incrementalContent = content.startsWith(state.lastMarkdownContent)
     ? content.slice(state.lastMarkdownContent.length)
     : content;
+
+  if (deltaContainsSourceGroupMarkup(incrementalContent)) {
+    return true;
+  }
+
+  if (!content.includes("<tool-call")) {
+    return false;
+  }
+
+  if (!state.lastMarkdownContent) {
+    return true;
+  }
 
   return (
     incrementalContent.includes("<tool-call") ||
@@ -272,6 +287,8 @@ function renderStreamingTextNow(
     state.lastMarkdownContent && content.startsWith(state.lastMarkdownContent)
       ? content.slice(state.lastMarkdownContent.length)
       : content;
+  const suppressSourceGroupCards =
+    activeMessage.streamingState === "in_progress";
   const shouldRenderMarkdown =
     contentReplacedAfterMarkdownRender ||
     presentationArtifactSignature !== state.lastPresentationArtifactSignature ||
@@ -307,14 +324,6 @@ function renderStreamingTextNow(
     state.lastMarkdownContent = content;
     state.lastPresentationArtifactSignature = presentationArtifactSignature;
     state.lastMarkdownRenderAt = now;
-    updateAgentActivityPanel(
-      container,
-      messageId,
-      activeMessage.reasoning || "",
-      content,
-      true,
-      activeMessage.turnUsage,
-    );
   } else if (state.lastMarkdownContent) {
     let tail = streamingEl.querySelector(
       `[${STREAMING_TEXT_TAIL_ATTR}]`,
@@ -324,10 +333,32 @@ function renderStreamingTextNow(
       tail.setAttribute(STREAMING_TEXT_TAIL_ATTR, "true");
       streamingEl.appendChild(tail);
     }
-    tail.textContent = content.slice(state.lastMarkdownContent.length);
+    tail.textContent = getStreamingAssistantTextTail(
+      content,
+      state.lastMarkdownContent,
+      suppressSourceGroupCards,
+    );
   } else if (streamingEl.textContent !== content) {
-    streamingEl.textContent = content;
+    const visibleContent = suppressSourceGroupCards
+      ? stripSourceGroupMarkup(content)
+      : content;
+    if (streamingEl.textContent !== visibleContent) {
+      streamingEl.textContent = visibleContent;
+    }
   }
+
+  if (assistantContentHasVisibleAnswer(content)) {
+    collapseDockedExecutionPlan(container);
+  }
+  updateAgentActivityPanel(
+    container,
+    messageId,
+    activeMessage.reasoning || "",
+    content,
+    true,
+    activeMessage.turnUsage,
+    isDockedExecutionPlanVisible(container),
+  );
 
   ensureStreamingTypingIndicator(streamingEl, getCurrentTheme());
 
@@ -2264,6 +2295,7 @@ function setupChatManagerCallbacks(
       cancelPendingStreamingTextRender(container);
       context.renderMessages(messages);
       updateModelSelectorDisplay(container);
+      refreshContextWindowUsageForContainer(container);
     },
     onStreamingUpdate: (content, messageId) => {
       if (container) {
@@ -2308,6 +2340,9 @@ function setupChatManagerCallbacks(
         ) {
           return;
         }
+        if (assistantContentHasVisibleAnswer(activeMessage.content)) {
+          collapseDockedExecutionPlan(container);
+        }
         updateAgentActivityPanel(
           container,
           messageId,
@@ -2315,6 +2350,7 @@ function setupChatManagerCallbacks(
           activeMessage.content,
           true,
           activeMessage.turnUsage,
+          isDockedExecutionPlanVisible(container),
         );
       }
     },

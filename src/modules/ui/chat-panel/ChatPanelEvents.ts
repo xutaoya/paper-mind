@@ -25,6 +25,7 @@ import { getString } from "../../../utils/locale";
 import { getProviderManager } from "../../providers";
 import { getPref, setPref } from "../../../utils/prefs";
 import {
+  formatChatModelSelectorSummary,
   formatModelLabel,
 } from "../../preferences/ModelsFetcher";
 import {
@@ -2182,7 +2183,10 @@ export function updateModelSelectorDisplay(container: HTMLElement): void {
       currentModel,
       providerManager.getActiveProviderId() || undefined,
     );
-    modelSelectorText.textContent = `${activeProvider.getName()}: ${modelShort}`;
+    modelSelectorText.textContent = formatChatModelSelectorSummary(
+      activeProvider.getName(),
+      modelShort,
+    );
   } else {
     modelSelectorText.textContent = activeProvider.getName();
   }

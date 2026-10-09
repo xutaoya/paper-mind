@@ -5,6 +5,9 @@ import {
   formatMarkdownForMessageCopy,
   renderMarkdownToElement,
   stripIncompleteTrailingToolCall,
+  getAssistantVisibleAnswerMarkdown,
+  getStreamingAssistantTextTail,
+  stripSourceGroupMarkup,
 } from "../src/modules/ui/chat-panel/MarkdownRenderer.ts";
 import { sanitizeSourceGroupTargets } from "../src/modules/chat/note-source-provenance.ts";
 import { getMessageMarkdownRenderOptions } from "../src/modules/ui/chat-panel/MessageRenderer.ts";
@@ -1012,6 +1015,72 @@ describe("markdown renderer source groups", function () {
       assert.isUndefined(options?.sourceGroupAction);
       assert.isUndefined(options?.evidenceAction);
     }
+    const streaming = getMessageMarkdownRenderOptions(markdown, "in_progress");
+    assert.equal(streaming?.suppressSourceGroupCards, true);
+    const completed = getMessageMarkdownRenderOptions(markdown, undefined);
+    assert.isUndefined(completed?.suppressSourceGroupCards);
+  });
+
+  it("strips source-group markup for streaming previews", function () {
+    const stripped = stripSourceGroupMarkup(`
+Intro.
+
+<source-group label="Paper A" type="web" url="https://example.com">
+Body
+</source-group>
+
+Outro.
+`);
+    assert.include(stripped, "Intro.");
+    assert.include(stripped, "Outro.");
+    assert.notInclude(stripped, "source-group");
+    assert.notInclude(stripped, "Paper A");
+
+    const partial = stripSourceGroupMarkup(
+      'Lead\n<source-group label="Still writing" type="web" url="https://',
+    );
+    assert.equal(partial.trim(), "Lead");
+  });
+
+  it("detects visible assistant answer outside tool and source blocks", function () {
+    const content = [
+      '<tool-call status="completed"><tool-name>web_search</tool-name>',
+      "<tool-status>Done</tool-status></tool-call>",
+      "\n\nFinal answer paragraph.",
+    ].join("");
+    assert.equal(
+      getAssistantVisibleAnswerMarkdown(content),
+      "Final answer paragraph.",
+    );
+    assert.equal(
+      getAssistantVisibleAnswerMarkdown(
+        '<source-group label="Web" type="web" url="https://x">x</source-group>',
+      ),
+      "",
+    );
+  });
+
+  it("hides source-group text from streaming tail updates", function () {
+    const group =
+      '<source-group label="Web" type="web" url="https://example.com">body</source-group>';
+    const last = "Summary so far.\n";
+    const content = `${last}${group}\nMore text.`;
+    assert.equal(
+      getStreamingAssistantTextTail(content, last, true),
+      "\nMore text.",
+    );
+    assert.equal(
+      getStreamingAssistantTextTail(
+        `${last}<source-group label="Partial" type="web"`,
+        last,
+        true,
+      ),
+      "",
+    );
+    assert.equal(
+      getStreamingAssistantTextTail(content, last, false),
+      `${group}\nMore text.`,
+    );
   });
 
   it("extracts source-group fragments while preserving surrounding markdown", function () {

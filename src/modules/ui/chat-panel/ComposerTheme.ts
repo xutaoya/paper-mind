@@ -291,6 +291,25 @@ export function applyComposerChromeTheme(
 
   applyQuickActionsTheme(container, theme);
   applyModelSelectorTheme(container, theme);
+
+  const nextQuestionHint = container.querySelector(
+    "#chat-next-question-hint",
+  ) as HTMLElement | null;
+  if (nextQuestionHint) {
+    nextQuestionHint.style.color = theme.textMuted;
+    const hintText = nextQuestionHint.querySelector(
+      ".chat-next-question-hint-text",
+    ) as HTMLElement | null;
+    if (hintText) {
+      hintText.style.color = theme.textPrimary;
+    }
+    const hintAction = nextQuestionHint.querySelector(
+      ".chat-next-question-hint-action",
+    ) as HTMLElement | null;
+    if (hintAction) {
+      hintAction.style.color = theme.textSecondary;
+    }
+  }
 }
 
 export function resolveQuickActionChipTheme(theme: ThemeColors): {

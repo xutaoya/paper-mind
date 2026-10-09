@@ -46,4 +46,21 @@ describe("agent activity panel", function () {
       assert.equal(items[0].content, "line 9");
     }
   });
+
+  it("omits tool rows when execution plan already lists steps", function () {
+    const content = [
+      '<tool-call status="completed" expand-key="ra-1">',
+      "<tool-name>read_artifact</tool-name>",
+      "<tool-status>Done</tool-status>",
+      "</tool-call>",
+    ].join("");
+
+    const items = buildAgentActivityItems("Thinking line", content, {
+      hideToolActivityRows: true,
+    });
+    assert.deepEqual(
+      items.map((item) => item.kind),
+      ["text"],
+    );
+  });
 });

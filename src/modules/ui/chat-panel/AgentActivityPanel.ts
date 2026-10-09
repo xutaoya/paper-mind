@@ -9,6 +9,7 @@ import { formatCompactTokenCount, estimateTextTokens } from "../../../utils/toke
 import type { ChatMessageTurnUsage } from "../../../types/chat";
 import type { ThemeColors } from "./types";
 import { HTML_NS } from "./types";
+import { createUiChevron, setUiChevronExpanded } from "./UiChevron";
 import {
   isPresentationToolCallEntry,
   parseToolCallFragments,
@@ -159,6 +160,22 @@ export interface AgentActivityPanelOptions {
   /** Wall-clock end when the assistant turn finished (assistant message timestamp). */
   activityEndedAt?: number;
   turnUsage?: ChatMessageTurnUsage;
+  /** Hide per-tool rows when the docked execution plan already lists steps. */
+  hideToolActivityRows?: boolean;
+}
+
+const HIDE_TOOL_ACTIVITY_ATTR = "data-hide-tool-activity-rows";
+
+function shouldHideToolActivityRows(host: HTMLElement): boolean {
+  return host.getAttribute(HIDE_TOOL_ACTIVITY_ATTR) === "true";
+}
+
+function removeToolActivityRows(list: HTMLElement): void {
+  list
+    .querySelectorAll(
+      '[data-agent-activity-row="tool"], [data-agent-activity-row="search"], .paperchat-tool-result',
+    )
+    .forEach((node) => node.remove());
 }
 
 function parseTurnUsageAttribute(
@@ -383,6 +400,7 @@ export function splitReasoningIntoLines(reasoning: string): string[] {
 
 export interface BuildAgentActivityItemsOptions {
   isWorking?: boolean;
+  hideToolActivityRows?: boolean;
 }
 
 export function buildAgentActivityItems(
@@ -404,15 +422,17 @@ export function buildAgentActivityItems(
     });
   }
 
-  const tools = extractToolEntries(content);
-  for (let index = 0; index < tools.length; index++) {
-    const entry = tools[index];
-    items.push({
-      kind: "tool",
-      id: entry.expandKey || `tool-${index}-${entry.toolName}`,
-      entry,
-      status: entry.status === "calling" ? "active" : "complete",
-    });
+  if (!options.hideToolActivityRows) {
+    const tools = extractToolEntries(content);
+    for (let index = 0; index < tools.length; index++) {
+      const entry = tools[index];
+      items.push({
+        kind: "tool",
+        id: entry.expandKey || `tool-${index}-${entry.toolName}`,
+        entry,
+        status: entry.status === "calling" ? "active" : "complete",
+      });
+    }
   }
   return items;
 }
@@ -678,6 +698,12 @@ function syncActivityRowsIncremental(
 
   pinReasoningStreamBeforeTools(list);
 
+  const hideTools = shouldHideToolActivityRows(list);
+  if (hideTools) {
+    removeToolActivityRows(list);
+    return { reasoningLines, toolCount: 0 };
+  }
+
   const tools = extractToolEntries(content);
   for (let index = 0; index < tools.length; index++) {
     const entry = tools[index];
@@ -706,11 +732,18 @@ function syncActivityRows(
   content: string,
   isWorking: boolean,
 ): { reasoningLines: number; toolCount: number } {
+  const hideTools = shouldHideToolActivityRows(list);
   if (isWorking) {
     return syncActivityRowsIncremental(doc, theme, list, reasoning, content);
   }
 
-  const items = buildAgentActivityItems(reasoning, content, { isWorking });
+  const items = buildAgentActivityItems(reasoning, content, {
+    isWorking,
+    hideToolActivityRows: hideTools,
+  });
+  if (hideTools) {
+    removeToolActivityRows(list);
+  }
   return renderActivityItems(doc, theme, list, items);
 }
 
@@ -790,6 +823,9 @@ export function createAgentActivityPanel(
       ...(endedAt != null
         ? { [ACTIVITY_ENDED_AT_ATTR]: String(endedAt) }
         : {}),
+      ...(options.hideToolActivityRows
+        ? { [HIDE_TOOL_ACTIVITY_ATTR]: "true" }
+        : {}),
     },
   );
 
@@ -840,15 +876,10 @@ export function createAgentActivityPanel(
   summaryButton.type = "button";
   summaryButton.className = "paperchat-agent-activity-summary";
 
-  const chevron = createElement(doc, "span", {
-    fontSize: "12px",
-    opacity: "0.65",
-    transition: "transform 0.18s ease",
-    display: "inline-block",
-    flexShrink: "0",
-    lineHeight: "1",
+  const chevron = createUiChevron(doc, {
+    size: 14,
+    opacity: 0.55,
   });
-  chevron.textContent = "⌄";
 
   const summaryText = createElement(doc, "span", {
     minWidth: "0",
@@ -886,6 +917,9 @@ export function createAgentActivityPanel(
   list.setAttribute("data-agent-activity-list", "true");
   list.setAttribute("data-streaming-reasoning-for", options.messageId);
   list.setAttribute("data-streaming-reasoning-role", "body");
+  if (options.hideToolActivityRows) {
+    list.setAttribute(HIDE_TOOL_ACTIVITY_ATTR, "true");
+  }
 
   viewport.appendChild(list);
   disclosure.appendChild(viewport);
@@ -971,7 +1005,7 @@ export function createAgentActivityPanel(
 
   summaryButton.addEventListener("click", () => {
     expanded = !expanded;
-    chevron.style.transform = expanded ? "rotate(180deg)" : "rotate(0deg)";
+    setUiChevronExpanded(chevron, expanded);
     setDisclosureOpen(disclosure, viewport, expanded, false);
     if (expanded) {
       scheduleNextFrame(doc, () => {
@@ -1022,6 +1056,7 @@ export function updateAgentActivityPanel(
   content: string,
   isWorking: boolean,
   turnUsage?: ChatMessageTurnUsage,
+  hideToolActivityRows = false,
 ): void {
   const activityPanel = container.querySelector(
     getAgentActivityContainerSelector(messageId),
@@ -1034,11 +1069,23 @@ export function updateAgentActivityPanel(
   activityPanel.setAttribute("data-agent-reasoning", reasoning);
   activityPanel.setAttribute("data-agent-content", content);
   activityPanel.setAttribute("data-agent-working", isWorking ? "true" : "false");
+  activityPanel.setAttribute(
+    HIDE_TOOL_ACTIVITY_ATTR,
+    hideToolActivityRows ? "true" : "false",
+  );
+  const activityList = activityPanel.querySelector(
+    "[data-agent-activity-list]",
+  ) as HTMLElement | null;
+  activityList?.setAttribute(
+    HIDE_TOOL_ACTIVITY_ATTR,
+    hideToolActivityRows ? "true" : "false",
+  );
   setTurnUsageAttribute(activityPanel, turnUsage);
   activityPanel.classList.toggle("paperchat-agent-activity--working", isWorking);
 
   const hasContent =
-    Boolean(reasoning.trim()) || content.includes("<tool-call");
+    Boolean(reasoning.trim()) ||
+    (!hideToolActivityRows && content.includes("<tool-call"));
   activityPanel.style.display = hasContent || isWorking ? "block" : "none";
 
   const workingLabel = activityPanel.querySelector(

@@ -8,6 +8,7 @@ import type {
 import { config } from "../../../../package.json";
 import { getString } from "../../../utils/locale";
 import { copyToClipboard, createElement } from "./ChatPanelBuilder";
+import { createUiChevron, setUiChevronExpanded } from "./UiChevron";
 import { HTML_NS } from "./types";
 import {
   createBookmarkDialogButton,
@@ -1338,23 +1339,15 @@ function createFolderRow(
   }
   row.dataset.folderId = folder.id;
 
-  const chevron = createElement(
-    doc,
-    "span",
-    {
-      width: "20px",
-      height: "20px",
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      color: theme.textMuted,
-      fontSize: "12px",
-      flexShrink: "0",
-      pointerEvents: "none",
-    },
-    { "aria-hidden": "true" },
-  );
-  chevron.textContent = expanded ? "▾" : "▸";
+  const chevron = createUiChevron(doc, {
+    className: "paperchat-bookmark-folder-chevron",
+    kind: "right",
+    size: 16,
+    color: theme.textMuted,
+    opacity: 0.55,
+  });
+  chevron.style.pointerEvents = "none";
+  setUiChevronExpanded(chevron, expanded);
 
   const toggleFolderExpanded = async () => {
     const nextState = getBookmarkManagerState(panel);
