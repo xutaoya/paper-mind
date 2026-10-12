@@ -83,4 +83,11 @@ describe("chat math markdown helpers", function () {
     const input = "这是**普通加粗**文本";
     assert.equal(preserveStrongEmphasisAsHtml(input), input);
   });
+
+  it("preserves bold spans immediately followed by CJK text", function () {
+    const input = "提出**弹性权重巩固（EWC）**通过正则化";
+    const processed = preserveStrongEmphasisAsHtml(input);
+    assert.include(processed, "<strong>弹性权重巩固（EWC）</strong>");
+    assert.notInclude(processed, "**弹性权重巩固（EWC）**");
+  });
 });

@@ -75,6 +75,8 @@ export function normalizeEmphasisDelimiters(markdown: string): string {
 const STRONG_EMPHASIS_QUOTE_PATTERN = /["“”‘’「」『』]/;
 const STRONG_EMPHASIS_FOLLOW_PATTERN =
   /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef：:，,。．；;！!？?、\s]|$/;
+const STRONG_EMPHASIS_CJK_LEAD_PATTERN =
+  /^[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/u;
 
 /**
  * markdown-it can leave ** literals when bold text contains quotes and is
@@ -89,14 +91,19 @@ export function preserveStrongEmphasisAsHtml(content: string): string {
     /\*\*([^*\n]+?)\*\*/g,
     (match, text: string, offset: number, source: string) => {
       const trimmed = text.trim();
-      if (!trimmed || !STRONG_EMPHASIS_QUOTE_PATTERN.test(trimmed)) {
+      if (!trimmed) {
         return match;
       }
       const after = source.slice(offset + match.length);
-      if (!STRONG_EMPHASIS_FOLLOW_PATTERN.test(after)) {
-        return match;
+      if (STRONG_EMPHASIS_QUOTE_PATTERN.test(trimmed)) {
+        if (STRONG_EMPHASIS_FOLLOW_PATTERN.test(after)) {
+          return `<strong>${escapeHtmlText(trimmed)}</strong>`;
+        }
       }
-      return `<strong>${escapeHtmlText(trimmed)}</strong>`;
+      if (STRONG_EMPHASIS_CJK_LEAD_PATTERN.test(after)) {
+        return `<strong>${escapeHtmlText(trimmed)}</strong>`;
+      }
+      return match;
     },
   );
 }

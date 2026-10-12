@@ -3065,6 +3065,37 @@ export function renderInlineTokens(
         appendInlineTextWithEvidenceRefs(doc, current, token.content, options);
         break;
 
+      case "html_inline": {
+        const markup = token.content.trim().toLowerCase();
+        if (markup === "<strong>") {
+          const strong = doc.createElementNS(HTML_NS, "strong") as HTMLElement;
+          current.appendChild(strong);
+          stack.push(strong);
+          break;
+        }
+        if (markup === "</strong>") {
+          const top = stack[stack.length - 1];
+          if (top && top.tagName?.toLowerCase() === "strong") {
+            stack.pop();
+          }
+          break;
+        }
+        if (markup === "<em>") {
+          const em = doc.createElementNS(HTML_NS, "em") as HTMLElement;
+          current.appendChild(em);
+          stack.push(em);
+          break;
+        }
+        if (markup === "</em>") {
+          const top = stack[stack.length - 1];
+          if (top && top.tagName?.toLowerCase() === "em") {
+            stack.pop();
+          }
+          break;
+        }
+        break;
+      }
+
       case "strong_open": {
         const strong = doc.createElementNS(HTML_NS, "strong") as HTMLElement;
         current.appendChild(strong);

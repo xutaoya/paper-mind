@@ -96,6 +96,22 @@ function collectRenderedText(node: FakeElement): string {
   return node.textContent;
 }
 
+function findElementByTagName(
+  node: FakeElement,
+  tagName: string,
+): FakeElement | null {
+  if (node.tagName.toLowerCase() === tagName.toLowerCase()) {
+    return node;
+  }
+  for (const child of node.children) {
+    const found = findElementByTagName(child, tagName);
+    if (found) {
+      return found;
+    }
+  }
+  return null;
+}
+
 class FakeDocument {
   readonly body = new FakeElement(this, "body");
   readonly documentElement = this.body;
@@ -110,6 +126,30 @@ class FakeDocument {
     return node;
   }
 }
+
+describe("markdown renderer emphasis", function () {
+  it("renders bold immediately followed by CJK text", function () {
+    const originalZotero = (globalThis as { Zotero?: unknown }).Zotero;
+    (globalThis as { Zotero?: unknown }).Zotero = {
+      getMainWindow: () => null,
+    };
+    const doc = new FakeDocument();
+    const root = new FakeElement(doc, "div");
+    try {
+      renderMarkdownToElement(
+        root as unknown as HTMLElement,
+        "提出**弹性权重巩固（EWC）**通过正则化缓解遗忘。",
+        "emphasis-cjk",
+      );
+      assert.notInclude(collectRenderedText(root), "**");
+      const strong = findElementByTagName(root, "strong");
+      assert.isNotNull(strong);
+      assert.equal(collectRenderedText(strong!), "弹性权重巩固（EWC）");
+    } finally {
+      (globalThis as { Zotero?: unknown }).Zotero = originalZotero;
+    }
+  });
+});
 
 describe("markdown renderer source groups", function () {
   it("renders trusted app-owned presentation previews and an open action independently of assistant markup", async function () {
