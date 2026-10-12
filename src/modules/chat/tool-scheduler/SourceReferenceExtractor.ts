@@ -19,6 +19,8 @@ const PDF_ITEM_TOOLS = new Set([
   "get_full_text",
 ]);
 const PAGE_BEARING_TOOLS = new Set([
+  "get_paper_section",
+  "get_full_text",
   "get_pages",
   "search_paper_content",
   "search_with_regex",

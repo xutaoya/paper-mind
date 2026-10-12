@@ -143,7 +143,9 @@ function renderMonthAxis(
     minHeight: "14px",
     marginBottom: "2px",
   });
-  row.appendChild(createElement(doc, "div", { width: "22px", flexShrink: "0" }));
+  row.appendChild(
+    createElement(doc, "div", { width: "22px", flexShrink: "0" }),
+  );
 
   const track = createElement(doc, "div", {
     position: "relative",
@@ -263,21 +265,28 @@ function animateMetricCards(
 
   if (valueEls[0]) {
     valueEls[0].textContent = "0";
-    runCountUp(valueEls[0], 520, (p) => {
-      valueEls[0]!.textContent = String(
-        Math.round(values.total * p),
-      );
-    }, () => pulseStatValue(valueEls[0]!));
+    runCountUp(
+      valueEls[0],
+      520,
+      (p) => {
+        valueEls[0]!.textContent = String(Math.round(values.total * p));
+      },
+      () => pulseStatValue(valueEls[0]!),
+    );
   }
 
   if (valueEls[1]) {
     const denom = values.literatureTotal;
     valueEls[1].textContent = denom > 0 ? `0/${denom}` : "0";
-    runCountUp(valueEls[1], 620, (p) => {
-      const num = Math.round(values.withReadingTime * p);
-      valueEls[1]!.textContent =
-        denom > 0 ? `${num}/${denom}` : String(num);
-    }, () => pulseStatValue(valueEls[1]!));
+    runCountUp(
+      valueEls[1],
+      620,
+      (p) => {
+        const num = Math.round(values.withReadingTime * p);
+        valueEls[1]!.textContent = denom > 0 ? `${num}/${denom}` : String(num);
+      },
+      () => pulseStatValue(valueEls[1]!),
+    );
   }
 
   if (progressFill) {
@@ -292,11 +301,16 @@ function animateMetricCards(
 
   if (valueEls[2]) {
     valueEls[2].textContent = formatReadingDurationCompact(0);
-    runCountUp(valueEls[2], 500, (p) => {
-      valueEls[2]!.textContent = formatReadingDurationCompact(
-        Math.round(values.weekSeconds * p),
-      );
-    }, () => pulseStatValue(valueEls[2]!));
+    runCountUp(
+      valueEls[2],
+      500,
+      (p) => {
+        valueEls[2]!.textContent = formatReadingDurationCompact(
+          Math.round(values.weekSeconds * p),
+        );
+      },
+      () => pulseStatValue(valueEls[2]!),
+    );
   }
 }
 
@@ -378,6 +392,7 @@ function createStatCard(
     color: theme.textMuted,
     lineHeight: "1.25",
   });
+  labelEl.className = "paperchat-stats-metric-label";
   labelEl.textContent = label;
 
   const valueEl = createElement(doc, "div", {
@@ -489,20 +504,24 @@ function createSectionTitle(
     letterSpacing: "-0.01em",
   });
   title.className = "paperchat-stats-section-title";
-  const mark = createElement(doc, "span", {
-    width: "3px",
-    height: "14px",
-    borderRadius: "999px",
-    flexShrink: "0",
-    background: getReadingAccent(theme),
-    opacity: isDarkMode() ? "0.9" : "0.85",
-  });
-  mark.className = "paperchat-stats-section-mark";
   const label = createElement(doc, "span", { minWidth: "0" });
   label.textContent = text;
-  title.appendChild(mark);
   title.appendChild(label);
   return title;
+}
+
+function appendStatsSection(
+  host: HTMLElement,
+  doc: Document,
+  theme: ThemeColors,
+  title: string,
+  content: HTMLElement,
+): void {
+  const section = createElement(doc, "section", {});
+  section.className = "paperchat-stats-section";
+  section.appendChild(createSectionTitle(doc, theme, title, { first: true }));
+  section.appendChild(content);
+  host.appendChild(section);
 }
 
 function attachLiteratureRowAction(
@@ -562,7 +581,11 @@ function createStatsEmptyIcon(doc: Document, theme: ThemeColors): HTMLElement {
   return wrap;
 }
 
-function createEmptyHint(doc: Document, theme: ThemeColors, text: string): HTMLElement {
+function createEmptyHint(
+  doc: Document,
+  theme: ThemeColors,
+  text: string,
+): HTMLElement {
   const wrap = createElement(doc, "div", {
     padding: "28px 16px 20px",
     textAlign: "center",
@@ -1523,6 +1546,7 @@ function renderContributionHeatmap(
     maxWidth: "100%",
     minWidth: "0",
   });
+  wrap.className = "paperchat-stats-heatmap";
   wrap.appendChild(renderMonthAxis(doc, theme, cells, weekCount));
 
   const grid = createElement(doc, "div", {
@@ -1573,6 +1597,14 @@ function renderContributionHeatmap(
       cell.dataset.level = String(cellData?.level ?? 0);
       if (cellData) {
         cell.setAttribute("role", "button");
+        cell.tabIndex = 0;
+        cell.setAttribute("aria-label", _describe(cellData));
+        cell.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            cell.click();
+          }
+        });
         cell.addEventListener("mouseenter", () => {
           const panel = wrap.closest(`#${PANEL_ID}`) as HTMLElement | null;
           if (!panel || !onCellEnter) {
@@ -1668,7 +1700,9 @@ function renderHeatmap(
           })
         : `${formatTooltipDate(cell.date)} · ${getString("chat-stats-heatmap-empty-day")}`,
     (panel, cellEl, cell) => {
-      const source = snapshot.cells.find((entry) => entry.dayKey === cell.dayKey);
+      const source = snapshot.cells.find(
+        (entry) => entry.dayKey === cell.dayKey,
+      );
       if (!source) {
         return;
       }
@@ -1683,13 +1717,7 @@ function renderHeatmap(
     },
     undefined,
     (panel, cellEl, cell) => {
-      showReadingDayHoverTooltip(
-        panel,
-        cellEl,
-        theme,
-        cell.date,
-        cell.value,
-      );
+      showReadingDayHoverTooltip(panel, cellEl, theme, cell.date, cell.value);
     },
     (panel) => {
       hideTokenBarHoverTooltip(panel);
@@ -1752,8 +1780,9 @@ function syncStatsViewSwitcher(
     const id = button.dataset.statsViewId as StatsView;
     const selected = id === current;
     button.setAttribute("aria-selected", selected ? "true" : "false");
-    button.style.background = selected ? theme.inputBg : "transparent";
+    button.style.background = "transparent";
     button.style.color = selected ? theme.textPrimary : theme.textMuted;
+    button.style.boxShadow = "none";
   });
 }
 
@@ -1818,7 +1847,9 @@ function createViewSwitcher(
   return bar;
 }
 
-type TokenDayDetail = TokenStatsSnapshot["cells"][number] | TokenStatsSnapshot["recentDays"][number];
+type TokenDayDetail =
+  | TokenStatsSnapshot["cells"][number]
+  | TokenStatsSnapshot["recentDays"][number];
 
 function appendTokenIoLegendItem(
   doc: Document,
@@ -2167,7 +2198,9 @@ function renderTokenHeatmap(
           })
         : `${formatTooltipDate(cell.date)} · ${getString("chat-stats-heatmap-day-none")}`,
     (panel, cellEl, cell) => {
-      const source = snapshot.cells.find((entry) => entry.dayKey === cell.dayKey);
+      const source = snapshot.cells.find(
+        (entry) => entry.dayKey === cell.dayKey,
+      );
       if (!source) {
         return;
       }
@@ -2182,7 +2215,9 @@ function renderTokenHeatmap(
     },
     tokenColors,
     (panel, cellEl, cell) => {
-      const source = snapshot.cells.find((entry) => entry.dayKey === cell.dayKey);
+      const source = snapshot.cells.find(
+        (entry) => entry.dayKey === cell.dayKey,
+      );
       if (!source || source.totalTokens <= 0) {
         return;
       }
@@ -2242,6 +2277,7 @@ function renderTokenDailyChart(
     alignItems: "end",
     height: "104px",
   });
+  chart.className = "paperchat-stats-daily-chart";
   const inputColor = isDarkMode() ? "#c4b5fd" : "#ddd6fe";
   const outputColor = isDarkMode() ? "#8b5cf6" : "#7c3aed";
   for (let dayIndex = 0; dayIndex < days.length; dayIndex += 1) {
@@ -2258,6 +2294,17 @@ function renderTokenDailyChart(
     column.className = "paperchat-stats-token-bar-column";
     if (day.totalTokens > 0) {
       column.setAttribute("role", "button");
+      column.tabIndex = 0;
+      column.setAttribute(
+        "aria-label",
+        `${formatTooltipDate(day.date)}: ${formatTokenCount(day.totalTokens)} Token`,
+      );
+      column.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          column.click();
+        }
+      });
     }
     const track = createElement(doc, "div", {
       flex: "1",
@@ -2302,6 +2349,7 @@ function renderTokenDailyChart(
       color: theme.textMuted,
       fontVariantNumeric: "tabular-nums",
     });
+    label.className = "paperchat-stats-bar-axis-label";
     const showMonth = shouldShowMonthOnBarAxis(
       day.date,
       dayIndex > 0 ? days[dayIndex - 1].date : null,
@@ -2545,6 +2593,10 @@ async function renderTokenStats(
       },
     ),
   );
+  cards.classList.add(
+    "paperchat-stats-overview",
+    "paperchat-stats-overview--tokens",
+  );
   host.appendChild(cards);
   if (!prefersReducedMotion(doc)) {
     const values = cards.querySelectorAll(".paperchat-stats-metric-value");
@@ -2569,12 +2621,13 @@ async function renderTokenStats(
     });
   }
 
-  host.appendChild(
-    createSectionTitle(doc, theme, getString("chat-stats-token-daily-title"), {
-      first: true,
-    }),
+  appendStatsSection(
+    host,
+    doc,
+    theme,
+    getString("chat-stats-token-daily-title"),
+    renderTokenHeatmap(doc, theme, snapshot),
   );
-  host.appendChild(renderTokenHeatmap(doc, theme, snapshot));
 
   host.appendChild(
     createCollapsibleSection(
@@ -2594,10 +2647,13 @@ async function renderTokenStats(
   bindHeatmapDayPopoverDismiss(panel);
 
   if (snapshot.models.length) {
-    host.appendChild(
-      createSectionTitle(doc, theme, getString("chat-stats-token-models-title")),
+    appendStatsSection(
+      host,
+      doc,
+      theme,
+      getString("chat-stats-token-models-title"),
+      renderTokenModelList(doc, theme, snapshot),
     );
-    host.appendChild(renderTokenModelList(doc, theme, snapshot));
   }
   const footnote = createElement(doc, "div", {
     fontSize: "11px",
@@ -2648,45 +2704,54 @@ async function renderReadingStatsContent(
     ),
   );
 
+  cards.classList.add(
+    "paperchat-stats-overview",
+    "paperchat-stats-overview--reading",
+  );
   host.appendChild(cards);
-  animateMetricCards(
+  animateMetricCards(doc, Array.from(cards.children) as HTMLElement[], {
+    total: snapshot.literature.total,
+    withReadingTime: snapshot.literature.withReadingTime,
+    literatureTotal: snapshot.literature.total,
+    weekSeconds: snapshot.totalSecondsThisWeek,
+    progressPercent:
+      snapshot.literature.total > 0
+        ? (snapshot.literature.withReadingTime / snapshot.literature.total) *
+          100
+        : 0,
+  });
+  appendStatsSection(
+    host,
     doc,
-    Array.from(cards.children) as HTMLElement[],
-    {
-      total: snapshot.literature.total,
-      withReadingTime: snapshot.literature.withReadingTime,
-      literatureTotal: snapshot.literature.total,
-      weekSeconds: snapshot.totalSecondsThisWeek,
-      progressPercent:
-        snapshot.literature.total > 0
-          ? (snapshot.literature.withReadingTime /
-              snapshot.literature.total) *
-            100
-          : 0,
-    },
+    theme,
+    getString("chat-stats-daily-reading-title"),
+    renderHeatmap(doc, theme, snapshot),
   );
-  host.appendChild(
-    createSectionTitle(doc, theme, getString("chat-stats-daily-reading-title"), {
-      first: true,
-    }),
-  );
-  host.appendChild(renderHeatmap(doc, theme, snapshot));
   closeHeatmapDayPopover(panel);
   bindHeatmapDayPopoverDismiss(panel);
-  host.appendChild(
-    createSectionTitle(doc, theme, getString("chat-stats-top-reading-title")),
+  appendStatsSection(
+    host,
+    doc,
+    theme,
+    getString("chat-stats-top-reading-title"),
+    renderTopReadingList(doc, theme, snapshot.topReadItems),
   );
-  host.appendChild(renderTopReadingList(doc, theme, snapshot.topReadItems));
-  host.appendChild(
-    createSectionTitle(doc, theme, getString("chat-stats-recent-added-title")),
+  appendStatsSection(
+    host,
+    doc,
+    theme,
+    getString("chat-stats-recent-added-title"),
+    renderRecentlyAddedList(doc, theme, snapshot.recentlyAdded),
   );
-  host.appendChild(renderRecentlyAddedList(doc, theme, snapshot.recentlyAdded));
 
   const chatActivity = await getChatActivitySnapshot();
-  host.appendChild(
-    createSectionTitle(doc, theme, getString("chat-stats-chat-activity-title")),
+  appendStatsSection(
+    host,
+    doc,
+    theme,
+    getString("chat-stats-chat-activity-title"),
+    renderChatActivitySection(doc, theme, chatActivity),
   );
-  host.appendChild(renderChatActivitySection(doc, theme, chatActivity));
   closeHeatmapDayPopover(panel);
   bindHeatmapDayPopoverDismiss(panel);
 
@@ -2755,7 +2820,9 @@ export async function refreshReadingStatsPanel(
   let readingHost = body.querySelector(
     `#${VIEW_HOST_READING}`,
   ) as HTMLElement | null;
-  let tokenHost = body.querySelector(`#${VIEW_HOST_TOKEN}`) as HTMLElement | null;
+  let tokenHost = body.querySelector(
+    `#${VIEW_HOST_TOKEN}`,
+  ) as HTMLElement | null;
   if (!readingHost) {
     readingHost = createElement(doc, "div", {}, { id: VIEW_HOST_READING });
     body.appendChild(readingHost);
@@ -2815,6 +2882,7 @@ export function createReadingStatsPanel(
     },
     { id: PANEL_ID },
   );
+  panel.dataset.statsView = "reading";
   panel.dataset.statsLayout = "wide";
   panel.dataset.theme = isDarkMode() ? "dark" : "light";
 
@@ -2895,6 +2963,7 @@ export function createReadingStatsPanel(
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
   });
+  title.className = "paperchat-stats-panel-title";
   title.textContent = getString("chat-stats-title");
   const subtitle = createElement(
     doc,

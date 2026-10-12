@@ -16,6 +16,7 @@ import { getErrorMessage } from "../../../utils/common";
 import {
   createPassageEvidenceManifestEntry,
   formatPassageEvidenceManifest,
+  normalizeEvidenceQuote,
 } from "../evidence";
 import type { SemanticSearchResult } from "../../../types/embedding";
 
@@ -29,6 +30,89 @@ function formatSourceReferences(pages: Array<number | undefined>): string {
     ),
   );
   return `Source references: ${JSON.stringify({ version: 1, pages: uniquePages })}\n`;
+}
+
+interface ReadPassageSource {
+  content: string;
+  startIndex: number;
+  page?: number;
+  section?: string;
+}
+
+/** Keep returned text and evidence in the same bounded, hash-verified blocks. */
+function formatReadPassages(
+  sources: ReadPassageSource[],
+  paper: PaperStructureExtended,
+  heading: string,
+): string {
+  const entries: ReturnType<typeof createPassageEvidenceManifestEntry>[] = [];
+  const blocks: string[] = [];
+  const pages: number[] = [];
+  let resultIndex = 0;
+  for (const source of sources) {
+    // Only use offsets when they actually point to this extracted content.
+    const hasOffset =
+      source.startIndex >= 0 &&
+      paper.fullText.slice(
+        source.startIndex,
+        source.startIndex + source.content.length,
+      ) === source.content;
+    for (let offset = 0; offset < source.content.length; ) {
+      const start = hasOffset ? source.startIndex + offset : -1;
+      const pageInfo =
+        start >= 0
+          ? paper.pages.find(
+              (page) => start >= page.startIndex && start < page.endIndex,
+            )
+          : undefined;
+      const nextPageStart =
+        start >= 0
+          ? paper.pages
+              .filter((page) => page.startIndex > start)
+              .reduce((next, page) => Math.min(next, page.startIndex), Infinity)
+          : Infinity;
+      const length = Math.min(
+        4000,
+        source.content.length - offset,
+        pageInfo ? pageInfo.endIndex - start : nextPageStart - start,
+      );
+      const quote = normalizeEvidenceQuote(
+        source.content.slice(offset, offset + length),
+      );
+      offset += length;
+      if (!quote) continue;
+      const page = source.page || pageInfo?.pageNumber;
+      const section =
+        source.section ||
+        (start >= 0 ? findPassageLocation(paper, start).section : undefined);
+      resultIndex++;
+      if (page) pages.push(page);
+      if (resultIndex <= 100)
+        entries.push(
+          createPassageEvidenceManifestEntry({
+            resultIndex,
+            quote,
+            page,
+            section,
+          }),
+        );
+      const location =
+        [
+          page ? `Page ${page}` : "",
+          section ? `Section: ${section.replace(/[\r\n]+/g, " ")}` : "",
+        ]
+          .filter(Boolean)
+          .join("; ") || "Paper text";
+      blocks.push(
+        `[${resultIndex <= 100 ? "Result" : "Unindexed passage"} ${resultIndex}] (${location})\n${quote}`,
+      );
+    }
+  }
+  const overflow =
+    resultIndex > 100
+      ? "\n[Evidence catalog covers the first 100 passages. Use get_pages or search_paper_content for later passages.]"
+      : "";
+  return `${formatSourceReferences(pages)}${formatPassageEvidenceManifest(entries)}${heading}\n\n${blocks.join("\n\n---\n\n")}${overflow}`;
 }
 
 const HEURISTIC_SECTION_NOTE =
@@ -103,12 +187,19 @@ export function executeGetPaperSection(
   );
 
   if (section) {
-    // 限制返回内容长度
     const maxLength = 8000;
-    if (section.content.length > maxLength) {
-      return `[Section: ${section.name}]\n\n${section.content.substring(0, maxLength)}...\n\n[Content truncated, total length: ${section.content.length} characters]`;
-    }
-    return `[Section: ${section.name}]\n\n${section.content}`;
+    const truncated = section.content.length > maxLength;
+    return formatReadPassages(
+      [
+        {
+          content: section.content.slice(0, maxLength),
+          startIndex: section.startIndex,
+          section: section.name,
+        },
+      ],
+      paperStructure,
+      `[Section: ${section.name}]${truncated ? `\n[Content truncated, total length: ${section.content.length} characters. Use get_pages to read the remaining text.]` : ""}`,
+    );
   }
 
   // 如果没找到，列出可用的章节
@@ -423,35 +514,30 @@ export function executeGetPages(
     return `Error: Invalid page range "${pageRange}". Paper has ${pageCount} pages.`;
   }
 
-  const results: string[] = [];
-  const emittedPages: number[] = [];
-  let totalLength = 0;
-  const maxTotalLength = 15000;
-
+  const sources: ReadPassageSource[] = [];
+  let remaining = 15000;
+  let truncated = false;
   for (const pageNum of requestedPages) {
-    const page = pages.find((p) => p.pageNumber === pageNum);
-    if (page) {
-      emittedPages.push(pageNum);
-      const content = page.content;
-      if (totalLength + content.length > maxTotalLength) {
-        results.push(
-          `\n[Page ${pageNum}] (truncated due to length limit)\n${content.substring(0, maxTotalLength - totalLength)}...`,
-        );
-        results.push(
-          `\n[Output truncated. Requested ${requestedPages.length} pages, showing content up to page ${pageNum}]`,
-        );
-        break;
-      }
-      results.push(`\n[Page ${pageNum}]\n${content}`);
-      totalLength += content.length;
+    const page = pages.find((candidate) => candidate.pageNumber === pageNum);
+    if (!page?.content) continue;
+    if (!remaining) {
+      truncated = true;
+      break;
+    }
+    const content = page.content.slice(0, remaining);
+    sources.push({ content, startIndex: page.startIndex, page: pageNum });
+    remaining -= content.length;
+    if (content.length < page.content.length) {
+      truncated = true;
+      break;
     }
   }
-
-  if (results.length === 0) {
-    return `No content found for pages: ${pageRange}`;
-  }
-
-  return `${formatSourceReferences(emittedPages)}Content from pages ${requestedPages.join(", ")} (total ${pageCount} pages):\n${results.join("\n\n---")}`;
+  if (!sources.length) return `No content found for pages: ${pageRange}`;
+  return formatReadPassages(
+    sources,
+    paperStructure,
+    `Content from pages ${requestedPages.join(", ")} (total ${pageCount} pages):${truncated ? "\n[Output truncated. Request fewer pages to read the remaining text.]" : ""}`,
+  );
 }
 
 /**
@@ -710,5 +796,9 @@ export function executeGetFullText(
   // 添加警告头部
   const header = `[WARNING: Full text retrieved - approximately ${estimatedTokens} tokens]\n[Paper: ${pageCount} pages, ${charCount} characters]\n\n---\n\n`;
 
-  return header + fullText;
+  return formatReadPassages(
+    [{ content: fullText, startIndex: 0 }],
+    paperStructure,
+    header,
+  );
 }

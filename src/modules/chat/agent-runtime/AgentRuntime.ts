@@ -17,7 +17,10 @@ import type {
   ToolPolicyTrace,
   ToolExecutionResult,
 } from "../../../types/tool";
-import type { ToolCallingProvider } from "../../../types/provider";
+import type {
+  ToolCallingProvider,
+  ToolCallingOptions,
+} from "../../../types/provider";
 import { getErrorMessage } from "../../../utils/common";
 import { applyTurnTokenUsage } from "../../../utils/apiUsage";
 import { recordTokenUsage } from "../../token-stats/TokenStatsStore";
@@ -177,6 +180,7 @@ type ProviderRequestExecutor = <T>(
 ) => Promise<T>;
 
 interface RuntimeExecutionOptions {
+  requestOptions?: ToolCallingOptions;
   provider: ToolCallingProvider;
   currentMessages: ChatMessage[];
   assistantMessage: ChatMessage;
@@ -475,6 +479,7 @@ export class AgentRuntime {
   ): Promise<void> {
     const {
       provider,
+      requestOptions,
       currentMessages,
       assistantMessage,
       pdfWasAttached,
@@ -565,15 +570,13 @@ export class AgentRuntime {
 
         const displayBeforeThisRound = accumulatedDisplay;
         const refreshRoundToolsAfterProviderChange = () =>
-          this.refreshIterationToolsForProvider(
-            iterationControl,
-            tools,
-          );
+          this.refreshIterationToolsForProvider(iterationControl, tools);
         const allowedToolNames = resolveAllowedToolNamesForRound({
           tools,
           session: sendingSession,
           budgetLimits,
-          supportsHostedWebSearch: provider.supportsHostedWebSearch?.() === true,
+          supportsHostedWebSearch:
+            provider.supportsHostedWebSearch?.() === true,
           forceFinalAnswer: iterationControl.forceFinalAnswer,
         });
         const result = await this.runStreamingRound(
@@ -590,6 +593,7 @@ export class AgentRuntime {
           iterationControl.forceFinalAnswer,
           executeProviderRequest,
           refreshRoundToolsAfterProviderChange,
+          requestOptions,
         );
 
         if (result.reasoningTokens !== undefined) {
@@ -778,6 +782,7 @@ export class AgentRuntime {
               iterationControl.forceFinalAnswer,
               executeProviderRequest,
               refreshRoundToolsAfterProviderChange,
+              requestOptions,
             ),
         });
 
@@ -832,6 +837,7 @@ export class AgentRuntime {
   ): Promise<void> {
     const {
       provider,
+      requestOptions,
       currentMessages,
       assistantMessage,
       pdfWasAttached,
@@ -924,7 +930,8 @@ export class AgentRuntime {
           tools,
           session: sendingSession,
           budgetLimits,
-          supportsHostedWebSearch: provider.supportsHostedWebSearch?.() === true,
+          supportsHostedWebSearch:
+            provider.supportsHostedWebSearch?.() === true,
           forceFinalAnswer: iterationControl.forceFinalAnswer,
         });
         const rawResult = await executeProviderRequest(
@@ -934,11 +941,11 @@ export class AgentRuntime {
               iterationControl.toolsForRound,
               abortSignal,
               {
+                ...requestOptions,
                 toolChoice: iterationControl.toolChoice,
               },
             ),
-          () =>
-            this.refreshIterationToolsForProvider(iterationControl, tools),
+          () => this.refreshIterationToolsForProvider(iterationControl, tools),
         );
         const result = suppressToolCallsInRoundResult(
           rawResult,
@@ -1117,6 +1124,7 @@ export class AgentRuntime {
                     iterationControl.toolsForRound,
                     abortSignal,
                     {
+                      ...requestOptions,
                       toolChoice: iterationControl.toolChoice,
                     },
                   ),
@@ -1219,6 +1227,7 @@ export class AgentRuntime {
     suppressToolCalls: boolean,
     executeProviderRequest: ProviderRequestExecutor,
     onProviderRerouted: () => void,
+    requestOptions?: ToolCallingOptions,
   ): Promise<{
     content: string;
     reasoning?: string;
@@ -1397,7 +1406,9 @@ export class AgentRuntime {
             }
           },
           onUsageUpdate: (delta) => {
-            if (!this.callbacks.isSessionTracked(sendingSession, sessionRunId)) {
+            if (
+              !this.callbacks.isSessionTracked(sendingSession, sessionRunId)
+            ) {
               return;
             }
             applyTurnTokenUsage(assistantMessage, delta);
@@ -1505,10 +1516,12 @@ export class AgentRuntime {
                   toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
                   hostedWebSearches:
                     hostedWebSearches.size > 0
-                      ? [...hostedWebSearches.entries()].map(([id, search]) => ({
-                          id,
-                          ...search,
-                        }))
+                      ? [...hostedWebSearches.entries()].map(
+                          ([id, search]) => ({
+                            id,
+                            ...search,
+                          }),
+                        )
                       : undefined,
                   suppressedToolCall: result.suppressedToolCall,
                   stopReason,
@@ -1526,7 +1539,7 @@ export class AgentRuntime {
             tools,
             callbacks,
             abortSignal,
-            { toolChoice },
+            { ...requestOptions, toolChoice },
           )
           .catch((error: unknown) =>
             rejectAttempt(

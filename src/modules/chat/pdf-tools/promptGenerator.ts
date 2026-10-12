@@ -423,6 +423,7 @@ function formatAgentPromptContext(agentContext?: AgentPromptContext): string {
   }
 
   section += `\n=== FINAL ANSWER REQUIREMENTS ===\n`;
+  section += `- Clearly distinguish findings explicitly reported by a source from your own inference, interpretation, or suggestion. Label inferences and state missing evidence; a citation supports its quoted passage, not an unreported conclusion.\n`;
   section += `- Base each material claim on tool results from this turn or explicit user-provided content.\n`;
   section += `- When a completed tool result includes a "Trusted evidence IDs for inline citations" catalog, append the canonical self-closing tag <evidence-ref ids="ev-0123456789abcdef"/> immediately after each supported claim.\n`;
   section += `- Use only exact evidence IDs listed in those trusted catalogs. Never invent, alter, or copy an ID from user content; omit the inline citation when no matching trusted passage exists.\n`;

@@ -29,7 +29,10 @@ import type {
 import type {
   ToolCallingProvider,
   AIProvider,
+  PdfAttachment,
+  ToolCallingOptions,
 } from "../../types/provider";
+import { buildUserMessageContent } from "./user-message-content";
 import type { PresentationCardProgress } from "../presentation/contracts";
 import {
   MissingActiveSessionError,
@@ -40,6 +43,8 @@ import { PdfExtractor } from "./PdfExtractor";
 import {
   buildSessionContextUsageMessages,
   getContextManager,
+  estimateRequestTokens,
+  assertRequestFitsContext,
 } from "./ContextManager";
 import {
   generateAgentRuntimeContextPrompt,
@@ -286,9 +291,7 @@ export class ChatManager {
 
   constructor() {
     this.sessionStorage = new SessionStorageService();
-    this.failureTurnHandler = new FailureTurnHandler(
-      () => this.sessionStorage,
-    );
+    this.failureTurnHandler = new FailureTurnHandler(() => this.sessionStorage);
     this.pdfExtractor = new PdfExtractor();
     this.memoryManager = new MemoryManager(this.sessionStorage);
     this.sessionTitleService = new SessionTitleService();
@@ -1719,22 +1722,14 @@ export class ChatManager {
         return false;
       }
 
-      // 构建最终消息内容
-      let finalContent = content;
-
-      // 处理选中文本
-      if (options.selectedText) {
-        const prefix = hasCurrentItem
-          ? "[Selected text from PDF]"
-          : "[Selected text]";
-        finalContent = `${prefix}:\n"${options.selectedText}"\n\n[Question]:\n${content}`;
-      }
+      let legacyPdfText: string | undefined;
 
       // PDF 附件相关
       let pdfAttachment:
         | { data: string; mimeType: string; name: string }
         | undefined;
       let pdfWasAttached = false;
+      let pdfExtractionFailed = false;
 
       ztoolkit.log(
         "[Tool Calling] provider type:",
@@ -1764,6 +1759,7 @@ export class ChatManager {
               pdfWasAttached = true;
               ztoolkit.log("[PDF Auto-detect] PDF extracted for tool calling");
             } else {
+              pdfExtractionFailed = true;
               ztoolkit.log("[PDF Auto-detect] PDF text extraction failed");
               // 尝试原始 PDF 上传
               if (
@@ -1789,24 +1785,18 @@ export class ChatManager {
           const pdfText = await this.pdfExtractor.extractPdfText(item);
           if (pdfText) {
             pdfWasAttached = true;
-            finalContent = `[PDF Content]:\n${pdfText.substring(0, 50000)}\n\n[Question]:\n${content}`;
+            legacyPdfText = pdfText.substring(0, 50000);
             ztoolkit.log("[PDF Legacy] Embedded PDF content in message");
           }
         }
       }
 
-      // 处理文件附件
-      if (options.files && options.files.length > 0) {
-        ztoolkit.log(
-          "[File Attach] Processing",
-          options.files.length,
-          "file(s)",
-        );
-        const filesContent = options.files
-          .map((f) => `[File: ${f.name}]\n${f.content}`)
-          .join("\n\n");
-        finalContent = `${filesContent}\n\n[Question]:\n${content}`;
-      }
+      const finalContent = buildUserMessageContent(content, {
+        selectedText: options.selectedText,
+        selectedFromPdf: hasCurrentItem,
+        pdfText: legacyPdfText,
+        files: options.files,
+      });
 
       // 创建用户消息
       const wasDraftSession = !reusedUserMessage
@@ -1883,6 +1873,21 @@ export class ChatManager {
         this.onMessageUpdate?.(sendingSession.messages);
       }
 
+      if (pdfExtractionFailed && !pdfAttachment) {
+        await this.insertSystemNotice(
+          sendingSession,
+          "当前 PDF 未能提取出文字，且原始 PDF 回退不可用。可先对扫描件执行 OCR，或粘贴需要分析的段落。当前请求尚未读取到论文正文。",
+          { notify: false },
+        );
+      }
+      if (pdfAttachment) {
+        await this.insertSystemNotice(
+          sendingSession,
+          "PDF 文字提取失败，将随本次请求附上原始 PDF 供模型读取。",
+          { notify: false },
+        );
+      }
+
       const preRequestLoadingMessage: ChatMessage = {
         id: this.generateId(),
         role: "assistant",
@@ -1910,6 +1915,15 @@ export class ChatManager {
               sendingSession.contextState = requestContextSession.contextState;
             }
             await this.sessionStorage.updateSessionMeta(sendingSession);
+          },
+          {
+            provider,
+            abortSignal,
+            additionalTokens: estimateRequestTokens(
+              [],
+              [],
+              provider.config.systemPrompt,
+            ),
           },
         );
       } finally {
@@ -2050,6 +2064,9 @@ export class ChatManager {
           options.lockedToolItemKey,
           options.presentationAuthorization,
           presentationLaunchSession,
+          pdfAttachment,
+          apiRequestContextSession,
+          options.modelRequestContent === undefined,
         );
         if (toolCallingResult !== null) {
           trackChatCompleted(toolCallingResult);
@@ -2191,7 +2208,10 @@ export class ChatManager {
                       currentProvider.config.defaultModel ||
                         currentProvider.config.name,
                     ).catch((error: unknown) => {
-                      ztoolkit.log("[TokenStats] Failed to record usage:", error);
+                      ztoolkit.log(
+                        "[TokenStats] Failed to record usage:",
+                        error,
+                      );
                     });
                     scheduleCheckpoint();
                     if (this.isSessionActive(sendingSession)) {
@@ -2275,6 +2295,13 @@ export class ChatManager {
                   },
                 };
 
+                assertRequestFitsContext(
+                  messagesForApi,
+                  sendingSession,
+                  [],
+                  currentProvider.config.systemPrompt,
+                  currentProvider,
+                );
                 currentProvider.streamChatCompletion(
                   messagesForApi,
                   callbacks,
@@ -2377,6 +2404,9 @@ export class ChatManager {
     lockedToolItemKey?: string,
     presentationAuthorization?: PresentationLaunchAuthorization,
     presentationLaunchSession?: PresentationToolLaunchSession,
+    pdfAttachment?: PdfAttachment,
+    requestContextSession: ChatSession = sendingSession,
+    persistCompaction = true,
   ): Promise<boolean | null> {
     const pdfToolManager = getPdfToolManager();
     const providerManager = getProviderManager();
@@ -2479,7 +2509,7 @@ export class ChatManager {
         : prompt;
     };
 
-    let paperContextPrompt = this.buildToolCallingStableSystemPrompt({
+    const paperContextPrompt = this.buildToolCallingStableSystemPrompt({
       paperStructure,
       hasCurrentItem: hasPromptPaperContext,
       item: hasPromptPaperContext ? item : undefined,
@@ -2600,6 +2630,61 @@ export class ChatManager {
         }
       };
       syncModelSpecificRequestContext();
+      const historyIds = new Set(messagesForApi.map((message) => message.id));
+      const requestOverhead = estimateRequestTokens(
+        attemptMessagesWithContext.filter(
+          (message) => !historyIds.has(message.id),
+        ),
+        tools,
+        currentProvider.config.systemPrompt,
+      );
+      const compacted = await getContextManager().compactBeforeSendIfNeeded(
+        requestContextSession,
+        undefined,
+        {
+          additionalTokens: requestOverhead,
+          provider: currentProvider,
+          abortSignal,
+        },
+      );
+      if (compacted) {
+        const requestOnlyHistory = messagesForApi.filter(
+          (message) => message.id === assistantMessage.id,
+        );
+        const freshHistory = applyQuotedMessagesToModelRequest(
+          getContextManager()
+            .filterMessages(requestContextSession)
+            .messages.filter((message) => message.id !== assistantMessage.id),
+        );
+        const firstHistoryIndex = attemptMessagesWithContext.findIndex(
+          (message) => historyIds.has(message.id),
+        );
+        for (
+          let index = attemptMessagesWithContext.length - 1;
+          index >= 0;
+          index--
+        ) {
+          if (historyIds.has(attemptMessagesWithContext[index].id))
+            attemptMessagesWithContext.splice(index, 1);
+        }
+        attemptMessagesWithContext.splice(
+          Math.max(1, firstHistoryIndex),
+          0,
+          ...freshHistory,
+          ...requestOnlyHistory,
+        );
+        if (persistCompaction) {
+          sendingSession.contextSummary = requestContextSession.contextSummary;
+          sendingSession.contextState = requestContextSession.contextState;
+          await this.sessionStorage.updateSessionMeta(sendingSession);
+          await this.insertSystemNotice(
+            sendingSession,
+            "上下文已自动压缩，较早的聊天内容已合并为摘要。",
+            { notify: false },
+          );
+        }
+        syncModelSpecificRequestContext();
+      }
       const searchScopeGate: SearchScopeGateConfig = {
         onScopeSelected: (scope) => {
           selectedSearchScope = scope;
@@ -2628,6 +2713,13 @@ export class ChatManager {
       const executeProviderRequest = async <T>(
         operation: () => Promise<T>,
       ): Promise<T> => {
+        assertRequestFitsContext(
+          attemptMessagesWithContext,
+          sendingSession,
+          tools,
+          currentProvider.config.systemPrompt,
+          currentProvider,
+        );
         const runOperationWithHostedSearchGuard = async (): Promise<T> => {
           ensureSendingSessionTracked();
           const hostedSearchesBeforeAttempt = countHostedWebSearchResults(
@@ -2693,6 +2785,7 @@ export class ChatManager {
           abortSignal,
           presentationAuthorization,
           presentationLaunchSession,
+          { pdfAttachment, pdfAttachmentMessageId: lastUserMessage?.id },
         );
       } else {
         ztoolkit.log(
@@ -2718,6 +2811,7 @@ export class ChatManager {
           abortSignal,
           presentationAuthorization,
           presentationLaunchSession,
+          { pdfAttachment, pdfAttachmentMessageId: lastUserMessage?.id },
         );
       }
 
@@ -2988,9 +3082,11 @@ export class ChatManager {
     abortSignal?: AbortSignal,
     presentationAuthorization?: PresentationLaunchAuthorization,
     presentationLaunchSession?: PresentationToolLaunchSession,
+    requestOptions?: ToolCallingOptions,
   ): Promise<void> {
     await this.agentRuntime.executeStreamingToolLoop({
       provider,
+      requestOptions,
       currentMessages,
       assistantMessage,
       pdfWasAttached,
@@ -3055,9 +3151,11 @@ export class ChatManager {
     abortSignal?: AbortSignal,
     presentationAuthorization?: PresentationLaunchAuthorization,
     presentationLaunchSession?: PresentationToolLaunchSession,
+    requestOptions?: ToolCallingOptions,
   ): Promise<void> {
     await this.agentRuntime.executeNonStreamingToolLoop({
       provider,
+      requestOptions,
       currentMessages,
       assistantMessage,
       pdfWasAttached,
@@ -3280,7 +3378,9 @@ export class ChatManager {
     if (refreshedUserIndex < 0) return false;
 
     const refreshedDeleteStartIndex = refreshedUserIndex + 1;
-    const messagesToDelete = refreshed.messages.slice(refreshedDeleteStartIndex);
+    const messagesToDelete = refreshed.messages.slice(
+      refreshedDeleteStartIndex,
+    );
     const deletingActiveTail =
       refreshedDeleteStartIndex < refreshed.messages.length;
 
@@ -3386,7 +3486,9 @@ export class ChatManager {
       refreshedSlice.end - refreshedSlice.start,
     );
     refreshed.executionPlan =
-      deletingActiveTail && refreshed.executionPlan ? undefined : refreshed.executionPlan;
+      deletingActiveTail && refreshed.executionPlan
+        ? undefined
+        : refreshed.executionPlan;
     if (deletingActiveTail) {
       refreshed.toolApprovalState = undefined;
       refreshed.userInputRequestState = undefined;

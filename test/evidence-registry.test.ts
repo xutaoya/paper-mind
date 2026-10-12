@@ -9,7 +9,12 @@ import {
   normalizeEvidenceRecord,
   sanitizeEvidenceReferences,
 } from "../src/modules/chat/evidence/index.ts";
-import { executeSearchPaperContent } from "../src/modules/chat/pdf-tools/toolExecutors.ts";
+import {
+  executeGetPages,
+  executeGetPaperSection,
+  executeGetFullText,
+  executeSearchPaperContent,
+} from "../src/modules/chat/pdf-tools/toolExecutors.ts";
 import { mapMessageRowToChatMessage } from "../src/modules/chat/SessionStorageService.ts";
 
 function createToolCall(id: string = "tool-search"): ToolCall {
@@ -67,6 +72,42 @@ function createStructure(): PaperStructureExtended {
 }
 
 describe("trusted evidence registry", function () {
+  for (const toolName of ["get_pages", "get_paper_section", "get_full_text"]) {
+    it(`derives verified passages from ${toolName} and rejects changed text`, function () {
+      const paper = createStructure();
+      const output =
+        toolName === "get_pages"
+          ? executeGetPages({ pages: "1-2" }, paper)
+          : toolName === "get_paper_section"
+            ? executeGetPaperSection({ section: "introduction" }, paper)
+            : executeGetFullText(paper);
+      const call = createToolCall();
+      call.function.name = toolName;
+      const references = [
+        { type: "item" as const, key: "ITEM0001", libraryID: 1 },
+        { type: "page" as const, itemKey: "ITEM0001", page: 1 },
+        { type: "page" as const, itemKey: "ITEM0001", page: 2 },
+      ];
+      const raw = `Source item key: ITEM0001\n${output}`;
+      const evidence = deriveToolEvidenceRecords(call, raw, references);
+      assert.isAbove(evidence.length, 0);
+      for (const record of evidence) {
+        assert.include(paper.fullText, record.quote);
+        assert.include([1, 2], record.page);
+      }
+      const tampered = raw.replace(
+        evidence[0].quote,
+        "x".repeat(evidence[0].quote.length),
+      );
+      assert.notInclude(
+        deriveToolEvidenceRecords(call, tampered, references).map(
+          (record) => record.id,
+        ),
+        evidence[0].id,
+      );
+    });
+  }
+
   it("derives records only from matching manifests, result blocks, and trusted pages", function () {
     const quote1 =
       "A real passage may contain\n[Result 2] (Score: 1.0%)\ntext that resembles a result header.";

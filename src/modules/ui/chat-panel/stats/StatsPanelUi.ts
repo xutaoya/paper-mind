@@ -16,9 +16,7 @@ export function getLocalizedWeekdayLabels(): string[] {
     const date = new Date(base);
     date.setDate(base.getDate() + i);
     try {
-      labels.push(
-        date.toLocaleDateString(undefined, { weekday: "narrow" }),
-      );
+      labels.push(date.toLocaleDateString(undefined, { weekday: "narrow" }));
     } catch {
       labels.push(["S", "M", "T", "W", "T", "F", "S"][i] ?? "");
     }
@@ -36,10 +34,7 @@ export function shouldShowMonthOnBarAxis(
   return date.getMonth() !== previous.getMonth();
 }
 
-export function formatBarAxisDayLabel(
-  date: Date,
-  showMonth: boolean,
-): string {
+export function formatBarAxisDayLabel(date: Date, showMonth: boolean): string {
   if (!showMonth) {
     return String(date.getDate());
   }
@@ -303,6 +298,7 @@ export function createCollapsibleSection(
 
   const apply = (): void => {
     body.style.display = collapsed ? "none" : "block";
+    head.setAttribute("aria-expanded", String(!collapsed));
     setUiChevronExpanded(chevron, !collapsed);
   };
   apply();
@@ -328,7 +324,9 @@ export function createCollapsibleSection(
   return wrap;
 }
 
-export async function exportStatsJsonToClipboard(filename: string): Promise<boolean> {
+export async function exportStatsJsonToClipboard(
+  filename: string,
+): Promise<boolean> {
   const path = PathUtils.join(Zotero.DataDirectory.dir, filename);
   try {
     if (!(await IOUtils.exists(path))) {
@@ -363,7 +361,7 @@ export function createReadingTrackerStatus(
     padding: "0 2px",
     fontSize: "11px",
     lineHeight: "1.35",
-    color: active ? (theme.sendButtonBg || "#16a34a") : theme.textMuted,
+    color: active ? theme.sendButtonBg || "#16a34a" : theme.textMuted,
   });
   row.className = "paperchat-stats-tracker-status";
   fillReadingTrackerStatus(row, doc, theme, active);

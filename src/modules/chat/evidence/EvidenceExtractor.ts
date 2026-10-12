@@ -43,7 +43,15 @@ export function deriveToolEvidenceRecords(
   rawContent: string,
   references: ToolSourceReference[],
 ): EvidenceRecord[] {
-  if (toolCall.function.name !== "search_paper_content") return [];
+  if (
+    ![
+      "search_paper_content",
+      "get_pages",
+      "get_paper_section",
+      "get_full_text",
+    ].includes(toolCall.function.name)
+  )
+    return [];
 
   const lines = rawContent.split("\n");
   const manifestEntries = parsePassageEvidenceManifestLine(lines[2]);

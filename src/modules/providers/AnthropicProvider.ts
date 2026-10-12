@@ -167,8 +167,12 @@ export class AnthropicProvider extends BaseProvider {
    * - Consecutive tool results are combined into one user message
    * - Tool calls use "tool_use" blocks in assistant messages
    */
-  private formatMessagesWithTools(messages: ChatMessage[]): AnthropicMessage[] {
+  private formatMessagesWithTools(
+    messages: ChatMessage[],
+    options?: ToolCallingOptions,
+  ): AnthropicMessage[] {
     const result: AnthropicMessage[] = [];
+    let documentTarget: AnthropicMessage | undefined;
     const filtered = messages.filter(
       (msg) => msg.role !== "system" && msg.role !== "error",
     );
@@ -276,9 +280,37 @@ export class AnthropicProvider extends BaseProvider {
             content: msg.content,
           });
         }
+        if (
+          msg.role === "user" &&
+          (!options?.pdfAttachmentMessageId ||
+            msg.id === options.pdfAttachmentMessageId)
+        ) {
+          documentTarget = result[result.length - 1];
+        }
       }
     }
 
+    if (options?.pdfAttachment) {
+      const target = documentTarget;
+      if (!target) {
+        throw new Error("PDF 附件对应的用户消息已不在请求中，请重新发送。");
+      }
+      const blocks =
+        typeof target.content === "string"
+          ? [{ type: "text" as const, text: target.content }]
+          : target.content;
+      target.content = [
+        {
+          type: "document",
+          source: {
+            type: "base64",
+            media_type: options.pdfAttachment.mimeType,
+            data: options.pdfAttachment.data,
+          },
+        },
+        ...blocks,
+      ];
+    }
     return result;
   }
 
@@ -302,7 +334,7 @@ export class AnthropicProvider extends BaseProvider {
       throw new Error("Provider is not configured");
     }
 
-    const anthropicMessages = this.formatMessagesWithTools(messages);
+    const anthropicMessages = this.formatMessagesWithTools(messages, options);
     const systemBlocks = this.buildAnthropicSystemBlocks(messages);
 
     const requestBody: Record<string, unknown> = {
@@ -421,7 +453,7 @@ export class AnthropicProvider extends BaseProvider {
     }
 
     try {
-      const anthropicMessages = this.formatMessagesWithTools(messages);
+      const anthropicMessages = this.formatMessagesWithTools(messages, options);
       const systemBlocks = this.buildAnthropicSystemBlocks(messages);
 
       const requestBody: Record<string, unknown> = {

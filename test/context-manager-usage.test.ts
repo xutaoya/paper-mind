@@ -34,6 +34,20 @@ function toolMessage(id: string, content: string): ChatMessage {
 }
 
 describe("session context usage", function () {
+  let originalZotero: unknown;
+  let originalToolkit: unknown;
+  beforeEach(function () {
+    originalZotero = (globalThis as any).Zotero;
+    originalToolkit = (globalThis as any).ztoolkit;
+    (globalThis as any).Zotero = {
+      Prefs: { get: () => undefined, set: () => {} },
+    };
+    (globalThis as any).ztoolkit = { log: () => {} };
+  });
+  afterEach(function () {
+    (globalThis as any).Zotero = originalZotero;
+    (globalThis as any).ztoolkit = originalToolkit;
+  });
   it("drops compacted history including intermediate tool messages", function () {
     const long = "token ".repeat(800);
     const session = createSession([
@@ -61,7 +75,11 @@ describe("session context usage", function () {
     );
 
     assert.isBelow(afterCompaction, beforeCompaction);
-    assert.deepEqual(usageMessages, ["user-new", "assistant-new"]);
+    assert.deepEqual(usageMessages, [
+      "context-summary",
+      "user-new",
+      "assistant-new",
+    ]);
   });
 
   it("ignores empty in-progress assistant placeholders", function () {

@@ -60,11 +60,7 @@ export type ProviderType =
 /**
  * Provider identifier for built-in providers
  */
-export type BuiltinProviderId =
-  | "openai"
-  | "claude"
-  | "gemini"
-  | "deepseek";
+export type BuiltinProviderId = "openai" | "claude" | "gemini" | "deepseek";
 
 /**
  * Base provider configuration
@@ -298,6 +294,9 @@ export interface ToolCallingProvider extends AIProvider {
 }
 
 export interface ToolCallingOptions {
+  /** Raw PDF fallback, scoped to this request and its originating user message. */
+  pdfAttachment?: PdfAttachment;
+  pdfAttachmentMessageId?: string;
   toolChoice?: "auto" | "none";
   /**
    * Run this request without reading or mutating the provider's persistent
