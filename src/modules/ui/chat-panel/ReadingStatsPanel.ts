@@ -4,6 +4,7 @@ import {
   formatReadingDuration,
   formatReadingDurationCompact,
   getReadingStatsSnapshot,
+  getStartOfLocalWeek,
   isReadingTimeAccumulatingNow,
   type DayReadingItem,
   type ItemReadingEntry,
@@ -235,6 +236,61 @@ function pulseStatValue(element: HTMLElement): void {
   element.classList.add("paperchat-stats-metric-value--pulse");
 }
 
+function renderReadingTimeValue(element: HTMLElement, seconds: number): void {
+  element.textContent = "";
+  // Keep the existing localized duration, with quieter units than digits.
+  for (const part of formatReadingDurationCompact(seconds).split(/(\d+)/)) {
+    const span = createElement(element.ownerDocument, "span", {});
+    span.className = /^\d+$/.test(part)
+      ? "paperchat-stats-time-number"
+      : "paperchat-stats-time-unit";
+    span.textContent = part;
+    element.appendChild(span);
+  }
+}
+
+function createReadingWeekRhythm(
+  doc: Document,
+  snapshot: ReadingStatsSnapshot,
+): HTMLElement {
+  const rhythm = createElement(doc, "div", {});
+  rhythm.className = "paperchat-stats-week-rhythm";
+  const end = snapshot.rangeEnd;
+  const start = getStartOfLocalWeek(end);
+  const days = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(date.getDate() + index);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    return { date, seconds: snapshot.dailySeconds[key] || 0 };
+  });
+  const maximum = Math.max(1, ...days.map((day) => day.seconds));
+  for (const day of days) {
+    const column = createElement(doc, "div", {});
+    column.className = "paperchat-stats-week-day";
+    const description = `${formatTooltipDate(day.date)}: ${formatReadingDuration(day.seconds)}`;
+    column.title = description;
+    column.setAttribute("aria-label", description);
+    column.setAttribute("role", "img");
+    if (day.date.toDateString() === end.toDateString())
+      column.dataset.today = "true";
+    if (day.date > end) column.dataset.future = "true";
+    const track = createElement(doc, "div", {});
+    track.className = "paperchat-stats-week-track";
+    const bar = createElement(doc, "div", {});
+    bar.className = "paperchat-stats-week-fill";
+    bar.style.height = `${(day.seconds / maximum) * 100}%`;
+    track.appendChild(bar);
+    const label = createElement(doc, "span", {});
+    label.textContent = day.date.toLocaleDateString(undefined, {
+      weekday: "narrow",
+    });
+    column.appendChild(track);
+    column.appendChild(label);
+    rhythm.appendChild(column);
+  }
+  return rhythm;
+}
+
 function animateMetricCards(
   doc: Document,
   cards: HTMLElement[],
@@ -300,12 +356,13 @@ function animateMetricCards(
   }
 
   if (valueEls[2]) {
-    valueEls[2].textContent = formatReadingDurationCompact(0);
+    renderReadingTimeValue(valueEls[2], 0);
     runCountUp(
       valueEls[2],
       500,
       (p) => {
-        valueEls[2]!.textContent = formatReadingDurationCompact(
+        renderReadingTimeValue(
+          valueEls[2]!,
           Math.round(values.weekSeconds * p),
         );
       },
@@ -374,15 +431,11 @@ function createStatCard(
     padding: "10px 10px 9px",
     borderRadius: "12px",
     border: metricCardBorder(theme),
-    background: isDarkMode()
-      ? "rgba(255, 255, 255, 0.03)"
-      : theme.inputBg,
+    background: isDarkMode() ? "rgba(255, 255, 255, 0.03)" : theme.inputBg,
     display: "flex",
     flexDirection: "column",
     gap: "5px",
-    boxShadow: isDarkMode()
-      ? "none"
-      : "0 1px 2px rgba(15, 23, 42, 0.04)",
+    boxShadow: isDarkMode() ? "none" : "0 1px 2px rgba(15, 23, 42, 0.04)",
   });
   card.className = "paperchat-stats-metric-card";
 
@@ -616,7 +669,10 @@ function readingBarColor(rank: number): string {
   const palette = isDarkMode()
     ? ["#39d353", "#26a641", "#006d32", "#0e4429"]
     : ["#196127", "#239a3b", "#7bc96f", "#9be9a8"];
-  return palette[Math.min(rank - 1, palette.length - 1)] ?? palette[palette.length - 1];
+  return (
+    palette[Math.min(rank - 1, palette.length - 1)] ??
+    palette[palette.length - 1]
+  );
 }
 
 function revealBar(fill: HTMLElement, percent: number): void {
@@ -652,6 +708,7 @@ function createReadingRankRow(
     columnGap: "8px",
     alignItems: "baseline",
   });
+  head.className = "paperchat-stats-rank-heading";
   const indexEl = createElement(doc, "div", {
     fontSize: "12px",
     fontWeight: "650",
@@ -678,7 +735,8 @@ function createReadingRankRow(
     fontVariantNumeric: "tabular-nums",
     whiteSpace: "nowrap",
   });
-  durationEl.textContent = formatReadingDuration(item.totalSeconds);
+  durationEl.textContent = formatReadingDurationCompact(item.totalSeconds);
+  durationEl.title = formatReadingDuration(item.totalSeconds);
   head.appendChild(indexEl);
   head.appendChild(titleEl);
   head.appendChild(durationEl);
@@ -1839,8 +1897,9 @@ function createViewSwitcher(
         return;
       }
       panel.dataset.statsView = id;
-      syncStatsViewSwitcher(panel, theme, id);
-      void refreshReadingStatsPanel(panel, theme);
+      const currentTheme = getCurrentTheme();
+      syncStatsViewSwitcher(panel, currentTheme, id);
+      void refreshReadingStatsPanel(panel, currentTheme);
     });
     bar.appendChild(button);
   }
@@ -2708,6 +2767,12 @@ async function renderReadingStatsContent(
     "paperchat-stats-overview",
     "paperchat-stats-overview--reading",
   );
+  const weeklyCard = cards.lastElementChild as HTMLElement;
+  const weeklyValue = weeklyCard.querySelector(
+    ".paperchat-stats-metric-value",
+  ) as HTMLElement;
+  renderReadingTimeValue(weeklyValue, snapshot.totalSecondsThisWeek);
+  weeklyCard.appendChild(createReadingWeekRhythm(doc, snapshot));
   host.appendChild(cards);
   animateMetricCards(doc, Array.from(cards.children) as HTMLElement[], {
     total: snapshot.literature.total,

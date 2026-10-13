@@ -31,7 +31,10 @@ function scheduleNextFrame(callback: () => void, doc: Document): void {
   setTimeout(callback, 0);
 }
 
-function setInputPlaceholder(input: HTMLTextAreaElement, placeholder: string): void {
+function setInputPlaceholder(
+  input: HTMLTextAreaElement,
+  placeholder: string,
+): void {
   input.placeholder = placeholder;
   if (placeholder) {
     input.setAttribute("placeholder", placeholder);
@@ -117,6 +120,7 @@ export class NextQuestionHintController {
   private readonly onFocus = () => {
     this.hintLayer?.classList.add("is-composer-focused");
     this.syncVisibility();
+    this.syncNativePlaceholder();
     const doc = this.input?.ownerDocument;
     if (!doc) {
       return;
@@ -124,6 +128,7 @@ export class NextQuestionHintController {
     scheduleNextFrame(() => {
       if (!this.disposed) {
         this.syncVisibility();
+        this.syncNativePlaceholder();
       }
     }, doc);
   };
@@ -142,6 +147,7 @@ export class NextQuestionHintController {
       }
       this.hintLayer?.classList.remove("is-composer-focused");
       this.syncVisibility();
+      this.syncNativePlaceholder();
     }, doc);
   };
 
@@ -292,8 +298,6 @@ export class NextQuestionHintController {
       this.generationAssistantMessageId = null;
     }
 
-    this.dismissHint({ markDismissed: false });
-
     const generationController = createAbortController();
     this.generationController = generationController;
     this.generationAssistantMessageId = lastAssistantAtRequest.id;
@@ -398,7 +402,9 @@ export class NextQuestionHintController {
         this.hintTextEl.setAttribute("title", this.hint.text);
       }
       if (this.hintActionEl) {
-        this.hintActionEl.textContent = getString("chat-next-question-hint-tab");
+        this.hintActionEl.textContent = getString(
+          "chat-next-question-hint-tab",
+        );
       }
     }
     syncComposerHintOffset(context.container);
@@ -465,22 +471,22 @@ export class NextQuestionHintController {
     this.wrapper?.removeEventListener("keydown", this.onWrapperKeyDown, true);
   }
 
-  private getHintMountParent(): HTMLElement | null {
-    const composerFloat = this.context.container.querySelector(
-      "#chat-composer-float",
-    ) as HTMLElement | null;
-    return composerFloat || this.wrapper;
-  }
-
   private mountHintLayer(): void {
     if (!this.hintLayer || !this.wrapper) {
       return;
     }
-    const parent = this.getHintMountParent();
-    if (!parent) {
+    const parent = this.wrapper;
+    const anchor =
+      (parent.querySelector(
+        "#chat-context-item-banner",
+      ) as HTMLElement | null) ||
+      (parent.querySelector(
+        "#chat-edit-message-banner",
+      ) as HTMLElement | null) ||
+      this.input;
+    if (!anchor) {
       return;
     }
-    const anchor = this.wrapper;
     if (this.hintLayer.parentNode !== parent) {
       parent.insertBefore(this.hintLayer, anchor);
       return;
@@ -587,6 +593,9 @@ export class NextQuestionHintController {
       syncComposerHintOffset(this.context.container);
     }
     this.syncNativePlaceholder();
+    if (visible && this.input?.ownerDocument?.activeElement === this.input) {
+      this.hintLayer.classList.add("is-composer-focused");
+    }
   }
 
   private isMentionPopupVisible(): boolean {
@@ -659,6 +668,12 @@ export class NextQuestionHintController {
 
   private syncNativePlaceholder(): void {
     if (!this.input) {
+      return;
+    }
+    const doc = this.input.ownerDocument;
+    const focused = doc?.activeElement === this.input;
+    if (focused && this.hint && !this.input.value.trim()) {
+      setInputPlaceholder(this.input, getString("chat-next-question-hint-tab"));
       return;
     }
     setInputPlaceholder(this.input, this.originalPlaceholder);
