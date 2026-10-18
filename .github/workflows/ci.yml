@@ -61,8 +61,8 @@ jobs:
           mkdir -p "$RUNNER_TEMP/papermind-zotero"
           curl --fail --location --retry 3 \
             'https://www.zotero.org/download/client/dl?platform=linux-x86_64&channel=release' \
-            --output "$RUNNER_TEMP/papermind-zotero/zotero.tar.bz2"
-          tar -xjf "$RUNNER_TEMP/papermind-zotero/zotero.tar.bz2" -C "$RUNNER_TEMP/papermind-zotero"
+            --output "$RUNNER_TEMP/papermind-zotero/zotero.tar"
+          tar -xf "$RUNNER_TEMP/papermind-zotero/zotero.tar" -C "$RUNNER_TEMP/papermind-zotero"
           echo "ZOTERO_PLUGIN_ZOTERO_BIN_PATH=$RUNNER_TEMP/papermind-zotero/Zotero_linux-x86_64/zotero" >> "$GITHUB_ENV"
       - run: npm run test:online-release-upgrade
       - run: npm run test
