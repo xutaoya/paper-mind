@@ -44,6 +44,25 @@ class FakeElement {
   readonly listeners = new Map<string, Array<(event: any) => void>>();
   parentElement: FakeElement | null = null;
   readonly dataset: Record<string, string> = {};
+  readonly classList = {
+    add: (...names: string[]) =>
+      this.setAttribute(
+        "class",
+        [...new Set([...this.classNames(), ...names])].join(" "),
+      ),
+    remove: (...names: string[]) =>
+      this.setAttribute(
+        "class",
+        this.classNames()
+          .filter((name) => !names.includes(name))
+          .join(" "),
+      ),
+    contains: (name: string) => this.classNames().includes(name),
+  };
+
+  private classNames(): string[] {
+    return (this.getAttribute("class") || "").split(/\s+/).filter(Boolean);
+  }
   scrollTop = 0;
   scrollHeight = 0;
   clientHeight = 0;
@@ -147,6 +166,15 @@ class FakeElement {
     this.attributes.delete(name);
   }
 
+  closest(selector: string): FakeElement | null {
+    if (
+      selector.startsWith(".") &&
+      this.classNames().includes(selector.slice(1))
+    )
+      return this;
+    return this.parentElement?.closest(selector) ?? null;
+  }
+
   addEventListener(type: string, listener: (event: any) => void): void {
     const listeners = this.listeners.get(type) || [];
     listeners.push(listener);
@@ -212,6 +240,12 @@ class FakeDocument {
     return new FakeElement(this, "#fragment");
   }
 
+  createComment(value: string): FakeElement {
+    const node = new FakeElement(this, "#comment");
+    node.textContent = value;
+    return node;
+  }
+
   createTextNode(value: string): FakeElement {
     const node = new FakeElement(this, "#text");
     node.textContent = value;
@@ -259,8 +293,11 @@ function message(
 
 describe("chat message exact navigation", function () {
   let originalAddon: unknown;
+  let originalZotero: unknown;
 
   beforeEach(function () {
+    originalZotero = (globalThis as { Zotero?: unknown }).Zotero;
+    (globalThis as { Zotero?: unknown }).Zotero = { getMainWindow: () => null };
     originalAddon = (globalThis as { addon?: unknown }).addon;
     (globalThis as { addon?: unknown }).addon = {
       data: {
@@ -276,6 +313,7 @@ describe("chat message exact navigation", function () {
   });
 
   afterEach(function () {
+    (globalThis as { Zotero?: unknown }).Zotero = originalZotero;
     (globalThis as { addon?: unknown }).addon = originalAddon;
   });
 
@@ -395,7 +433,10 @@ describe("chat message exact navigation", function () {
       undefined,
       {
         onRenderComplete: () => {
-          renderedId = history.children[0]?.getAttribute("data-message-id");
+          renderedId =
+            history
+              .querySelector("[data-message-id]")
+              ?.getAttribute("data-message-id") ?? null;
         },
       },
     );
@@ -443,8 +484,8 @@ describe("chat message exact navigation", function () {
       },
     );
 
-    assert.lengthOf(history.children, 1);
-    const wrapper = history.children[0];
+    assert.lengthOf(history.querySelectorAll("[data-message-id]"), 1);
+    const wrapper = history.querySelector("[data-message-id]")!;
     assert.equal(wrapper.getAttribute("data-message-id"), "assistant-1");
     const bubble = wrapper.children[0];
     const footer = bubble.children.at(-1)!;
@@ -530,7 +571,9 @@ describe("chat message exact navigation", function () {
       darkTheme,
     );
 
-    const footer = history.children[0].children[0].children.at(-1)!;
+    const footer = history
+      .querySelector("[data-message-id]")!
+      .children[0].children.at(-1)!;
     assert.equal(footer.getAttribute("data-interrupted-footer"), "true");
     assert.isNull(footer.getAttribute("aria-live"));
     assert.equal(footer.children[0].textContent, "paperchat-chat-interrupted");
@@ -762,7 +805,9 @@ describe("chat message exact navigation", function () {
       darkTheme,
     );
 
-    const footer = history.children[0].children[0].children.at(-1)!;
+    const footer = history
+      .querySelector("[data-message-id]")!
+      .children[0].children.at(-1)!;
     assert.equal(footer.getAttribute("data-interrupted-footer"), "true");
     assert.equal(footer.getAttribute("data-attached-error-id"), "error-1");
     assert.lengthOf(footer.children, 1);
@@ -782,18 +827,20 @@ describe("chat message exact navigation", function () {
       darkTheme,
     );
 
-    assert.lengthOf(history.children, 1);
+    assert.lengthOf(history.querySelectorAll("[data-message-id]"), 1);
     assert.equal(
-      history.children[0].getAttribute("data-message-id"),
+      history
+        .querySelector("[data-message-id]")!
+        .getAttribute("data-message-id"),
       "error-1",
     );
     assert.equal(
-      history.children[0].getAttribute("class"),
+      history.querySelector("[data-message-id]")!.getAttribute("class"),
       "chat-message error-message",
     );
   });
 
-  it("keeps quota recovery and top-up inside the interrupted footer", function () {
+  it("keeps external quota errors in the interrupted footer without upstream top-up actions", function () {
     const doc = new FakeDocument();
     const history = new FakeElement(doc, "div");
     history.scrollHeight = 100;
@@ -823,21 +870,24 @@ describe("chat message exact navigation", function () {
       () => undefined,
     );
 
-    assert.lengthOf(history.children, 1);
-    const wrapper = history.children[0];
+    assert.lengthOf(history.querySelectorAll("[data-message-id]"), 1);
+    const wrapper = history.querySelector("[data-message-id]")!;
     const footer = wrapper.children[0].children.at(-1)!;
     assert.equal(
       footer.children[0].textContent,
-      "⚠️ paperchat-chat-error-paperchat-insufficient-quota",
+      '⚠️ {"error":{"code":"insufficient_user_quota","message":"quota exceeded"}}',
     );
-    const topup = footer.children[1];
-    assert.equal(topup.getAttribute("class"), "paperchat-topup-btn");
-    assert.lengthOf(topup.listeners.get("click") || [], 1);
+    assert.lengthOf(footer.children, 1);
+    assert.isNull(footer.querySelector(".paperchat-topup-btn"));
     const actions = wrapper.children[1];
-    assert.lengthOf(actions.children, 1);
+    assert.lengthOf(actions.children, 2);
     assert.equal(
       actions.children[0].getAttribute("class"),
       "message-action-btn copy-message-btn",
+    );
+    assert.equal(
+      actions.children[1].getAttribute("class"),
+      "message-action-btn reroll-btn",
     );
   });
 
@@ -868,7 +918,7 @@ describe("chat message exact navigation", function () {
       },
     );
 
-    const actions = history.children[0].children[1];
+    const actions = history.querySelector("[data-message-id]")!.children[1];
     assert.lengthOf(actions.children, 2);
     const summaryButton = actions.children[1];
     assert.equal(
@@ -923,7 +973,7 @@ describe("chat message exact navigation", function () {
       },
     );
 
-    const actions = history.children[0].children[1];
+    const actions = history.querySelector("[data-message-id]")!.children[1];
     assert.lengthOf(actions.children, 2);
     const quoteButton = actions.children[1];
     assert.equal(
@@ -1071,7 +1121,9 @@ describe("chat message exact navigation", function () {
     );
     imageTag.listeners.get("mouseenter")?.[0]?.({});
     assert.lengthOf(
-      doc.documentElement.querySelectorAll("[data-paperchat-image-hover-preview]"),
+      doc.documentElement.querySelectorAll(
+        "[data-paperchat-image-hover-preview]",
+      ),
       1,
     );
     imageTag.children[2].listeners.get("click")?.[0]?.({
@@ -1079,7 +1131,9 @@ describe("chat message exact navigation", function () {
       stopPropagation: () => undefined,
     });
     assert.lengthOf(
-      doc.documentElement.querySelectorAll("[data-paperchat-image-hover-preview]"),
+      doc.documentElement.querySelectorAll(
+        "[data-paperchat-image-hover-preview]",
+      ),
       0,
     );
     assert.deepEqual(removedImages, [0]);
@@ -1114,7 +1168,10 @@ describe("chat message exact navigation", function () {
     assert.equal(selectedTag.getAttribute("class"), "pending-selected-text");
     assert.equal(selectedTag.getAttribute("title"), selectedText);
     assert.lengthOf(selectedTag.children, 2);
-    assert.include(selectedTag.children[0].textContent, selectedText.slice(0, 20));
+    assert.include(
+      selectedTag.children[0].textContent,
+      selectedText.slice(0, 20),
+    );
     selectedTag.children[1].listeners.get("click")?.[0]?.({
       preventDefault: () => undefined,
       stopPropagation: () => undefined,

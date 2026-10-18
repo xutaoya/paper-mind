@@ -62,8 +62,7 @@ export function truncateMessageText(text: string, limit: number): string {
   if (normalized.length <= limit) return normalized;
   const excerpt = normalized.slice(0, limit);
   const boundary = excerpt.lastIndexOf(" ");
-  const end =
-    boundary > limit * 0.65 ? boundary : limit;
+  const end = boundary > limit * 0.65 ? boundary : limit;
   return `${excerpt.slice(0, end).trim()}…`;
 }
 
@@ -248,9 +247,7 @@ export function resolveActiveRailItemId(
   }
 
   const distanceFromEnd =
-    chatHistory.scrollHeight -
-    chatHistory.scrollTop -
-    chatHistory.clientHeight;
+    chatHistory.scrollHeight - chatHistory.scrollTop - chatHistory.clientHeight;
   if (distanceFromEnd <= followThreshold) {
     return items.at(-1)?.id ?? "";
   }
@@ -432,9 +429,7 @@ function updateRailTickVisuals(
   engaged: boolean,
 ): void {
   const focusIndex = resolveRailFocusIndex(activeIndex, highlightedIndex);
-  const buttons = elements.ticks.querySelectorAll(
-    `.${NAV_TICK_BUTTON_CLASS}`,
-  );
+  const buttons = elements.ticks.querySelectorAll(`.${NAV_TICK_BUTTON_CLASS}`);
 
   elements.ticks.style.justifyItems = "start";
   elements.root.style.width = engaged
@@ -459,7 +454,9 @@ function updateRailTickVisuals(
       `.${NAV_TICK_MARK_CLASS}`,
     ) as HTMLElement | null;
 
-    button.style.color = visual.emphasized ? theme.textPrimary : theme.textMuted;
+    button.style.color = visual.emphasized
+      ? theme.textPrimary
+      : theme.textMuted;
     if (mark) {
       mark.style.width = `${visual.width}px`;
       mark.style.opacity = String(visual.opacity);
@@ -860,12 +857,12 @@ export function ensureConversationNavigator(
   container: HTMLElement,
   theme: ThemeColors,
 ): ConversationNavigatorController | null {
-  const chatViewport = container.querySelector("#chat-viewport") as
-    | HTMLElement
-    | null;
-  const chatHistory = container.querySelector("#chat-history") as
-    | HTMLElement
-    | null;
+  const chatViewport = container.querySelector(
+    "#chat-viewport",
+  ) as HTMLElement | null;
+  const chatHistory = container.querySelector(
+    "#chat-history",
+  ) as HTMLElement | null;
   if (!chatViewport || !chatHistory) return null;
 
   const existing = navigatorControllers.get(container);
@@ -898,15 +895,15 @@ export function updateConversationNavigatorTheme(
   container: HTMLElement,
   theme: ThemeColors,
 ): void {
-  const chatViewport = container.querySelector("#chat-viewport") as
-    | HTMLElement
-    | null;
-  const root = chatViewport?.querySelector(`#${NAV_ROOT_ID}`) as
-    | HTMLElement
-    | null;
-  const preview = chatViewport?.querySelector(`#${NAV_PREVIEW_ID}`) as
-    | HTMLElement
-    | null;
+  const chatViewport = container.querySelector(
+    "#chat-viewport",
+  ) as HTMLElement | null;
+  const root = chatViewport?.querySelector(
+    `#${NAV_ROOT_ID}`,
+  ) as HTMLElement | null;
+  const preview = chatViewport?.querySelector(
+    `#${NAV_PREVIEW_ID}`,
+  ) as HTMLElement | null;
   if (!root || !preview) return;
 
   const rail = root.querySelector(`.${NAV_RAIL_CLASS}`) as HTMLElement;

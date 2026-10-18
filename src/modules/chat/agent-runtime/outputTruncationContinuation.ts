@@ -14,7 +14,7 @@ export function shouldContinueTruncatedOutput(result: {
 }): boolean {
   return (
     result.stopReason === "max_tokens" &&
-    !(result.toolCalls?.length) &&
+    !result.toolCalls?.length &&
     (Boolean((result.content || "").trim()) ||
       Boolean((result.reasoning || "").trim()))
   );

@@ -139,34 +139,34 @@ export function openQuickActionEditDialog(
     }
 
     dialogHelper.addButton(getString("chat-quick-action-save"), "save", {
-        noClose: true,
-        callback: () => {
-          const doc = dialogHelper.window?.document;
-          if (!doc) {
-            return;
-          }
-          const label = readFieldValue(doc, "quick-action-label-input");
-          const prompt = readFieldValue(doc, "quick-action-prompt-input");
-          if (!label || !prompt) {
-            Services.prompt.alert(
-              dialogHelper.window as unknown as mozIDOMWindowProxy,
-              getString("chat-quick-action-edit-title"),
-              getString("chat-quick-action-invalid"),
-            );
-            return;
-          }
-          savedResult = {
-            saved: true,
-            action: {
-              id: action?.id || createQuickActionId(label),
-              label,
-              prompt,
-            },
-          };
-          finish(savedResult);
-          dialogHelper.window?.close();
-        },
-      });
+      noClose: true,
+      callback: () => {
+        const doc = dialogHelper.window?.document;
+        if (!doc) {
+          return;
+        }
+        const label = readFieldValue(doc, "quick-action-label-input");
+        const prompt = readFieldValue(doc, "quick-action-prompt-input");
+        if (!label || !prompt) {
+          Services.prompt.alert(
+            dialogHelper.window as unknown as mozIDOMWindowProxy,
+            getString("chat-quick-action-edit-title"),
+            getString("chat-quick-action-invalid"),
+          );
+          return;
+        }
+        savedResult = {
+          saved: true,
+          action: {
+            id: action?.id || createQuickActionId(label),
+            label,
+            prompt,
+          },
+        };
+        finish(savedResult);
+        dialogHelper.window?.close();
+      },
+    });
 
     openZToolkitDialog(
       dialogHelper,

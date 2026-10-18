@@ -79,7 +79,8 @@ describe("mineru library browser", function () {
       assert.lengthOf(missingTag, 0);
     } finally {
       if (originalGet) {
-        (globalThis as { Zotero: typeof Zotero }).Zotero.Items.get = originalGet;
+        (globalThis as { Zotero: typeof Zotero }).Zotero.Items.get =
+          originalGet;
       }
     }
   });

@@ -222,8 +222,14 @@ export function applyThemeToContainer(container: HTMLElement): void {
       "--composer-border-focus",
       theme.inputFocusBorderColor,
     );
-    inputWrapper.style.setProperty("--composer-shadow-idle", theme.composerShadow);
-    inputWrapper.style.setProperty("--composer-context-focus", theme.textPrimary);
+    inputWrapper.style.setProperty(
+      "--composer-shadow-idle",
+      theme.composerShadow,
+    );
+    inputWrapper.style.setProperty(
+      "--composer-context-focus",
+      theme.textPrimary,
+    );
     inputWrapper.style.background = theme.inputBg;
     if (!inputWrapper.classList.contains("is-focused")) {
       inputWrapper.style.borderColor = theme.inputBorderColor;

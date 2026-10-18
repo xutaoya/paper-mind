@@ -1,5 +1,8 @@
 import { assert } from "chai";
-import { formatCompactTokenCount, resolveReasoningTokenCount } from "../src/utils/tokens.ts";
+import {
+  formatCompactTokenCount,
+  resolveReasoningTokenCount,
+} from "../src/utils/tokens.ts";
 
 describe("context window usage", function () {
   it("formats token counts compactly", function () {
@@ -14,10 +17,7 @@ describe("context window usage", function () {
 
   it("grows reasoning token count with streamed text after a stale API usage", function () {
     const longReasoning = "x".repeat(4000);
-    assert.isAbove(
-      resolveReasoningTokenCount(longReasoning, 718),
-      718,
-    );
+    assert.isAbove(resolveReasoningTokenCount(longReasoning, 718), 718);
     assert.equal(resolveReasoningTokenCount("", 718), 718);
   });
 });

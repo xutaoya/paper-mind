@@ -257,7 +257,7 @@ export interface ParsedToolCallEntry {
   presentationProgress?: PresentationCardProgress;
 }
 
-interface ToolCallCardData extends ParsedToolCallEntry {}
+type ToolCallCardData = ParsedToolCallEntry;
 
 type ToolCallFragment =
   | {

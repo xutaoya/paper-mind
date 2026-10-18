@@ -48,7 +48,9 @@ function createElement(
 
 function prefersReducedMotion(doc: Document): boolean {
   const view = (doc.defaultView ?? Zotero.getMainWindow()) as Window | null;
-  return Boolean(view?.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+  return Boolean(
+    view?.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches,
+  );
 }
 
 export function mapStepStatusToTodoStatus(
@@ -107,7 +109,10 @@ function createStatusIcon(
   svg.classList.add("paperchat-todo-status-icon");
   svg.classList.add(`paperchat-todo-status-icon--${status}`);
 
-  const baseCircle = doc.createElementNS("http://www.w3.org/2000/svg", "circle");
+  const baseCircle = doc.createElementNS(
+    "http://www.w3.org/2000/svg",
+    "circle",
+  );
   baseCircle.setAttribute("cx", "12");
   baseCircle.setAttribute("cy", "12");
   baseCircle.setAttribute("r", "9");
@@ -356,7 +361,8 @@ function syncTodoListContent(
   const items = mapExecutionPlanToTodoItems(plan);
   const completed = items.filter((item) => item.status === "completed").length;
   const allComplete = items.length > 0 && completed === items.length;
-  const collapseOnComplete = root.getAttribute("data-collapse-on-complete") !== "false";
+  const collapseOnComplete =
+    root.getAttribute("data-collapse-on-complete") !== "false";
 
   const titleEl = root.querySelector(
     ".paperchat-todo-list-title",
@@ -437,7 +443,8 @@ export function createTodoListElement(
     },
     {
       class: `paperchat-todo-list paperchat-todo-list--docked ${TODO_LIST_ROOT_CLASS}`,
-      "data-open": defaultOpen && !(allComplete && collapseOnComplete) ? "true" : "false",
+      "data-open":
+        defaultOpen && !(allComplete && collapseOnComplete) ? "true" : "false",
       "data-collapse-on-complete": collapseOnComplete ? "true" : "false",
       "data-all-complete": allComplete ? "true" : "false",
       "data-item-count": String(items.length),

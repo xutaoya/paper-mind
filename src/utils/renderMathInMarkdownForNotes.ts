@@ -9,9 +9,7 @@ function escapeMathHtml(text: string): string {
 }
 
 function escapeHtml(text: string): string {
-  return escapeMathHtml(text)
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+  return escapeMathHtml(text).replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function shouldUseBlockMath(latex: string): boolean {
@@ -44,7 +42,10 @@ export function preserveEmphasisInMarkdownForNotes(
       if (!trimmed) {
         return match;
       }
-      return preserveToken(preserved, `<strong>${escapeHtml(trimmed)}</strong>`);
+      return preserveToken(
+        preserved,
+        `<strong>${escapeHtml(trimmed)}</strong>`,
+      );
     },
   );
   processed = processed.replace(/__([^_\n]+?)__/g, (match, text: string) => {

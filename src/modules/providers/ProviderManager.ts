@@ -180,7 +180,8 @@ export class ProviderManager {
         );
 
         // Normalize stored configs and drop removed built-in providers.
-        this.activeProviderId = data.activeProviderId || this.getDefaultActiveProviderId();
+        this.activeProviderId =
+          data.activeProviderId || this.getDefaultActiveProviderId();
         const { configs, changed } = this.normalizeLoadedConfigs(providers);
         this.configs = configs;
         let prefsChanged = changed;

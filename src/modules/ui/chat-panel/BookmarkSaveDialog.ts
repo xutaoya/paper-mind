@@ -9,7 +9,10 @@ import {
   openBookmarkTextPrompt,
   showBookmarkError,
 } from "./BookmarkUiPrompts";
-import { getBookmarkDialogColors, getBookmarkFolderRowStyle } from "./bookmarkDialogTheme";
+import {
+  getBookmarkDialogColors,
+  getBookmarkFolderRowStyle,
+} from "./bookmarkDialogTheme";
 import type { ThemeColors } from "./types";
 import { HTML_NS } from "./types";
 
@@ -226,7 +229,10 @@ export async function openBookmarkSaveDialog(
         selectedFolderId = null;
         return;
       }
-      if (!selectedFolderId || !items.some((folder) => folder.id === selectedFolderId)) {
+      if (
+        !selectedFolderId ||
+        !items.some((folder) => folder.id === selectedFolderId)
+      ) {
         selectedFolderId = items[0]?.id ?? null;
       }
       for (const folder of items) {

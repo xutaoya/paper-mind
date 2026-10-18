@@ -1,4 +1,8 @@
-export type StreamStopReason = "tool_calls" | "end_turn" | "max_tokens" | "stop";
+export type StreamStopReason =
+  | "tool_calls"
+  | "end_turn"
+  | "max_tokens"
+  | "stop";
 
 export function normalizeOpenAIFinishReason(
   finishReason: string | null | undefined,

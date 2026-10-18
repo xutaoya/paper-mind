@@ -31,7 +31,10 @@ import {
   renderMarkdownToElement,
 } from "./MarkdownRenderer";
 import { createAgentActivityPanel } from "./AgentActivityPanel";
-import { createToolApprovalCardElement, type ToolApprovalCardBanner } from "./ApprovalCardElement";
+import {
+  createToolApprovalCardElement,
+  type ToolApprovalCardBanner,
+} from "./ApprovalCardElement";
 import {
   collapseTodoListElement,
   createTodoListElement,
@@ -142,7 +145,9 @@ function bindHistoryClickDelegation(chatHistory: HTMLElement): void {
       return;
     }
     const target = event.target as Element | null;
-    const wrapper = target?.closest?.("[data-message-id]") as HTMLElement | null;
+    const wrapper = target?.closest?.(
+      "[data-message-id]",
+    ) as HTMLElement | null;
     const messageId = wrapper?.getAttribute("data-message-id");
     if (!wrapper || !messageId) {
       return;
@@ -1146,7 +1151,11 @@ export function createMessageElement(
           ? isDockedExecutionPlanVisible(chatContainer)
           : false,
       });
-      if (isReasoningStreaming && !msg.reasoning && !msg.content.includes("<tool-call")) {
+      if (
+        isReasoningStreaming &&
+        !msg.reasoning &&
+        !msg.content.includes("<tool-call")
+      ) {
         activityPanel.style.display = "none";
       }
       bubble.appendChild(activityPanel);
@@ -1193,7 +1202,11 @@ export function createMessageElement(
     );
   }
 
-  if (msg.role === "user" && msg.streamingState === undefined && !msg.isSystemNotice) {
+  if (
+    msg.role === "user" &&
+    msg.streamingState === undefined &&
+    !msg.isSystemNotice
+  ) {
     bubble.dataset.editable = "true";
     bubble.title = getString("chat-edit-message-hint");
     if (renderOptions.onEditUserMessage) {
@@ -1433,7 +1446,9 @@ function createQuoteReplyButton(
 }
 
 function resolveChatPanelContainer(node: HTMLElement): HTMLElement | null {
-  return node.closest(`#${config.addonRef}-chat-container`) as HTMLElement | null;
+  return node.closest(
+    `#${config.addonRef}-chat-container`,
+  ) as HTMLElement | null;
 }
 
 function resolveMessageAnchor(node: HTMLElement): HTMLElement | null {
@@ -1449,7 +1464,10 @@ function showInlineMessageActionSuccess(
   button.textContent = "\u2713";
   button.setAttribute("title", message);
   button.setAttribute("aria-label", message);
-  button.style.color = resolveFeedbackBubbleColors("success", isDarkMode()).color;
+  button.style.color = resolveFeedbackBubbleColors(
+    "success",
+    isDarkMode(),
+  ).color;
   showChatPanelToast(resolveChatPanelContainer(button), message, "success", {
     anchor: resolveMessageAnchor(button) ?? button,
   });
@@ -1492,7 +1510,12 @@ function createBookmarkMessageButton(
       try {
         const successMessage = await onBookmarkMessage(assistantMessageId);
         if (typeof successMessage === "string" && successMessage.trim()) {
-          showInlineMessageActionSuccess(btn, successMessage, "bookmark", label);
+          showInlineMessageActionSuccess(
+            btn,
+            successMessage,
+            "bookmark",
+            label,
+          );
         }
       } catch (error: unknown) {
         const bookmarkError =
@@ -1831,7 +1854,11 @@ function appendPresentationRange(
 ): void {
   let previousTimestamp = previousMessageTimestamp;
   for (let index = start; index < end; index++) {
-    const { message: msg, attachedError, attachedNotices } = presentations[index];
+    const {
+      message: msg,
+      attachedError,
+      attachedNotices,
+    } = presentations[index];
     if (shouldShowMessageTimeSeparator(previousTimestamp, msg.timestamp)) {
       target.appendChild(
         createMessageTimeSeparatorElement(doc, theme, msg.timestamp),
@@ -1904,7 +1931,10 @@ function shouldEagerRenderHistory(
   return true;
 }
 
-function createLoadOlderControl(doc: Document, theme: ThemeColors): HTMLElement {
+function createLoadOlderControl(
+  doc: Document,
+  theme: ThemeColors,
+): HTMLElement {
   return createElement(
     doc,
     "button",
@@ -2225,8 +2255,8 @@ export function updateExecutionPlanView(
 
   const shouldShow = Boolean(
     executionPlan &&
-      executionPlan.status === "in_progress" &&
-      executionPlan.steps.length > 0,
+    executionPlan.status === "in_progress" &&
+    executionPlan.steps.length > 0,
   );
 
   const existingBanner = panel.querySelector(

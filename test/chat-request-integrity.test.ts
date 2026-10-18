@@ -29,6 +29,7 @@ describe("chat request integrity", function () {
   let manager: ReturnType<typeof getProviderManager>;
   let originalProvider: typeof manager.getActiveProvider;
   const prefs: Record<string, unknown> = {};
+
   beforeEach(function () {
     originalZotero = (globalThis as any).Zotero;
     originalToolkit = (globalThis as any).ztoolkit;
@@ -53,6 +54,7 @@ describe("chat request integrity", function () {
         isReady: () => true,
       }) as any;
   });
+
   afterEach(function () {
     manager.getActiveProvider = originalProvider;
     (globalThis as any).Zotero = originalZotero;
@@ -240,7 +242,9 @@ describe("chat request integrity", function () {
   });
 
   for (const streaming of [false, true]) {
-    it(`keeps PDF request options throughout ${streaming ? "streaming" : "non-streaming"} tool rounds`, async function () {
+    const mode = streaming ? "streaming" : "non-streaming";
+
+    it(`keeps PDF request options throughout ${mode} tool rounds`, async function () {
       const chat = session([message("user", "user", "read paper")]);
       const assistant = message("assistant", "assistant", "");
       chat.messages.push(assistant);
@@ -341,7 +345,9 @@ describe("chat request integrity", function () {
   }
 
   for (const streaming of [false, true]) {
-    it(`sends raw PDF on the correct user message (${streaming ? "streaming" : "non-streaming"})`, async function () {
+    const mode = streaming ? "streaming" : "non-streaming";
+
+    it(`sends raw PDF on the correct user message (${mode})`, async function () {
       const provider = new AnthropicProvider({
         id: "test",
         name: "test",

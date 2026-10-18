@@ -65,7 +65,7 @@ describe("search activity element", function () {
       statusText: "Done",
       toolArgs: 'query="short tru..."',
       toolResult:
-        'query: MambaDFuse github repository code repository full query text\nsources:\n- GitHub — https://github.com',
+        "query: MambaDFuse github repository code repository full query text\nsources:\n- GitHub — https://github.com",
     };
     assert.equal(
       parseSearchQueryFromEntry(entry),

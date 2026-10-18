@@ -325,7 +325,10 @@ function shouldCountResultTowardBudget(result: ToolExecutionResult): boolean {
     return false;
   }
 
-  if (isSearchToolName(result.toolCall.function.name) && result.status === "failed") {
+  if (
+    isSearchToolName(result.toolCall.function.name) &&
+    result.status === "failed"
+  ) {
     return false;
   }
 

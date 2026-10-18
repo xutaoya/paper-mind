@@ -36,6 +36,7 @@ function toolMessage(id: string, content: string): ChatMessage {
 describe("session context usage", function () {
   let originalZotero: unknown;
   let originalToolkit: unknown;
+
   beforeEach(function () {
     originalZotero = (globalThis as any).Zotero;
     originalToolkit = (globalThis as any).ztoolkit;
@@ -44,10 +45,12 @@ describe("session context usage", function () {
     };
     (globalThis as any).ztoolkit = { log: () => {} };
   });
+
   afterEach(function () {
     (globalThis as any).Zotero = originalZotero;
     (globalThis as any).ztoolkit = originalToolkit;
   });
+
   it("drops compacted history including intermediate tool messages", function () {
     const long = "token ".repeat(800);
     const session = createSession([

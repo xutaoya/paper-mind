@@ -90,7 +90,10 @@ describe("markdownToNoteHtml", function () {
     const html = markdownToNoteHtml(
       "$h'(t) = Ah(t) + Bx(t), \\tag{1}$\n\n$y(t) = Ch(t), \\tag{2}$",
     );
-    assert.include(html, '<pre class="math">$$h\'(t) = Ah(t) + Bx(t), \\tag{1}$$</pre>');
+    assert.include(
+      html,
+      '<pre class="math">$$h\'(t) = Ah(t) + Bx(t), \\tag{1}$$</pre>',
+    );
     assert.include(html, '<pre class="math">$$y(t) = Ch(t), \\tag{2}$$</pre>');
     assert.notMatch(html, /<p>[\s\S]*<pre class="math">[\s\S]*<br/);
   });

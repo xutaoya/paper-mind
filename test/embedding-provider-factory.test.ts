@@ -1,7 +1,10 @@
 import { assert } from "chai";
 import { destroyAuthManager } from "../src/modules/auth";
 import { destroyEmbeddingProviderFactory } from "../src/modules/embedding";
-import { destroyProviderManager } from "../src/modules/providers";
+import {
+  destroyProviderManager,
+  getProviderManager,
+} from "../src/modules/providers";
 
 describe("embedding provider factory", function () {
   let originalZotero: unknown;
@@ -79,7 +82,13 @@ describe("embedding provider factory", function () {
     }
   });
 
-  it("resolves a PaperChat provider without probing the embeddings endpoint", async function () {
+  it("resolves the configured OpenAI provider without probing the embeddings endpoint", async function () {
+    const manager = getProviderManager();
+    manager.updateProviderConfig("openai", {
+      enabled: true,
+      apiKey: "sk-test",
+    } as any);
+    manager.setActiveProvider("openai");
     let fetchCalls = 0;
     (globalThis as any).fetch = async () => {
       fetchCalls += 1;
@@ -92,12 +101,19 @@ describe("embedding provider factory", function () {
     const provider = await factory.getProvider();
 
     assert.isNotNull(provider);
-    assert.equal(provider?.type, "paperchat");
-    assert.equal(provider?.modelId, "paperchat:text-embedding-v4");
+    assert.equal(provider?.type, "openai");
+    assert.include(provider?.modelId || "", "openai:");
     assert.equal(fetchCalls, 0);
   });
 
-  it("uses the current PaperChat base URL for an existing provider", async function () {
+  it("uses the configured OpenAI base URL and reuses the resolved provider", async function () {
+    const manager = getProviderManager();
+    manager.updateProviderConfig("openai", {
+      enabled: true,
+      apiKey: "sk-test",
+      baseUrl: "http://localhost:9002/v1",
+    } as any);
+    manager.setActiveProvider("openai");
     const urls: string[] = [];
     (globalThis as any).fetch = async (input: string | URL | Request) => {
       urls.push(String(input));
@@ -113,14 +129,14 @@ describe("embedding provider factory", function () {
     assert.isNotNull(provider);
 
     await provider!.embed("first");
-    prefStore.set(
-      "extensions.zotero.paperchat.paperchatBaseUrlOverride",
-      "http://localhost:9002",
+    assert.strictEqual(
+      await getEmbeddingProviderFactory().getProvider(),
+      provider,
     );
     await provider!.embed("second");
 
     assert.deepEqual(urls, [
-      "https://paperchat.zotero.store/v1/embeddings",
+      "http://localhost:9002/v1/embeddings",
       "http://localhost:9002/v1/embeddings",
     ]);
   });

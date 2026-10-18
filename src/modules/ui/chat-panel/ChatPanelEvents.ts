@@ -4,7 +4,11 @@
 
 import { config } from "../../../../package.json";
 import type { ChatPanelContext, AttachmentState, SessionInfo } from "./types";
-import { createElement, copyToClipboard, dispatchInputEvent } from "./ChatPanelBuilder";
+import {
+  createElement,
+  copyToClipboard,
+  dispatchInputEvent,
+} from "./ChatPanelBuilder";
 import { updateContextItemBannerForItem } from "./ContextItemBanner";
 import {
   positionContextWindowUsageTooltip,
@@ -488,7 +492,8 @@ export function setupEventHandlers(context: ChatPanelContext): () => void {
   const emptyState = container.querySelector(
     "#chat-empty-state",
   ) as HTMLElement;
-  let conversationNavigator: ReturnType<typeof ensureConversationNavigator> = null;
+  let conversationNavigator: ReturnType<typeof ensureConversationNavigator> =
+    null;
   let submitPending = false;
   const submitMessage = async (): Promise<void> => {
     if (submitPending) return;
@@ -2123,7 +2128,9 @@ async function sendMessage(
  * Only shows user bar when PaperChat provider is active
  */
 export function updateUserBarDisplay(container: HTMLElement): void {
-  const userBar = container.querySelector("#chat-user-bar") as HTMLElement | null;
+  const userBar = container.querySelector(
+    "#chat-user-bar",
+  ) as HTMLElement | null;
   if (userBar) {
     userBar.style.display = "none";
   }

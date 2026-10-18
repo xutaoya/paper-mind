@@ -147,7 +147,9 @@ describe("resolveAssistantSelectionQuote", function () {
       class: "paperchat-reader-section paperchat-reader-section--assistant",
       attrs: { "data-message-id": "assistant-reader" },
     });
-    const body = new FakeElement("div", { class: "paperchat-reader-section-body" });
+    const body = new FakeElement("div", {
+      class: "paperchat-reader-section-body",
+    });
     const text = new FakeText("SSM branch output");
     body.appendChild(text);
     message.appendChild(body);

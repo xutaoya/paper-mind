@@ -1198,8 +1198,8 @@ export function updateAgentActivityPanel(
   ) as HTMLElement | null;
 
   if (isWorking) {
-    workingLabel && (workingLabel.style.display = "inline-block");
-    summaryButton && (summaryButton.style.display = "none");
+    if (workingLabel) workingLabel.style.display = "inline-block";
+    if (summaryButton) summaryButton.style.display = "none";
     activityPanel.classList.remove("paperchat-agent-activity--complete");
     const disclosure = activityPanel.querySelector(
       "[data-agent-activity-disclosure]",
@@ -1214,8 +1214,8 @@ export function updateAgentActivityPanel(
     if (!activityPanel.hasAttribute(ACTIVITY_ENDED_AT_ATTR)) {
       activityPanel.setAttribute(ACTIVITY_ENDED_AT_ATTR, String(Date.now()));
     }
-    workingLabel && (workingLabel.style.display = "none");
-    summaryButton && (summaryButton.style.display = "inline-flex");
+    if (workingLabel) workingLabel.style.display = "none";
+    if (summaryButton) summaryButton.style.display = "inline-flex";
     activityPanel.classList.add("paperchat-agent-activity--complete");
     const disclosure = activityPanel.querySelector(
       "[data-agent-activity-disclosure]",
@@ -1264,8 +1264,8 @@ export function finalizeAgentActivityPanel(
     ".paperchat-agent-activity-viewport",
   ) as HTMLElement | null;
 
-  workingLabel && (workingLabel.style.display = "none");
-  summaryButton && (summaryButton.style.display = "inline-flex");
+  if (workingLabel) workingLabel.style.display = "none";
+  if (summaryButton) summaryButton.style.display = "inline-flex";
 
   activityPanel.__updateAgentActivity?.();
 

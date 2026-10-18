@@ -16,10 +16,10 @@ function hasComposerDraft(
 ): boolean {
   return Boolean(
     messageInput?.value.trim() ||
-      attachmentState.pendingImages.length ||
-      attachmentState.pendingFiles.length ||
-      attachmentState.pendingSelectedText ||
-      attachmentState.pendingQuotedMessages.length,
+    attachmentState.pendingImages.length ||
+    attachmentState.pendingFiles.length ||
+    attachmentState.pendingSelectedText ||
+    attachmentState.pendingQuotedMessages.length,
   );
 }
 

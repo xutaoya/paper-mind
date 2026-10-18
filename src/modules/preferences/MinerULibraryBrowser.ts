@@ -73,10 +73,7 @@ export function formatCreatorLabel(item: Zotero.Item | null): string {
   if (!creators.length) {
     return "-";
   }
-  const primary =
-    creators[0].lastName ||
-    creators[0].firstName ||
-    "-";
+  const primary = creators[0].lastName || creators[0].firstName || "-";
   return creators.length > 1 ? `${primary} 等` : primary;
 }
 
@@ -126,7 +123,10 @@ export function getPdfAttachment(item: Zotero.Item): Zotero.Item | null {
   return null;
 }
 
-function resolveTitle(attachment: Zotero.Item, parent: Zotero.Item | null): string {
+function resolveTitle(
+  attachment: Zotero.Item,
+  parent: Zotero.Item | null,
+): string {
   if (parent) {
     const title = String(parent.getField("title") || "").trim();
     if (title) {
@@ -221,7 +221,9 @@ export async function buildCollectionTree(
   };
 }
 
-export function buildTagSummary(pdfAttachments: readonly Zotero.Item[]): MineruTagSummary {
+export function buildTagSummary(
+  pdfAttachments: readonly Zotero.Item[],
+): MineruTagSummary {
   const tagCounts = new Map<string, number>();
   let tagged = 0;
   let untagged = 0;
@@ -326,7 +328,9 @@ export function buildLibraryRows(
     }
   }
 
-  return rows.sort((left, right) => right.dateAdded.localeCompare(left.dateAdded));
+  return rows.sort((left, right) =>
+    right.dateAdded.localeCompare(left.dateAdded),
+  );
 }
 
 export async function listPdfAttachmentsForScope(

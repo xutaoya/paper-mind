@@ -11,7 +11,9 @@ export interface BookmarkTurnContent {
   assistantMessageId?: string;
 }
 
-type SourceGroupFragment = ReturnType<typeof extractSourceGroupFragments>[number];
+type SourceGroupFragment = ReturnType<
+  typeof extractSourceGroupFragments
+>[number];
 
 /** Strip copied "## Thinking" sections from reader-facing assistant content. */
 export function stripReaderThinkingSection(content: string): string {
@@ -20,7 +22,9 @@ export function stripReaderThinkingSection(content: string): string {
   if (firstLine !== "## Thinking") {
     return trimmed;
   }
-  return trimmed.replace(/^## Thinking\s*\r?\n[\s\S]*?(?:\r?\n\r?\n|$)/, "").trim();
+  return trimmed
+    .replace(/^## Thinking\s*\r?\n[\s\S]*?(?:\r?\n\r?\n|$)/, "")
+    .trim();
 }
 
 function escapeXmlAttribute(value: string): string {
@@ -162,10 +166,7 @@ export function resolveBookmarkJumpMessageId(
   if (!hasAssistant) {
     return null;
   }
-  const user = findPrecedingUserMessage(
-    [...messages],
-    assistantMessageId,
-  );
+  const user = findPrecedingUserMessage([...messages], assistantMessageId);
   return user?.id ?? assistantMessageId;
 }
 

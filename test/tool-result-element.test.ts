@@ -35,11 +35,7 @@ describe("tool result element", function () {
   });
 
   it("opens while running and collapses after completion by default", function () {
-    assert.isTrue(
-      resolveToolResultDefaultOpen("running", "active", true),
-    );
-    assert.isFalse(
-      resolveToolResultDefaultOpen("success", "complete", true),
-    );
+    assert.isTrue(resolveToolResultDefaultOpen("running", "active", true));
+    assert.isFalse(resolveToolResultDefaultOpen("success", "complete", true));
   });
 });

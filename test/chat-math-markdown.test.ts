@@ -55,7 +55,10 @@ describe("chat math markdown helpers", function () {
     const input =
       '下面从**核心思想**、架构、关键设计到**为什么它能提供"全特征"**逐层说明。';
     const processed = preserveStrongEmphasisAsHtml(input);
-    assert.include(processed, "<strong>为什么它能提供&quot;全特征&quot;</strong>");
+    assert.include(
+      processed,
+      "<strong>为什么它能提供&quot;全特征&quot;</strong>",
+    );
     assert.notInclude(processed, '**为什么它能提供"全特征"**');
     assert.include(processed, "**核心思想**");
   });
@@ -68,7 +71,7 @@ describe("chat math markdown helpers", function () {
       processed,
       "<strong>&quot;四维图像张量如何被摊平成一个可以做矩阵乘法的二维矩阵&quot;</strong>",
     );
-    assert.notInclude(processed, "**\"四维图像张量");
+    assert.notInclude(processed, '**"四维图像张量');
   });
 
   it("preserves quoted bold spans before ascii colons and at line end", function () {
@@ -80,7 +83,7 @@ describe("chat math markdown helpers", function () {
   });
 
   it("leaves ordinary bold markdown unchanged", function () {
-    const input = "这是**普通加粗**文本";
+    const input = "这是 **普通加粗** 文本";
     assert.equal(preserveStrongEmphasisAsHtml(input), input);
   });
 

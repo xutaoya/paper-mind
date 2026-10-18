@@ -70,8 +70,7 @@ function summarizeApprovalArgs(args: Record<string, unknown>): string {
   return entries
     .slice(0, 2)
     .map(([key, value]) => {
-      const text =
-        typeof value === "string" ? value : JSON.stringify(value);
+      const text = typeof value === "string" ? value : JSON.stringify(value);
       return `${key}: ${text.length > 48 ? `${text.slice(0, 48)}…` : text}`;
     })
     .join(" · ");

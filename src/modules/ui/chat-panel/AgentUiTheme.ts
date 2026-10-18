@@ -123,17 +123,17 @@ export function applyAgentActivityTheme(
       summary.style.color = theme.textMuted;
     }
 
-    panel.querySelectorAll(".paperchat-agent-activity-live-tokens").forEach(
-      (token) => {
+    panel
+      .querySelectorAll(".paperchat-agent-activity-live-tokens")
+      .forEach((token) => {
         (token as HTMLElement).style.color = theme.textMuted;
-      },
-    );
+      });
 
-    panel.querySelectorAll(".paperchat-agent-activity-text-row").forEach(
-      (row) => {
+    panel
+      .querySelectorAll(".paperchat-agent-activity-text-row")
+      .forEach((row) => {
         (row as HTMLElement).style.color = theme.textMuted;
-      },
-    );
+      });
 
     panel
       .querySelectorAll(".paperchat-agent-activity-reasoning-stream")
@@ -200,31 +200,31 @@ export function applyTodoListTheme(
     root.style.borderColor = surface.border;
     root.style.boxShadow = surface.boxShadow;
 
-    const title = root.querySelector(".paperchat-todo-list-title") as
-      | HTMLElement
-      | null;
+    const title = root.querySelector(
+      ".paperchat-todo-list-title",
+    ) as HTMLElement | null;
     if (title) {
       title.style.color = theme.textPrimary;
     }
 
-    const count = root.querySelector(".paperchat-todo-list-count") as
-      | HTMLElement
-      | null;
+    const count = root.querySelector(
+      ".paperchat-todo-list-count",
+    ) as HTMLElement | null;
     if (count) {
       const allComplete = root.getAttribute("data-all-complete") === "true";
       count.style.color = allComplete ? semantic.success : theme.textMuted;
     }
 
-    const chevron = root.querySelector(".paperchat-todo-list-chevron") as
-      | HTMLElement
-      | null;
+    const chevron = root.querySelector(
+      ".paperchat-todo-list-chevron",
+    ) as HTMLElement | null;
     if (chevron) {
       chevron.style.color = theme.textMuted;
     }
 
-    const headerIcon = root.querySelector(".paperchat-todo-header-icon") as
-      | HTMLElement
-      | null;
+    const headerIcon = root.querySelector(
+      ".paperchat-todo-header-icon",
+    ) as HTMLElement | null;
     if (headerIcon) {
       const allComplete = root.getAttribute("data-all-complete") === "true";
       headerIcon.style.color = allComplete ? semantic.success : theme.textMuted;
@@ -233,13 +233,15 @@ export function applyTodoListTheme(
     root.querySelectorAll(".paperchat-todo-item").forEach((item) => {
       const row = item as HTMLElement;
       const status = row.getAttribute("data-todo-status");
-      const titleWrap = row.querySelector("span:nth-child(2)") as
-        | HTMLElement
-        | null;
-      const detail = row.querySelector("span:nth-child(3)") as HTMLElement | null;
-      const icon = row.querySelector(".paperchat-todo-status-icon") as
-        | SVGSVGElement
-        | null;
+      const titleWrap = row.querySelector(
+        "span:nth-child(2)",
+      ) as HTMLElement | null;
+      const detail = row.querySelector(
+        "span:nth-child(3)",
+      ) as HTMLElement | null;
+      const icon = row.querySelector(
+        ".paperchat-todo-status-icon",
+      ) as SVGSVGElement | null;
 
       if (icon) {
         icon.style.color =
@@ -252,7 +254,9 @@ export function applyTodoListTheme(
 
       if (titleWrap) {
         titleWrap.style.color =
-          status === "pending" || status === "completed" || status === "cancelled"
+          status === "pending" ||
+          status === "completed" ||
+          status === "cancelled"
             ? theme.textMuted
             : theme.textPrimary;
       }
@@ -275,9 +279,9 @@ export function applyApprovalCardTheme(
     card.style.borderColor = theme.borderColor;
 
     const verdict = card.getAttribute("data-approval-verdict");
-    const icon = card.querySelector(".paperchat-approval-card-icon") as
-      | HTMLElement
-      | null;
+    const icon = card.querySelector(
+      ".paperchat-approval-card-icon",
+    ) as HTMLElement | null;
     if (icon) {
       icon.style.color =
         verdict === "allowed"
@@ -312,8 +316,9 @@ export function applyApprovalCardTheme(
       }
     });
 
-    card.querySelectorAll(".paperchat-approval-status-badge").forEach(
-      (badge) => {
+    card
+      .querySelectorAll(".paperchat-approval-status-badge")
+      .forEach((badge) => {
         const el = badge as HTMLElement;
         const tone = (el.getAttribute("data-badge-tone") ||
           "pending") as AgentBadgeTone;
@@ -321,12 +326,11 @@ export function applyApprovalCardTheme(
         el.style.color = colors.color;
         el.style.borderColor = colors.border;
         el.style.background = colors.background;
-      },
-    );
+      });
 
-    const meta = card.querySelector(".paperchat-approval-card-meta") as
-      | HTMLElement
-      | null;
+    const meta = card.querySelector(
+      ".paperchat-approval-card-meta",
+    ) as HTMLElement | null;
     if (meta) {
       meta.style.borderTopColor = theme.borderColor;
     }

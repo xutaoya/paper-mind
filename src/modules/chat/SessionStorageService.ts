@@ -677,7 +677,9 @@ export class SessionStorageService {
           reasoning,
           timestamp: now,
           turnStartedAt:
-            options?.turnStartedAt ?? previousMessage.turnStartedAt ?? undefined,
+            options?.turnStartedAt ??
+            previousMessage.turnStartedAt ??
+            undefined,
           streamingState: options?.streamingState ?? undefined,
           evidence: nextEvidence,
           sourceItemKeys:

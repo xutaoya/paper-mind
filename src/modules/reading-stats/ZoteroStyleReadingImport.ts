@@ -86,10 +86,7 @@ function getStyleStorageMode(): "file" | "note" | null {
 function findItemByKeyAcrossLibraries(itemKey: string): Zotero.Item | null {
   try {
     for (const library of Zotero.Libraries.getAll()) {
-      const item = Zotero.Items.getByLibraryAndKey(
-        library.libraryID,
-        itemKey,
-      );
+      const item = Zotero.Items.getByLibraryAndKey(library.libraryID, itemKey);
       if (item && !item.deleted) {
         return item;
       }
@@ -112,7 +109,9 @@ function getItemDateModifiedMs(item: Zotero.Item): number {
   return 0;
 }
 
-async function resolveStyleJsonPath(configured: string): Promise<string | null> {
+async function resolveStyleJsonPath(
+  configured: string,
+): Promise<string | null> {
   const trimmed = configured.trim();
   if (!trimmed) {
     return null;

@@ -63,8 +63,10 @@ async function loadDailyMessageCounts(
       [minTimestamp],
     )) || [];
 
-  const daily: Record<string, { user: number; assistant: number; total: number }> =
-    {};
+  const daily: Record<
+    string,
+    { user: number; assistant: number; total: number }
+  > = {};
   for (const row of rows) {
     const timestamp = Number((row as { timestamp: number }).timestamp);
     if (!Number.isFinite(timestamp)) {

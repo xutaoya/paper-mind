@@ -115,19 +115,34 @@ export function createContextWindowUsageIndicator(
     { id: "chat-context-usage-tooltip", role: "tooltip" },
   );
 
-  const title = createElement(doc, "div", {
-    fontSize: "12px",
-    fontWeight: "600",
-    lineHeight: "18px",
-  }, { id: "chat-context-usage-title" });
-  const percent = createElement(doc, "div", {
-    fontSize: "12px",
-    lineHeight: "18px",
-  }, { id: "chat-context-usage-percent" });
-  const tokens = createElement(doc, "div", {
-    fontSize: "12px",
-    lineHeight: "18px",
-  }, { id: "chat-context-usage-tokens" });
+  const title = createElement(
+    doc,
+    "div",
+    {
+      fontSize: "12px",
+      fontWeight: "600",
+      lineHeight: "18px",
+    },
+    { id: "chat-context-usage-title" },
+  );
+  const percent = createElement(
+    doc,
+    "div",
+    {
+      fontSize: "12px",
+      lineHeight: "18px",
+    },
+    { id: "chat-context-usage-percent" },
+  );
+  const tokens = createElement(
+    doc,
+    "div",
+    {
+      fontSize: "12px",
+      lineHeight: "18px",
+    },
+    { id: "chat-context-usage-tokens" },
+  );
 
   tooltip.appendChild(title);
   tooltip.appendChild(percent);

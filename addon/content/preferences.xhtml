@@ -74,247 +74,266 @@
           class="paperchat-prefs-panel-title"
           data-l10n-id="pref-nav-models"
         ></html:h2>
-  <!-- Main layout: Sidebar + Content -->
-  <hbox flex="1" style="min-height: 400px">
-    <!-- Provider Sidebar -->
-    <vbox class="paperchat-prefs-provider-sidebar">
-      <label><html:h3 data-l10n-id="pref-providers"></html:h3></label>
+        <!-- Main layout: Sidebar + Content -->
+        <hbox flex="1" style="min-height: 400px">
+          <!-- Provider Sidebar -->
+          <vbox class="paperchat-prefs-provider-sidebar">
+            <label><html:h3 data-l10n-id="pref-providers"></html:h3></label>
 
-      <vbox id="pref-provider-list">
-        <!-- Provider items will be populated by JS -->
-      </vbox>
+            <vbox id="pref-provider-list">
+              <!-- Provider items will be populated by JS -->
+            </vbox>
 
-      <!-- Add Custom Provider Button -->
-      <button
-        id="pref-add-provider-btn"
-        data-l10n-id="pref-add-provider"
-      ></button>
-    </vbox>
-
-    <!-- Provider Content Panel -->
-    <vbox flex="1" class="paperchat-prefs-provider-content">
-
-      <!-- API Key Provider Panel Template (used for OpenAI, Claude, Gemini, etc.) -->
-      <vbox id="pref-panel-apikey" class="provider-panel">
-        <label
-          id="pref-provider-title"
-          style="font-size: 16px; font-weight: bold; margin-bottom: 8px"
-        ></label>
-        <label
-          id="pref-provider-description"
-          style="margin-bottom: 12px; opacity: 0.7"
-        ></label>
-
-        <!-- API Key -->
-        <hbox align="center" style="margin-bottom: 8px">
-          <label
-            for="pref-provider-apikey"
-            data-l10n-id="pref-api-key"
-            style="width: 70px; text-align: right"
-          ></label>
-          <html:input
-            type="password"
-            id="pref-provider-apikey"
-            style="flex: 1; margin-left: 8px; min-width: 150px"
-          ></html:input>
-          <button
-            id="pref-toggle-apikey"
-            data-l10n-id="pref-show-key"
-            style="margin-left: 8px; cursor: pointer"
-          ></button>
-        </hbox>
-
-        <!-- Base URL -->
-        <hbox align="center" style="margin-bottom: 8px">
-          <label
-            for="pref-provider-baseurl"
-            data-l10n-id="pref-base-url"
-            style="width: 70px; text-align: right"
-          ></label>
-          <html:input
-            type="text"
-            id="pref-provider-baseurl"
-            style="flex: 1; margin-left: 8px; min-width: 150px"
-          ></html:input>
-        </hbox>
-
-        <!-- Model Selection -->
-        <hbox align="center" style="margin-bottom: 8px">
-          <label
-            for="pref-provider-model"
-            data-l10n-id="pref-model"
-            style="width: 70px; text-align: right"
-          ></label>
-          <menulist
-            id="pref-provider-model"
-            style="flex: 1; margin-left: 8px; min-width: 120px"
-          >
-            <menupopup id="pref-provider-model-popup">
-              <!-- Models populated by JS -->
-            </menupopup>
-          </menulist>
-          <button
-            id="pref-refresh-models"
-            data-l10n-id="pref-refresh-models"
-            style="margin-left: 8px; cursor: pointer"
-          ></button>
-        </hbox>
-
-        <!-- Model List -->
-        <vbox style="margin-top: 12px; margin-bottom: 8px">
-          <hbox align="center" style="margin-bottom: 8px">
-            <label
-              data-l10n-id="pref-model-list"
-              style="width: 70px; text-align: right; font-weight: bold"
-            ></label>
+            <!-- Add Custom Provider Button -->
             <button
-              id="pref-add-model-btn"
-              data-l10n-id="pref-add-model"
-              style="margin-left: 8px; cursor: pointer"
+              id="pref-add-provider-btn"
+              data-l10n-id="pref-add-provider"
             ></button>
-          </hbox>
-          <vbox
-            id="pref-model-list"
-            style="
-              margin-left: 78px;
-              max-height: 120px;
-              overflow-y: auto;
-              border: 1px solid var(--color-border, #ddd);
-              border-radius: 4px;
-              padding: 4px;
-            "
-          >
-            <!-- Model list populated by JS -->
           </vbox>
-        </vbox>
 
-        <!-- Advanced Options (Collapsible) -->
-        <html:details style="margin-top: 12px; margin-bottom: 12px">
-          <html:summary
-            data-l10n-id="pref-advanced-options"
-            style="cursor: pointer; font-weight: bold; margin-bottom: 8px"
-          ></html:summary>
+          <!-- Provider Content Panel -->
+          <vbox flex="1" class="paperchat-prefs-provider-content">
+            <!-- API Key Provider Panel Template (used for OpenAI, Claude, Gemini, etc.) -->
+            <vbox id="pref-panel-apikey" class="provider-panel">
+              <label
+                id="pref-provider-title"
+                style="font-size: 16px; font-weight: bold; margin-bottom: 8px"
+              ></label>
+              <label
+                id="pref-provider-description"
+                style="margin-bottom: 12px; opacity: 0.7"
+              ></label>
 
-          <!-- Max Tokens -->
-          <hbox align="center" style="margin-bottom: 8px; margin-left: 12px">
-            <label
-              for="pref-provider-maxtokens"
-              data-l10n-id="pref-max-tokens"
-              style="width: 70px; text-align: right"
-            ></label>
-            <html:input
-              type="number"
-              id="pref-provider-maxtokens"
-              style="width: 100px; margin-left: 8px"
-              min="256"
-              max="128000"
-            ></html:input>
-          </hbox>
+              <!-- API Key -->
+              <hbox align="center" style="margin-bottom: 8px">
+                <label
+                  for="pref-provider-apikey"
+                  data-l10n-id="pref-api-key"
+                  style="width: 70px; text-align: right"
+                ></label>
+                <html:input
+                  type="password"
+                  id="pref-provider-apikey"
+                  style="flex: 1; margin-left: 8px; min-width: 150px"
+                ></html:input>
+                <button
+                  id="pref-toggle-apikey"
+                  data-l10n-id="pref-show-key"
+                  style="margin-left: 8px; cursor: pointer"
+                ></button>
+              </hbox>
 
-          <!-- Temperature -->
-          <hbox align="center" style="margin-bottom: 8px; margin-left: 12px">
-            <label
-              for="pref-provider-temperature"
-              data-l10n-id="pref-temperature"
-              style="width: 70px; text-align: right"
-            ></label>
-            <html:input
-              type="number"
-              id="pref-provider-temperature"
-              style="width: 80px; margin-left: 8px"
-              min="0"
-              max="2"
-              step="0.1"
-            ></html:input>
-          </hbox>
+              <!-- Base URL -->
+              <hbox align="center" style="margin-bottom: 8px">
+                <label
+                  for="pref-provider-baseurl"
+                  data-l10n-id="pref-base-url"
+                  style="width: 70px; text-align: right"
+                ></label>
+                <html:input
+                  type="text"
+                  id="pref-provider-baseurl"
+                  style="flex: 1; margin-left: 8px; min-width: 150px"
+                ></html:input>
+              </hbox>
 
-          <!-- System Prompt -->
-          <hbox align="start" style="margin-bottom: 8px; margin-left: 12px">
-            <label
-              for="pref-provider-systemprompt"
-              data-l10n-id="pref-system-prompt"
-              style="width: 70px; text-align: right; margin-top: 4px"
-            ></label>
-            <html:textarea
-              id="pref-provider-systemprompt"
-              style="flex: 1; height: 60px; margin-left: 8px; min-width: 200px"
-            ></html:textarea>
-          </hbox>
+              <!-- Model Selection -->
+              <hbox align="center" style="margin-bottom: 8px">
+                <label
+                  for="pref-provider-model"
+                  data-l10n-id="pref-model"
+                  style="width: 70px; text-align: right"
+                ></label>
+                <menulist
+                  id="pref-provider-model"
+                  style="flex: 1; margin-left: 8px; min-width: 120px"
+                >
+                  <menupopup id="pref-provider-model-popup">
+                    <!-- Models populated by JS -->
+                  </menupopup>
+                </menulist>
+                <button
+                  id="pref-refresh-models"
+                  data-l10n-id="pref-refresh-models"
+                  style="margin-left: 8px; cursor: pointer"
+                ></button>
+              </hbox>
 
-          <!-- Extra Request Body -->
-          <hbox align="start" style="margin-bottom: 8px; margin-left: 12px">
-            <label
-              for="pref-provider-extra-request-body"
-              data-l10n-id="pref-extra-request-body"
-              style="width: 70px; text-align: right; margin-top: 4px"
-            ></label>
-            <html:textarea
-              id="pref-provider-extra-request-body"
-              style="
-                flex: 1;
-                height: 80px;
-                margin-left: 8px;
-                min-width: 200px;
-                font-family: monospace;
-              "
-            ></html:textarea>
-          </hbox>
+              <!-- Model List -->
+              <vbox style="margin-top: 12px; margin-bottom: 8px">
+                <hbox align="center" style="margin-bottom: 8px">
+                  <label
+                    data-l10n-id="pref-model-list"
+                    style="width: 70px; text-align: right; font-weight: bold"
+                  ></label>
+                  <button
+                    id="pref-add-model-btn"
+                    data-l10n-id="pref-add-model"
+                    style="margin-left: 8px; cursor: pointer"
+                  ></button>
+                </hbox>
+                <vbox
+                  id="pref-model-list"
+                  style="
+                    margin-left: 78px;
+                    max-height: 120px;
+                    overflow-y: auto;
+                    border: 1px solid var(--color-border, #ddd);
+                    border-radius: 4px;
+                    padding: 4px;
+                  "
+                >
+                  <!-- Model list populated by JS -->
+                </vbox>
+              </vbox>
 
-          <!-- Per-Model Extra Request Body -->
-          <hbox align="start" style="margin-bottom: 8px; margin-left: 12px">
-            <label
-              for="pref-provider-model-extra-request-body"
-              data-l10n-id="pref-model-extra-request-body"
-              style="width: 70px; text-align: right; margin-top: 4px"
-            ></label>
-            <html:textarea
-              id="pref-provider-model-extra-request-body"
-              style="
-                flex: 1;
-                height: 100px;
-                margin-left: 8px;
-                min-width: 200px;
-                font-family: monospace;
-              "
-            ></html:textarea>
-          </hbox>
-        </html:details>
+              <!-- Advanced Options (Collapsible) -->
+              <html:details style="margin-top: 12px; margin-bottom: 12px">
+                <html:summary
+                  data-l10n-id="pref-advanced-options"
+                  style="cursor: pointer; font-weight: bold; margin-bottom: 8px"
+                ></html:summary>
 
-        <!-- Test Connection & Delete -->
-        <hbox align="center" style="margin-top: 16px">
-          <button
-            id="pref-test-connection"
-            data-l10n-id="pref-test-connection"
-            style="text-align: center; cursor: pointer"
-          ></button>
-          <label id="pref-test-result" style="margin-left: 12px"></label>
-          <spacer flex="1" />
-          <button
-            id="pref-delete-provider"
-            data-l10n-id="pref-delete-provider"
-            hidden="true"
-            style="color: #c00; cursor: pointer"
-          ></button>
+                <!-- Max Tokens -->
+                <hbox
+                  align="center"
+                  style="margin-bottom: 8px; margin-left: 12px"
+                >
+                  <label
+                    for="pref-provider-maxtokens"
+                    data-l10n-id="pref-max-tokens"
+                    style="width: 70px; text-align: right"
+                  ></label>
+                  <html:input
+                    type="number"
+                    id="pref-provider-maxtokens"
+                    style="width: 100px; margin-left: 8px"
+                    min="256"
+                    max="128000"
+                  ></html:input>
+                </hbox>
+
+                <!-- Temperature -->
+                <hbox
+                  align="center"
+                  style="margin-bottom: 8px; margin-left: 12px"
+                >
+                  <label
+                    for="pref-provider-temperature"
+                    data-l10n-id="pref-temperature"
+                    style="width: 70px; text-align: right"
+                  ></label>
+                  <html:input
+                    type="number"
+                    id="pref-provider-temperature"
+                    style="width: 80px; margin-left: 8px"
+                    min="0"
+                    max="2"
+                    step="0.1"
+                  ></html:input>
+                </hbox>
+
+                <!-- System Prompt -->
+                <hbox
+                  align="start"
+                  style="margin-bottom: 8px; margin-left: 12px"
+                >
+                  <label
+                    for="pref-provider-systemprompt"
+                    data-l10n-id="pref-system-prompt"
+                    style="width: 70px; text-align: right; margin-top: 4px"
+                  ></label>
+                  <html:textarea
+                    id="pref-provider-systemprompt"
+                    style="
+                      flex: 1;
+                      height: 60px;
+                      margin-left: 8px;
+                      min-width: 200px;
+                    "
+                  ></html:textarea>
+                </hbox>
+
+                <!-- Extra Request Body -->
+                <hbox
+                  align="start"
+                  style="margin-bottom: 8px; margin-left: 12px"
+                >
+                  <label
+                    for="pref-provider-extra-request-body"
+                    data-l10n-id="pref-extra-request-body"
+                    style="width: 70px; text-align: right; margin-top: 4px"
+                  ></label>
+                  <html:textarea
+                    id="pref-provider-extra-request-body"
+                    style="
+                      flex: 1;
+                      height: 80px;
+                      margin-left: 8px;
+                      min-width: 200px;
+                      font-family: monospace;
+                    "
+                  ></html:textarea>
+                </hbox>
+
+                <!-- Per-Model Extra Request Body -->
+                <hbox
+                  align="start"
+                  style="margin-bottom: 8px; margin-left: 12px"
+                >
+                  <label
+                    for="pref-provider-model-extra-request-body"
+                    data-l10n-id="pref-model-extra-request-body"
+                    style="width: 70px; text-align: right; margin-top: 4px"
+                  ></label>
+                  <html:textarea
+                    id="pref-provider-model-extra-request-body"
+                    style="
+                      flex: 1;
+                      height: 100px;
+                      margin-left: 8px;
+                      min-width: 200px;
+                      font-family: monospace;
+                    "
+                  ></html:textarea>
+                </hbox>
+              </html:details>
+
+              <!-- Test Connection & Delete -->
+              <hbox align="center" style="margin-top: 16px">
+                <button
+                  id="pref-test-connection"
+                  data-l10n-id="pref-test-connection"
+                  style="text-align: center; cursor: pointer"
+                ></button>
+                <label id="pref-test-result" style="margin-left: 12px"></label>
+                <spacer flex="1" />
+                <button
+                  id="pref-delete-provider"
+                  data-l10n-id="pref-delete-provider"
+                  hidden="true"
+                  style="color: #c00; cursor: pointer"
+                ></button>
+              </hbox>
+            </vbox>
+          </vbox>
         </hbox>
-      </vbox>
-    </vbox>
-  </hbox>
 
-  <html:div class="paperchat-prefs-block">
-    <label><html:h3 data-l10n-id="pref-active-provider"></html:h3></label>
-    <hbox align="center">
-      <label
-        for="pref-active-provider-select"
-        data-l10n-id="pref-current-provider"
-        style="margin-right: 8px"
-      ></label>
-      <menulist id="pref-active-provider-select" style="width: 200px">
-        <menupopup id="pref-active-provider-popup">
-          <!-- Populated by JS -->
-        </menupopup>
-      </menulist>
-    </hbox>
-  </html:div>
+        <html:div class="paperchat-prefs-block">
+          <label><html:h3 data-l10n-id="pref-active-provider"></html:h3></label>
+          <hbox align="center">
+            <label
+              for="pref-active-provider-select"
+              data-l10n-id="pref-current-provider"
+              style="margin-right: 8px"
+            ></label>
+            <menulist id="pref-active-provider-select" style="width: 200px">
+              <menupopup id="pref-active-provider-popup">
+                <!-- Populated by JS -->
+              </menupopup>
+            </menulist>
+          </hbox>
+        </html:div>
       </html:section>
 
       <html:section
@@ -327,191 +346,205 @@
           class="paperchat-prefs-panel-title"
           data-l10n-id="pref-nav-pdf"
         ></html:h2>
-    <hbox align="center">
-      <label
-        data-l10n-id="pref-upload-raw-pdf"
-        style="margin-right: 8px"
-      ></label>
-      <checkbox id="pref-upload-raw-pdf-checkbox" native="true" />
-    </hbox>
-    <label
-      data-l10n-id="pref-upload-raw-pdf-desc"
-      style="font-size: 11px; color: #666; margin-top: 4px; margin-left: 2px"
-    ></label>
-
-    <separator class="thin" style="margin: 14px 0" />
-
-    <html:div id="pref-mineru-cache-panel" class="mineru-pref-page mineru-pref-page--embedded">
-      <html:section class="mineru-pref-config">
-        <html:h4
-          class="mineru-pref-config-title"
-          data-l10n-id="pref-mineru-pane-title"
-        ></html:h4>
-        <html:div class="mineru-pref-config-desc-row">
-          <html:p
-            class="mineru-pref-config-desc"
-            data-l10n-id="pref-mineru-pane-desc"
-          ></html:p>
-          <html:a
-            id="pref-mineru-apply-link"
-            class="mineru-pref-apply-link"
-            href="#"
-            data-l10n-id="pref-api-apply-link"
-          ></html:a>
-        </html:div>
-
-        <html:div class="mineru-pref-config-row">
-          <label data-l10n-id="pref-use-mineru-on-failure"></label>
-          <checkbox id="pref-mineru-enable-checkbox" native="true" />
-        </html:div>
-
-        <html:div class="mineru-pref-config-row" style="margin-top: 10px">
-          <label data-l10n-id="pref-mineru-auto-cache-on-import"></label>
-          <checkbox
-            id="pref-mineru-auto-cache-on-import-checkbox"
-            native="true"
-          />
-        </html:div>
-        <label
-          data-l10n-id="pref-mineru-auto-cache-on-import-desc"
-          class="mineru-pref-inline-desc"
-        ></label>
-
-        <html:div class="mineru-pref-config-row" style="margin-top: 10px">
+        <hbox align="center">
           <label
-            class="mineru-pref-config-label"
-            for="pref-mineru-api-token"
-            data-l10n-id="pref-mineru-api-token"
+            data-l10n-id="pref-upload-raw-pdf"
+            style="margin-right: 8px"
           ></label>
-          <html:input
-            type="password"
-            id="pref-mineru-api-token"
-            class="mineru-pref-token-input"
-            autocomplete="off"
-          ></html:input>
-          <html:button
-            id="pref-mineru-test-btn"
-            class="mineru-pref-btn mineru-pref-btn-secondary"
-            data-l10n-id="pref-mineru-test"
-          ></html:button>
-        </html:div>
+          <checkbox id="pref-upload-raw-pdf-checkbox" native="true" />
+        </hbox>
         <label
-          id="pref-mineru-test-result"
-          class="mineru-pref-test-result"
-          hidden="true"
+          data-l10n-id="pref-upload-raw-pdf-desc"
+          style="
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+            margin-left: 2px;
+          "
         ></label>
-      </html:section>
 
-      <html:details class="mineru-pref-cache-details">
-        <html:summary
-          class="mineru-pref-cache-details-summary"
-          data-l10n-id="pref-mineru-cache-title"
-        ></html:summary>
+        <separator class="thin" style="margin: 14px 0" />
 
-        <html:section class="mineru-pref-cache">
-          <html:div class="mineru-pref-cache-header">
-            <html:div class="mineru-pref-progress-wrap">
-              <progress
-                id="pref-mineru-cache-progress"
-                mode="determined"
-                value="0"
-                max="100"
-              ></progress>
+        <html:div
+          id="pref-mineru-cache-panel"
+          class="mineru-pref-page mineru-pref-page--embedded"
+        >
+          <html:section class="mineru-pref-config">
+            <html:h4
+              class="mineru-pref-config-title"
+              data-l10n-id="pref-mineru-pane-title"
+            ></html:h4>
+            <html:div class="mineru-pref-config-desc-row">
+              <html:p
+                class="mineru-pref-config-desc"
+                data-l10n-id="pref-mineru-pane-desc"
+              ></html:p>
+              <html:a
+                id="pref-mineru-apply-link"
+                class="mineru-pref-apply-link"
+                href="#"
+                data-l10n-id="pref-api-apply-link"
+              ></html:a>
+            </html:div>
+
+            <html:div class="mineru-pref-config-row">
+              <label data-l10n-id="pref-use-mineru-on-failure"></label>
+              <checkbox id="pref-mineru-enable-checkbox" native="true" />
+            </html:div>
+
+            <html:div class="mineru-pref-config-row" style="margin-top: 10px">
+              <label data-l10n-id="pref-mineru-auto-cache-on-import"></label>
+              <checkbox
+                id="pref-mineru-auto-cache-on-import-checkbox"
+                native="true"
+              />
             </html:div>
             <label
-              id="pref-mineru-cache-summary"
-              class="mineru-pref-summary"
+              data-l10n-id="pref-mineru-auto-cache-on-import-desc"
+              class="mineru-pref-inline-desc"
             ></label>
-          </html:div>
 
-          <html:div class="mineru-pref-toolbar">
-            <html:button
-              id="pref-mineru-cache-start-all"
-              class="mineru-pref-btn mineru-pref-btn-primary"
-              data-l10n-id="pref-mineru-cache-start-all"
-            ></html:button>
-            <html:button
-              id="pref-mineru-cache-start-selected"
-              class="mineru-pref-btn mineru-pref-btn-secondary"
-              data-l10n-id="pref-mineru-cache-start-selected"
-            ></html:button>
-            <html:button
-              id="pref-mineru-cache-repair"
-              class="mineru-pref-btn mineru-pref-btn-secondary"
-              data-l10n-id="pref-mineru-cache-repair"
-            ></html:button>
-            <html:button
-              id="pref-mineru-cache-delete-all"
-              class="mineru-pref-btn mineru-pref-btn-danger"
-              data-l10n-id="pref-mineru-cache-delete-all"
-            ></html:button>
-            <html:button
-              id="pref-mineru-cache-refresh"
-              class="mineru-pref-btn mineru-pref-btn-ghost"
-              data-l10n-id="pref-mineru-cache-refresh"
-            ></html:button>
-          </html:div>
+            <html:div class="mineru-pref-config-row" style="margin-top: 10px">
+              <label
+                class="mineru-pref-config-label"
+                for="pref-mineru-api-token"
+                data-l10n-id="pref-mineru-api-token"
+              ></label>
+              <html:input
+                type="password"
+                id="pref-mineru-api-token"
+                class="mineru-pref-token-input"
+                autocomplete="off"
+              ></html:input>
+              <html:button
+                id="pref-mineru-test-btn"
+                class="mineru-pref-btn mineru-pref-btn-secondary"
+                data-l10n-id="pref-mineru-test"
+              ></html:button>
+            </html:div>
+            <label
+              id="pref-mineru-test-result"
+              class="mineru-pref-test-result"
+              hidden="true"
+            ></label>
+          </html:section>
 
-          <label
-            id="pref-mineru-cache-status"
-            class="mineru-pref-status-line"
-            hidden="true"
-          ></label>
+          <html:details class="mineru-pref-cache-details">
+            <html:summary
+              class="mineru-pref-cache-details-summary"
+              data-l10n-id="pref-mineru-cache-title"
+            ></html:summary>
 
-          <html:div id="pref-mineru-cache-layout" class="mineru-pref-layout">
-            <html:aside class="mineru-pref-sidebar">
-              <html:div class="mineru-pref-sidebar-body">
-                <html:div
-                  id="pref-mineru-cache-collections"
-                  class="mineru-pref-tree"
-                ></html:div>
-                <html:div class="mineru-pref-tags-section">
-                  <html:div class="mineru-pref-tags-header">
-                    <html:span
-                      class="mineru-pref-sidebar-title"
-                      data-l10n-id="pref-mineru-cache-tags-title"
-                    ></html:span>
-                    <html:span
-                      id="pref-mineru-cache-tags-total"
-                      class="mineru-pref-tags-total"
-                    ></html:span>
-                  </html:div>
-                  <html:div
-                    id="pref-mineru-cache-tags-summary"
-                    class="mineru-pref-tags-summary"
-                  ></html:div>
-                  <html:div
-                    id="pref-mineru-cache-tags"
-                    class="mineru-pref-tags"
-                  ></html:div>
+            <html:section class="mineru-pref-cache">
+              <html:div class="mineru-pref-cache-header">
+                <html:div class="mineru-pref-progress-wrap">
+                  <progress
+                    id="pref-mineru-cache-progress"
+                    mode="determined"
+                    value="0"
+                    max="100"
+                  ></progress>
                 </html:div>
+                <label
+                  id="pref-mineru-cache-summary"
+                  class="mineru-pref-summary"
+                ></label>
               </html:div>
-              <html:div class="mineru-pref-tag-filter-wrap">
-                <html:input
-                  id="pref-mineru-cache-tag-filter"
-                  type="search"
-                  class="mineru-pref-tag-filter"
-                  data-l10n-id="pref-mineru-cache-tag-filter"
-                  data-l10n-attrs="placeholder"
-                ></html:input>
+
+              <html:div class="mineru-pref-toolbar">
+                <html:button
+                  id="pref-mineru-cache-start-all"
+                  class="mineru-pref-btn mineru-pref-btn-primary"
+                  data-l10n-id="pref-mineru-cache-start-all"
+                ></html:button>
+                <html:button
+                  id="pref-mineru-cache-start-selected"
+                  class="mineru-pref-btn mineru-pref-btn-secondary"
+                  data-l10n-id="pref-mineru-cache-start-selected"
+                ></html:button>
+                <html:button
+                  id="pref-mineru-cache-repair"
+                  class="mineru-pref-btn mineru-pref-btn-secondary"
+                  data-l10n-id="pref-mineru-cache-repair"
+                ></html:button>
+                <html:button
+                  id="pref-mineru-cache-delete-all"
+                  class="mineru-pref-btn mineru-pref-btn-danger"
+                  data-l10n-id="pref-mineru-cache-delete-all"
+                ></html:button>
+                <html:button
+                  id="pref-mineru-cache-refresh"
+                  class="mineru-pref-btn mineru-pref-btn-ghost"
+                  data-l10n-id="pref-mineru-cache-refresh"
+                ></html:button>
               </html:div>
-            </html:aside>
-            <html:main class="mineru-pref-main">
-              <html:div id="pref-mineru-cache-list" class="mineru-pref-list"></html:div>
-              <html:div class="mineru-pref-search-wrap">
-                <html:input
-                  id="pref-mineru-cache-search"
-                  type="search"
-                  class="mineru-pref-search"
-                  data-l10n-id="pref-mineru-cache-search"
-                  data-l10n-attrs="placeholder"
-                ></html:input>
+
+              <label
+                id="pref-mineru-cache-status"
+                class="mineru-pref-status-line"
+                hidden="true"
+              ></label>
+
+              <html:div
+                id="pref-mineru-cache-layout"
+                class="mineru-pref-layout"
+              >
+                <html:aside class="mineru-pref-sidebar">
+                  <html:div class="mineru-pref-sidebar-body">
+                    <html:div
+                      id="pref-mineru-cache-collections"
+                      class="mineru-pref-tree"
+                    ></html:div>
+                    <html:div class="mineru-pref-tags-section">
+                      <html:div class="mineru-pref-tags-header">
+                        <html:span
+                          class="mineru-pref-sidebar-title"
+                          data-l10n-id="pref-mineru-cache-tags-title"
+                        ></html:span>
+                        <html:span
+                          id="pref-mineru-cache-tags-total"
+                          class="mineru-pref-tags-total"
+                        ></html:span>
+                      </html:div>
+                      <html:div
+                        id="pref-mineru-cache-tags-summary"
+                        class="mineru-pref-tags-summary"
+                      ></html:div>
+                      <html:div
+                        id="pref-mineru-cache-tags"
+                        class="mineru-pref-tags"
+                      ></html:div>
+                    </html:div>
+                  </html:div>
+                  <html:div class="mineru-pref-tag-filter-wrap">
+                    <html:input
+                      id="pref-mineru-cache-tag-filter"
+                      type="search"
+                      class="mineru-pref-tag-filter"
+                      data-l10n-id="pref-mineru-cache-tag-filter"
+                      data-l10n-attrs="placeholder"
+                    ></html:input>
+                  </html:div>
+                </html:aside>
+                <html:main class="mineru-pref-main">
+                  <html:div
+                    id="pref-mineru-cache-list"
+                    class="mineru-pref-list"
+                  ></html:div>
+                  <html:div class="mineru-pref-search-wrap">
+                    <html:input
+                      id="pref-mineru-cache-search"
+                      type="search"
+                      class="mineru-pref-search"
+                      data-l10n-id="pref-mineru-cache-search"
+                      data-l10n-attrs="placeholder"
+                    ></html:input>
+                  </html:div>
+                </html:main>
               </html:div>
-            </html:main>
-          </html:div>
-        </html:section>
-      </html:details>
-    </html:div>
+            </html:section>
+          </html:details>
+        </html:div>
       </html:section>
 
       <html:section
@@ -524,55 +557,55 @@
           class="paperchat-prefs-panel-title"
           data-l10n-id="pref-nav-web-search"
         ></html:h2>
-    <html:div class="mineru-pref-page mineru-pref-page--embedded">
-      <html:section class="mineru-pref-config">
-        <html:h4
-          class="mineru-pref-config-title"
-          data-l10n-id="pref-exa-pane-title"
-        ></html:h4>
-        <html:div class="mineru-pref-config-desc-row">
-          <html:p
-            class="mineru-pref-config-desc"
-            data-l10n-id="pref-exa-pane-desc"
-          ></html:p>
-          <html:a
-            id="pref-exa-apply-link"
-            class="mineru-pref-apply-link"
-            href="#"
-            data-l10n-id="pref-api-apply-link"
-          ></html:a>
-        </html:div>
+        <html:div class="mineru-pref-page mineru-pref-page--embedded">
+          <html:section class="mineru-pref-config">
+            <html:h4
+              class="mineru-pref-config-title"
+              data-l10n-id="pref-exa-pane-title"
+            ></html:h4>
+            <html:div class="mineru-pref-config-desc-row">
+              <html:p
+                class="mineru-pref-config-desc"
+                data-l10n-id="pref-exa-pane-desc"
+              ></html:p>
+              <html:a
+                id="pref-exa-apply-link"
+                class="mineru-pref-apply-link"
+                href="#"
+                data-l10n-id="pref-api-apply-link"
+              ></html:a>
+            </html:div>
 
-        <html:div class="mineru-pref-config-row">
-          <label data-l10n-id="pref-use-exa-web-search"></label>
-          <checkbox id="pref-exa-enable-checkbox" native="true" />
-        </html:div>
+            <html:div class="mineru-pref-config-row">
+              <label data-l10n-id="pref-use-exa-web-search"></label>
+              <checkbox id="pref-exa-enable-checkbox" native="true" />
+            </html:div>
 
-        <html:div class="mineru-pref-config-row">
-          <label
-            class="mineru-pref-config-label"
-            for="pref-exa-api-key"
-            data-l10n-id="pref-exa-api-key"
-          ></label>
-          <html:input
-            type="password"
-            id="pref-exa-api-key"
-            class="mineru-pref-token-input"
-            autocomplete="off"
-          ></html:input>
-          <html:button
-            id="pref-exa-test-btn"
-            class="mineru-pref-btn mineru-pref-btn-secondary"
-            data-l10n-id="pref-exa-test"
-          ></html:button>
+            <html:div class="mineru-pref-config-row">
+              <label
+                class="mineru-pref-config-label"
+                for="pref-exa-api-key"
+                data-l10n-id="pref-exa-api-key"
+              ></label>
+              <html:input
+                type="password"
+                id="pref-exa-api-key"
+                class="mineru-pref-token-input"
+                autocomplete="off"
+              ></html:input>
+              <html:button
+                id="pref-exa-test-btn"
+                class="mineru-pref-btn mineru-pref-btn-secondary"
+                data-l10n-id="pref-exa-test"
+              ></html:button>
+            </html:div>
+            <label
+              id="pref-exa-test-result"
+              class="mineru-pref-test-result"
+              hidden="true"
+            ></label>
+          </html:section>
         </html:div>
-        <label
-          id="pref-exa-test-result"
-          class="mineru-pref-test-result"
-          hidden="true"
-        ></label>
-      </html:section>
-    </html:div>
       </html:section>
 
       <html:section
@@ -585,29 +618,34 @@
           class="paperchat-prefs-panel-title"
           data-l10n-id="pref-nav-ui"
         ></html:h2>
-    <hbox align="center" style="margin-top: 8px">
-      <label
-        for="pref-chat-ui-font-scale"
-        data-l10n-id="pref-chat-ui-font-scale"
-        style="width: 150px; margin-right: 8px"
-      ></label>
-      <html:input
-        type="range"
-        id="pref-chat-ui-font-scale"
-        style="width: 180px"
-        min="80"
-        max="180"
-        step="10"
-      ></html:input>
-      <label
-        id="pref-chat-ui-font-scale-value"
-        style="margin-left: 8px; min-width: 48px"
-      ></label>
-    </hbox>
-    <label
-      data-l10n-id="pref-chat-ui-font-scale-desc"
-      style="font-size: 11px; color: #666; margin-top: 4px; margin-left: 2px"
-    ></label>
+        <hbox align="center" style="margin-top: 8px">
+          <label
+            for="pref-chat-ui-font-scale"
+            data-l10n-id="pref-chat-ui-font-scale"
+            style="width: 150px; margin-right: 8px"
+          ></label>
+          <html:input
+            type="range"
+            id="pref-chat-ui-font-scale"
+            style="width: 180px"
+            min="80"
+            max="180"
+            step="10"
+          ></html:input>
+          <label
+            id="pref-chat-ui-font-scale-value"
+            style="margin-left: 8px; min-width: 48px"
+          ></label>
+        </hbox>
+        <label
+          data-l10n-id="pref-chat-ui-font-scale-desc"
+          style="
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+            margin-left: 2px;
+          "
+        ></label>
       </html:section>
 
       <html:section
@@ -620,108 +658,128 @@
           class="paperchat-prefs-panel-title"
           data-l10n-id="pref-nav-ai-tools"
         ></html:h2>
-    <hbox align="center">
-      <label
-        for="pref-agent-max-planning-iterations"
-        data-l10n-id="pref-agent-max-planning-iterations"
-        style="margin-right: 8px"
-      ></label>
-      <html:input
-        type="number"
-        id="pref-agent-max-planning-iterations"
-        style="width: 100px"
-        min="2"
-        max="50"
-        step="1"
-      ></html:input>
-    </hbox>
-    <label
-      data-l10n-id="pref-agent-max-planning-iterations-desc"
-      style="font-size: 11px; color: #666; margin-top: 4px; margin-left: 2px"
-    ></label>
-
-    <hbox align="center" style="margin-top: 10px">
-      <label
-        for="pref-context-auto-compact-threshold"
-        data-l10n-id="pref-context-auto-compact-threshold"
-        style="width: 150px; margin-right: 8px"
-      ></label>
-      <html:input
-        type="range"
-        id="pref-context-auto-compact-threshold"
-        style="width: 180px"
-        min="0"
-        max="100"
-        step="1"
-      ></html:input>
-      <label
-        id="pref-context-auto-compact-threshold-value"
-        style="margin-left: 8px; min-width: 90px"
-      ></label>
-    </hbox>
-    <label
-      data-l10n-id="pref-context-auto-compact-threshold-desc"
-      style="font-size: 11px; color: #666; margin-top: 4px; margin-left: 2px"
-    ></label>
-
-    <separator class="thin" style="margin: 12px 0 8px 0" />
-
-    <html:details style="margin-top: 8px">
-      <html:summary
-        data-l10n-id="pref-tool-permission-defaults"
-        style="cursor: pointer; font-weight: bold; margin-bottom: 8px"
-      ></html:summary>
-      <label
-        data-l10n-id="pref-tool-permission-defaults-desc"
-        style="font-size: 11px; color: #666; margin-top: 4px; margin-left: 12px"
-      ></label>
-
-      <vbox style="margin-left: 12px; margin-top: 8px">
         <hbox align="center">
           <label
-            for="pref-tool-permission-network"
-            data-l10n-id="pref-tool-permission-network"
-            style="width: 140px; margin-right: 8px"
+            for="pref-agent-max-planning-iterations"
+            data-l10n-id="pref-agent-max-planning-iterations"
+            style="margin-right: 8px"
           ></label>
-          <menulist id="pref-tool-permission-network" style="width: 160px">
-            <menupopup id="pref-tool-permission-network-popup"></menupopup>
-          </menulist>
+          <html:input
+            type="number"
+            id="pref-agent-max-planning-iterations"
+            style="width: 100px"
+            min="2"
+            max="50"
+            step="1"
+          ></html:input>
         </hbox>
+        <label
+          data-l10n-id="pref-agent-max-planning-iterations-desc"
+          style="
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+            margin-left: 2px;
+          "
+        ></label>
 
-        <hbox align="center" style="margin-top: 8px">
+        <hbox align="center" style="margin-top: 10px">
           <label
-            for="pref-tool-permission-write"
-            data-l10n-id="pref-tool-permission-write"
-            style="width: 140px; margin-right: 8px"
+            for="pref-context-auto-compact-threshold"
+            data-l10n-id="pref-context-auto-compact-threshold"
+            style="width: 150px; margin-right: 8px"
           ></label>
-          <menulist id="pref-tool-permission-write" style="width: 160px">
-            <menupopup id="pref-tool-permission-write-popup"></menupopup>
-          </menulist>
+          <html:input
+            type="range"
+            id="pref-context-auto-compact-threshold"
+            style="width: 180px"
+            min="0"
+            max="100"
+            step="1"
+          ></html:input>
+          <label
+            id="pref-context-auto-compact-threshold-value"
+            style="margin-left: 8px; min-width: 90px"
+          ></label>
         </hbox>
+        <label
+          data-l10n-id="pref-context-auto-compact-threshold-desc"
+          style="
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+            margin-left: 2px;
+          "
+        ></label>
 
-        <hbox align="center" style="margin-top: 8px">
-          <label
-            for="pref-tool-permission-memory"
-            data-l10n-id="pref-tool-permission-memory"
-            style="width: 140px; margin-right: 8px"
-          ></label>
-          <menulist id="pref-tool-permission-memory" style="width: 160px">
-            <menupopup id="pref-tool-permission-memory-popup"></menupopup>
-          </menulist>
-        </hbox>
+        <separator class="thin" style="margin: 12px 0 8px 0" />
 
-        <hbox align="center" style="margin-top: 8px">
+        <html:details style="margin-top: 8px">
+          <html:summary
+            data-l10n-id="pref-tool-permission-defaults"
+            style="cursor: pointer; font-weight: bold; margin-bottom: 8px"
+          ></html:summary>
           <label
-            for="pref-tool-permission-high-cost"
-            data-l10n-id="pref-tool-permission-high-cost"
-            style="width: 140px; margin-right: 8px"
+            data-l10n-id="pref-tool-permission-defaults-desc"
+            style="
+              font-size: 11px;
+              color: #666;
+              margin-top: 4px;
+              margin-left: 12px;
+            "
           ></label>
-          <menulist id="pref-tool-permission-high-cost" style="width: 160px">
-            <menupopup id="pref-tool-permission-high-cost-popup"></menupopup>
-          </menulist>
-        </hbox>
-      </vbox>
-    </html:details>
+
+          <vbox style="margin-left: 12px; margin-top: 8px">
+            <hbox align="center">
+              <label
+                for="pref-tool-permission-network"
+                data-l10n-id="pref-tool-permission-network"
+                style="width: 140px; margin-right: 8px"
+              ></label>
+              <menulist id="pref-tool-permission-network" style="width: 160px">
+                <menupopup id="pref-tool-permission-network-popup"></menupopup>
+              </menulist>
+            </hbox>
+
+            <hbox align="center" style="margin-top: 8px">
+              <label
+                for="pref-tool-permission-write"
+                data-l10n-id="pref-tool-permission-write"
+                style="width: 140px; margin-right: 8px"
+              ></label>
+              <menulist id="pref-tool-permission-write" style="width: 160px">
+                <menupopup id="pref-tool-permission-write-popup"></menupopup>
+              </menulist>
+            </hbox>
+
+            <hbox align="center" style="margin-top: 8px">
+              <label
+                for="pref-tool-permission-memory"
+                data-l10n-id="pref-tool-permission-memory"
+                style="width: 140px; margin-right: 8px"
+              ></label>
+              <menulist id="pref-tool-permission-memory" style="width: 160px">
+                <menupopup id="pref-tool-permission-memory-popup"></menupopup>
+              </menulist>
+            </hbox>
+
+            <hbox align="center" style="margin-top: 8px">
+              <label
+                for="pref-tool-permission-high-cost"
+                data-l10n-id="pref-tool-permission-high-cost"
+                style="width: 140px; margin-right: 8px"
+              ></label>
+              <menulist
+                id="pref-tool-permission-high-cost"
+                style="width: 160px"
+              >
+                <menupopup
+                  id="pref-tool-permission-high-cost-popup"
+                ></menupopup>
+              </menulist>
+            </hbox>
+          </vbox>
+        </html:details>
       </html:section>
 
       <html:section
@@ -735,37 +793,42 @@
           data-l10n-id="pref-nav-skills"
         ></html:h2>
 
-    <label
-      data-l10n-id="pref-paper-skills-desc"
-      style="font-size: 11px; color: #666; margin-top: 4px; margin-left: 2px"
-    ></label>
+        <label
+          data-l10n-id="pref-paper-skills-desc"
+          style="
+            font-size: 11px;
+            color: #666;
+            margin-top: 4px;
+            margin-left: 2px;
+          "
+        ></label>
 
-    <label
-      id="pref-paper-skills-path"
-      style="
-        margin-top: 8px;
-        margin-left: 2px;
-        font-family: monospace;
-        font-size: 11px;
-        opacity: 0.8;
-      "
-    ></label>
+        <label
+          id="pref-paper-skills-path"
+          style="
+            margin-top: 8px;
+            margin-left: 2px;
+            font-family: monospace;
+            font-size: 11px;
+            opacity: 0.8;
+          "
+        ></label>
 
-    <hbox align="center" style="margin-top: 10px">
-      <button
-        id="pref-paper-skills-open-folder"
-        data-l10n-id="pref-paper-skills-open-folder"
-      ></button>
-      <button
-        id="pref-paper-skills-reload"
-        data-l10n-id="pref-paper-skills-reload"
-        style="margin-left: 8px"
-      ></button>
-      <label
-        id="pref-paper-skills-status"
-        style="margin-left: 10px; font-size: 11px; opacity: 0.8"
-      ></label>
-    </hbox>
+        <hbox align="center" style="margin-top: 10px">
+          <button
+            id="pref-paper-skills-open-folder"
+            data-l10n-id="pref-paper-skills-open-folder"
+          ></button>
+          <button
+            id="pref-paper-skills-reload"
+            data-l10n-id="pref-paper-skills-reload"
+            style="margin-left: 8px"
+          ></button>
+          <label
+            id="pref-paper-skills-status"
+            style="margin-left: 10px; font-size: 11px; opacity: 0.8"
+          ></label>
+        </hbox>
       </html:section>
 
       <html:section
@@ -779,63 +842,68 @@
           data-l10n-id="pref-nav-aisummary"
         ></html:h2>
 
-    <!-- Automatically summarize newly added papers -->
-    <hbox align="center" style="margin-bottom: 8px">
-      <label style="width: 80px"></label>
-      <checkbox
-        id="pref-aisummary-auto-generate-on-item-add"
-        data-l10n-id="pref-aisummary-auto-generate-on-item-add"
-        native="true"
-        style="margin-left: 8px"
-      />
-    </hbox>
+        <!-- Automatically summarize newly added papers -->
+        <hbox align="center" style="margin-bottom: 8px">
+          <label style="width: 80px"></label>
+          <checkbox
+            id="pref-aisummary-auto-generate-on-item-add"
+            data-l10n-id="pref-aisummary-auto-generate-on-item-add"
+            native="true"
+            style="margin-left: 8px"
+          />
+        </hbox>
 
-    <!-- Template Selection -->
-    <hbox align="center" style="margin-bottom: 8px">
-      <label
-        for="pref-aisummary-template"
-        data-l10n-id="pref-aisummary-template"
-        style="width: 80px; text-align: right"
-      ></label>
-      <menulist
-        id="pref-aisummary-template"
-        style="margin-left: 8px; width: 200px"
-      >
-        <menupopup id="pref-aisummary-template-popup">
-          <!-- Templates populated by JS -->
-        </menupopup>
-      </menulist>
-    </hbox>
+        <!-- Template Selection -->
+        <hbox align="center" style="margin-bottom: 8px">
+          <label
+            for="pref-aisummary-template"
+            data-l10n-id="pref-aisummary-template"
+            style="width: 80px; text-align: right"
+          ></label>
+          <menulist
+            id="pref-aisummary-template"
+            style="margin-left: 8px; width: 200px"
+          >
+            <menupopup id="pref-aisummary-template-popup">
+              <!-- Templates populated by JS -->
+            </menupopup>
+          </menulist>
+        </hbox>
 
-    <!-- Include Annotations -->
-    <hbox align="center" style="margin-bottom: 8px">
-      <label style="width: 80px"></label>
-      <checkbox
-        id="pref-aisummary-include-annotations"
-        data-l10n-id="pref-aisummary-include-annotations"
-        native="true"
-        style="margin-left: 8px"
-      />
-    </hbox>
+        <!-- Include Annotations -->
+        <hbox align="center" style="margin-bottom: 8px">
+          <label style="width: 80px"></label>
+          <checkbox
+            id="pref-aisummary-include-annotations"
+            data-l10n-id="pref-aisummary-include-annotations"
+            native="true"
+            style="margin-left: 8px"
+          />
+        </hbox>
 
-    <!-- Manual Run Button -->
-    <hbox align="center" style="margin-top: 12px">
-      <label style="width: 80px"></label>
-      <button
-        id="pref-aisummary-run-now"
-        data-l10n-id="pref-aisummary-run-now"
-        style="margin-left: 8px; cursor: pointer"
-      ></button>
-      <label
-        id="pref-aisummary-status"
-        style="margin-left: 12px; font-size: 12px"
-      ></label>
-    </hbox>
+        <!-- Manual Run Button -->
+        <hbox align="center" style="margin-top: 12px">
+          <label style="width: 80px"></label>
+          <button
+            id="pref-aisummary-run-now"
+            data-l10n-id="pref-aisummary-run-now"
+            style="margin-left: 8px; cursor: pointer"
+          ></button>
+          <label
+            id="pref-aisummary-status"
+            style="margin-left: 12px; font-size: 12px"
+          ></label>
+        </hbox>
 
-    <label
-      data-l10n-id="pref-aisummary-desc"
-      style="font-size: 11px; color: #666; margin-top: 8px; margin-left: 2px"
-    ></label>
+        <label
+          data-l10n-id="pref-aisummary-desc"
+          style="
+            font-size: 11px;
+            color: #666;
+            margin-top: 8px;
+            margin-left: 2px;
+          "
+        ></label>
       </html:section>
     </html:div>
   </html:div>

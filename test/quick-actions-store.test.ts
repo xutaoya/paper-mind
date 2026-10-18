@@ -49,9 +49,7 @@ describe("quick actions store", function () {
     const reloaded = loadQuickActions();
     assert.equal(reloaded[0]?.label, "精读论文");
     assert.equal(reloaded[0]?.prompt, "请精读这篇论文并输出结构化笔记");
-    assert.isString(
-      runtime.Zotero.Prefs.get(`${PREFS_PREFIX}.quickActions`),
-    );
+    assert.isString(runtime.Zotero.Prefs.get(`${PREFS_PREFIX}.quickActions`));
   });
 
   it("appends newly created shortcuts", function () {

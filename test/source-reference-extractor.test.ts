@@ -28,7 +28,7 @@ describe("tool source reference extraction", function () {
 
   before(function () {
     const runtimeZotero = (globalThis as any).Zotero;
-    if (!runtimeZotero) return;
+    if (!runtimeZotero?.Items || !runtimeZotero?.Collections) return;
 
     originalItemLookupDescriptor = Object.getOwnPropertyDescriptor(
       runtimeZotero.Items,
@@ -50,7 +50,7 @@ describe("tool source reference extraction", function () {
 
   after(function () {
     const runtimeZotero = (globalThis as any).Zotero;
-    if (!runtimeZotero) return;
+    if (!runtimeZotero?.Items || !runtimeZotero?.Collections) return;
 
     if (originalItemLookupDescriptor) {
       Object.defineProperty(

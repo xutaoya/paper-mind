@@ -277,7 +277,8 @@ export function populateModelList(
       "span",
     ) as HTMLSpanElement;
     speedResult.className = "pref-model-speed-result";
-    speedResult.style.cssText = "font-size: 11px; color: #666; min-width: 48px;";
+    speedResult.style.cssText =
+      "font-size: 11px; color: #666; min-width: 48px;";
 
     const speedBtn = doc.createElementNS(
       "http://www.w3.org/1999/xhtml",
@@ -321,7 +322,8 @@ export function populateModelList(
         }
       } catch (error) {
         speedResult.style.color = "#c62828";
-        speedResult.title = error instanceof Error ? error.message : String(error);
+        speedResult.title =
+          error instanceof Error ? error.message : String(error);
         speedResult.textContent = getString("pref-model-speed-failed");
       } finally {
         speedBtn.disabled = false;

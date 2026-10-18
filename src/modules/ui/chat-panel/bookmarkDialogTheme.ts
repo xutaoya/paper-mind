@@ -10,7 +10,9 @@ export interface BookmarkSelectionColors {
   saveButtonColor: string;
 }
 
-export function getBookmarkDialogColors(theme: ThemeColors): BookmarkSelectionColors {
+export function getBookmarkDialogColors(
+  theme: ThemeColors,
+): BookmarkSelectionColors {
   const dark = isDarkMode();
   if (dark) {
     return {

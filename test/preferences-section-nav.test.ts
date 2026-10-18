@@ -1,8 +1,6 @@
 import { readFileSync } from "node:fs";
 import { assert } from "chai";
-import {
-  bindPreferencesSectionNav,
-} from "../src/modules/preferences/PreferencesSectionNav.ts";
+import { bindPreferencesSectionNav } from "../src/modules/preferences/PreferencesSectionNav.ts";
 
 describe("preferences section navigation", function () {
   it("defines a left nav and one panel per settings section", function () {

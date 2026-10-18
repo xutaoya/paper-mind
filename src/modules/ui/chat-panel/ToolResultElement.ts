@@ -1,6 +1,9 @@
 import { copyToClipboard } from "./ChatPanelBuilder";
 import { isDarkMode } from "./ChatPanelTheme";
-import { getAgentUiSemanticColors, type AgentUiSemanticColors } from "./AgentUiTheme";
+import {
+  getAgentUiSemanticColors,
+  type AgentUiSemanticColors,
+} from "./AgentUiTheme";
 import {
   formatToolDisplayLabel,
   type ParsedToolCallEntry,
@@ -65,7 +68,9 @@ function createElement(
 
 function prefersReducedMotion(doc: Document): boolean {
   const view = (doc.defaultView ?? Zotero.getMainWindow()) as Window | null;
-  return Boolean(view?.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+  return Boolean(
+    view?.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches,
+  );
 }
 
 export function mapToolCallStatusToResultStatus(
@@ -80,7 +85,9 @@ export function mapToolCallStatusToResultStatus(
   return "success";
 }
 
-export function getToolResultContentSignature(entry: ParsedToolCallEntry): string {
+export function getToolResultContentSignature(
+  entry: ParsedToolCallEntry,
+): string {
   return `${entry.status}\n${entry.toolArgs ?? ""}\n${entry.toolResult ?? ""}\n${entry.statusText ?? ""}`;
 }
 
@@ -128,7 +135,10 @@ function getStatusLabel(status: ToolResultStatus): string {
   }
 }
 
-function getStatusColor(status: ToolResultStatus, palette: ToolResultPalette): string {
+function getStatusColor(
+  status: ToolResultStatus,
+  palette: ToolResultPalette,
+): string {
   switch (status) {
     case "running":
       return palette.running;
@@ -178,7 +188,9 @@ function applyToolResultOpenUi(root: HTMLElement, open: boolean): void {
   ) as HTMLElement | null;
 
   if (disclosure) {
-    disclosure.style.maxHeight = open ? `${TOOL_RESULT_MAX_HEIGHT_PX}px` : "0px";
+    disclosure.style.maxHeight = open
+      ? `${TOOL_RESULT_MAX_HEIGHT_PX}px`
+      : "0px";
     disclosure.style.opacity = open ? "1" : "0";
     disclosure.style.pointerEvents = open ? "auto" : "none";
   }
@@ -189,7 +201,10 @@ function applyToolResultOpenUi(root: HTMLElement, open: boolean): void {
   root.setAttribute("data-open", open ? "true" : "false");
 }
 
-function scrollToolResultViewportToEnd(viewport: HTMLElement, doc: Document): void {
+function scrollToolResultViewportToEnd(
+  viewport: HTMLElement,
+  doc: Document,
+): void {
   if (viewport.scrollHeight <= viewport.clientHeight) {
     return;
   }
@@ -320,7 +335,8 @@ function createOutputSection(
       color: resultStatus === "error" ? palette.errorText : theme.textPrimary,
       whiteSpace: "pre-wrap",
       wordBreak: "break-word",
-      opacity: resultStatus === "error" ? "0.95" : palette.toolResultTextOpacity,
+      opacity:
+        resultStatus === "error" ? "0.95" : palette.toolResultTextOpacity,
     });
     outputPre.setAttribute("data-tool-result-output", "true");
     outputPre.textContent = outputText;
@@ -351,13 +367,18 @@ function bindToolResultInteractions(
   if (trigger && canToggle) {
     trigger.addEventListener("click", () => {
       const nextOpen = root.getAttribute("data-open") !== "true";
-      root.setAttribute(TOOL_RESULT_USER_OPEN_ATTR, nextOpen ? "true" : "false");
+      root.setAttribute(
+        TOOL_RESULT_USER_OPEN_ATTR,
+        nextOpen ? "true" : "false",
+      );
       if (expandKey) {
         setToolCallGroupExpanded(expandKey, nextOpen);
       }
       applyToolResultOpenUi(root, nextOpen);
       if (nextOpen && viewport) {
-        scheduleAfterLayout(doc, () => scrollToolResultViewportToEnd(viewport, doc));
+        scheduleAfterLayout(doc, () =>
+          scrollToolResultViewportToEnd(viewport, doc),
+        );
       }
     });
   }
@@ -391,7 +412,9 @@ function bindToolResultInteractions(
   }
 
   if (viewport && resultStatus === "running") {
-    scheduleAfterLayout(doc, () => scrollToolResultViewportToEnd(viewport, doc));
+    scheduleAfterLayout(doc, () =>
+      scrollToolResultViewportToEnd(viewport, doc),
+    );
   }
 }
 
@@ -417,7 +440,9 @@ function populateToolResultElement(
 ): void {
   const resultStatus = mapToolCallStatusToResultStatus(entry.status);
   const hasDetails = Boolean(
-    entry.toolArgs?.trim() || entry.toolResult?.trim() || entry.statusText?.trim(),
+    entry.toolArgs?.trim() ||
+    entry.toolResult?.trim() ||
+    entry.statusText?.trim(),
   );
   const canToggle =
     hasDetails &&
@@ -448,13 +473,13 @@ function populateToolResultElement(
     activityStatus === "active" ? "active" : "complete",
   );
   root.setAttribute("data-tool-card-status", entry.status);
-  root.setAttribute(TOOL_RESULT_CONTENT_SIG_ATTR, getToolResultContentSignature(entry));
+  root.setAttribute(
+    TOOL_RESULT_CONTENT_SIG_ATTR,
+    getToolResultContentSignature(entry),
+  );
   root.setAttribute("data-tool-result-status", resultStatus);
 
-  const trigger = doc.createElementNS(
-    HTML_NS,
-    "button",
-  ) as HTMLButtonElement;
+  const trigger = doc.createElementNS(HTML_NS, "button") as HTMLButtonElement;
   trigger.type = "button";
   trigger.className = "paperchat-tool-result-trigger";
   Object.assign(trigger.style, {
@@ -605,13 +630,7 @@ function populateToolResultElement(
   }
 
   applyToolResultOpenUi(root, open);
-  bindToolResultInteractions(
-    root,
-    doc,
-    expandKey,
-    canToggle,
-    resultStatus,
-  );
+  bindToolResultInteractions(root, doc, expandKey, canToggle, resultStatus);
 }
 
 export function createToolResultActivityElement(
@@ -701,7 +720,9 @@ export function applyToolResultTheme(
     trigger.style.color = theme.textPrimary;
   }
 
-  const title = trigger?.querySelector("span:nth-child(2)") as HTMLElement | null;
+  const title = trigger?.querySelector(
+    "span:nth-child(2)",
+  ) as HTMLElement | null;
   if (title) {
     title.style.color = theme.textPrimary;
   }
@@ -749,11 +770,13 @@ export function applyToolResultTheme(
     (node as HTMLElement).style.color = theme.textMuted;
   });
 
-  root.querySelectorAll(
-    "[data-tool-result-args-label], [data-tool-result-output-label]",
-  ).forEach((node) => {
-    (node as HTMLElement).style.color = theme.textMuted;
-  });
+  root
+    .querySelectorAll(
+      "[data-tool-result-args-label], [data-tool-result-output-label]",
+    )
+    .forEach((node) => {
+      (node as HTMLElement).style.color = theme.textMuted;
+    });
 }
 
 export function getActivityMessageId(list: HTMLElement): string | undefined {

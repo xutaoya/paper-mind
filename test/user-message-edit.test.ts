@@ -28,10 +28,7 @@ describe("user message edit helpers", function () {
       { selectedText: "alpha" },
     );
 
-    assert.equal(
-      extractEditableUserMessageContent(message),
-      "What is 2D-SSM?",
-    );
+    assert.equal(extractEditableUserMessageContent(message), "What is 2D-SSM?");
   });
 
   it("restores attachments from the original user message", function () {

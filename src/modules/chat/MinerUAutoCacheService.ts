@@ -35,10 +35,7 @@ export function collectPdfAttachmentsFromAddedItem(
     if (!isZoteroItemAlive(attachment) || !attachment.isPDFAttachment?.()) {
       return;
     }
-    const cacheKey = buildMineruCacheKey(
-      attachment.libraryID,
-      attachment.key,
-    );
+    const cacheKey = buildMineruCacheKey(attachment.libraryID, attachment.key);
     if (seen.has(cacheKey)) {
       return;
     }
@@ -129,10 +126,7 @@ class MinerUAutoCacheService {
   }
 
   private scheduleAttachment(attachment: Zotero.Item): void {
-    const cacheKey = buildMineruCacheKey(
-      attachment.libraryID,
-      attachment.key,
-    );
+    const cacheKey = buildMineruCacheKey(attachment.libraryID, attachment.key);
 
     const existingTimer = this.pendingTimers.get(cacheKey);
     if (existingTimer) {
@@ -149,7 +143,10 @@ class MinerUAutoCacheService {
         attachment.libraryID,
         attachment.key,
       );
-      if (!isZoteroItemAlive(freshAttachment) || !freshAttachment.isPDFAttachment?.()) {
+      if (
+        !isZoteroItemAlive(freshAttachment) ||
+        !freshAttachment.isPDFAttachment?.()
+      ) {
         return;
       }
 

@@ -36,7 +36,9 @@ export interface PresentationToolLaunchSession {
   resolveSource(
     intent: PresentationLaunchIntent,
   ): Promise<PresentationLaunchSourceResolution | null>;
-  launch(intent: PresentationLaunchIntent): Promise<PresentationToolLaunchResult>;
+  launch(
+    intent: PresentationLaunchIntent,
+  ): Promise<PresentationToolLaunchResult>;
   finish(): void;
 }
 

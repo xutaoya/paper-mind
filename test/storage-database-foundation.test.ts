@@ -225,6 +225,7 @@ describe("StorageDatabase foundation", function () {
             { name: "source_item_keys" },
             { name: "presentation_artifacts" },
             { name: "edited_at" },
+            { name: "turn_started_at" },
             { name: "search_text" },
             { name: "search_index_version" },
           ];
@@ -412,6 +413,8 @@ describe("StorageDatabase foundation", function () {
       "quoted_messages",
       "source_item_keys",
       "presentation_artifacts",
+      "edited_at",
+      "turn_started_at",
       "search_text",
       "search_index_version",
     ]);
@@ -422,7 +425,9 @@ describe("StorageDatabase foundation", function () {
         if (normalized === "ALTER TABLE messages ADD COLUMN reasoning TEXT") {
           messageColumns.add("reasoning");
         }
-        if (normalized === "ALTER TABLE messages ADD COLUMN edited_at INTEGER") {
+        if (
+          normalized === "ALTER TABLE messages ADD COLUMN edited_at INTEGER"
+        ) {
           messageColumns.add("edited_at");
         }
         if (normalized === "PRAGMA table_info(messages)") {

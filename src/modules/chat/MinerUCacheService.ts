@@ -326,7 +326,11 @@ class MinerUCacheService {
         }
 
         if (
-          !isCacheRecordFresh(record, fingerprint.fileSize, fingerprint.fileMtime)
+          !isCacheRecordFresh(
+            record,
+            fingerprint.fileSize,
+            fingerprint.fileMtime,
+          )
         ) {
           items.push({ ...record, runtimeStatus: "stale" });
           continue;

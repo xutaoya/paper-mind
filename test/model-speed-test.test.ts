@@ -2,10 +2,11 @@ import { assert } from "chai";
 import { testModelSpeed } from "../src/modules/preferences/ModelSpeedTest.ts";
 
 describe("ModelSpeedTest", function () {
-  const originalFetch = globalThis.fetch;
+  let originalFetch: typeof fetch;
   let originalAddon: unknown;
 
   beforeEach(function () {
+    originalFetch = globalThis.fetch;
     originalAddon = (globalThis as { addon?: unknown }).addon;
     (globalThis as { addon?: unknown }).addon = {
       data: {
@@ -28,10 +29,13 @@ describe("ModelSpeedTest", function () {
 
   it("returns latency for openai-compatible providers", async function () {
     globalThis.fetch = (async () =>
-      new Response(JSON.stringify({ choices: [{ message: { content: "Hi" } }] }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      })) as typeof fetch;
+      new Response(
+        JSON.stringify({ choices: [{ message: { content: "Hi" } }] }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      )) as typeof fetch;
 
     const result = await testModelSpeed(
       {

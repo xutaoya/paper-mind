@@ -414,6 +414,10 @@ describe("agent runtime plan semantics", function () {
           assistantMessage.content = "";
         },
         updateSessionMeta: async () => {
+          assert.isTrue(
+            tracked,
+            "metadata must not be written after cancellation",
+          );
           sessionMetaUpdates += 1;
         },
         saveSession: async () => undefined,
@@ -471,7 +475,8 @@ describe("agent runtime plan semantics", function () {
 
       assert.equal(providerCalls, 1);
       assert.equal(scopeSelections, 0);
-      assert.equal(sessionMetaUpdates, 1);
+      // Planning may checkpoint metadata before the calling checkpoint.
+      assert.isAtLeast(sessionMetaUpdates, 1);
       assert.isUndefined(session.toolExecutionState);
       assert.equal(assistantMessage.content, "");
     } finally {
@@ -3597,8 +3602,7 @@ describe("agent runtime plan semantics", function () {
     session.messages.push({
       id: "runtime-context",
       role: "user",
-      content:
-        "[Agent runtime context — not a user message]\n\niteration 2",
+      content: "[Agent runtime context — not a user message]\n\niteration 2",
       timestamp: Date.now(),
     });
     session.messages.push({

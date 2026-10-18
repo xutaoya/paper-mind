@@ -117,9 +117,8 @@ export function getStartOfLocalWeek(date: Date = new Date()): Date {
   } catch {
     // ignore
   }
-  const weekStartsOnMonday = /^(zh|ja|de|ko|fr|sv|nb|da|fi|nl|pl|cs|sk|hu|ru)/i.test(
-    locale,
-  );
+  const weekStartsOnMonday =
+    /^(zh|ja|de|ko|fr|sv|nb|da|fi|nl|pl|cs|sk|hu|ru)/i.test(locale);
   if (weekStartsOnMonday) {
     const weekday = day.getDay();
     return addLocalDays(day, weekday === 0 ? -6 : 1 - weekday);

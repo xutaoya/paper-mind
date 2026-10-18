@@ -1592,7 +1592,10 @@ function positionHistoryDropdown(
 
   const margin = 8;
   const preferredWidth = 300;
-  const width = Math.min(preferredWidth, Math.max(0, rootRect.width - margin * 2));
+  const width = Math.min(
+    preferredWidth,
+    Math.max(0, rootRect.width - margin * 2),
+  );
   const anchorLeft = anchorRect.left - rootRect.left;
   const anchorRight = anchorRect.right - rootRect.left;
   let left = anchorLeft;
@@ -1606,7 +1609,10 @@ function positionHistoryDropdown(
   }
   // If the anchor sits on the left toolbar, keep the menu aligned under it when possible.
   if (anchorRight <= rootRect.width / 2) {
-    left = Math.max(margin, Math.min(anchorLeft, rootRect.width - width - margin));
+    left = Math.max(
+      margin,
+      Math.min(anchorLeft, rootRect.width - width - margin),
+    );
   }
 
   dropdown.style.width = `${width}px`;

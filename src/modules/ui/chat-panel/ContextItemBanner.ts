@@ -18,7 +18,10 @@ function getItemCreatorMeta(item: Zotero.Item): string | null {
     return null;
   }
   const first = creators[0];
-  const name = [first.lastName, first.firstName].filter(Boolean).join(" ").trim();
+  const name = [first.lastName, first.firstName]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
   if (!name) {
     return null;
   }
@@ -29,11 +32,7 @@ function getItemCreatorMeta(item: Zotero.Item): string | null {
 }
 
 function resolveContextItem(item: Zotero.Item): Zotero.Item {
-  if (
-    item.isAttachment?.() &&
-    item.parentItemID &&
-    !item.isPDFAttachment?.()
-  ) {
+  if (item.isAttachment?.() && item.parentItemID && !item.isPDFAttachment?.()) {
     const parent = Zotero.Items.get(item.parentItemID);
     if (parent) {
       return parent;
@@ -56,7 +55,10 @@ function buildCompactLine(
   return parts.join(" · ");
 }
 
-function syncComposerInputPadding(container: HTMLElement, visible: boolean): void {
+function syncComposerInputPadding(
+  container: HTMLElement,
+  visible: boolean,
+): void {
   const input = container.querySelector(
     "#chat-message-input",
   ) as HTMLTextAreaElement | null;
@@ -70,21 +72,18 @@ export function syncComposerHintOffset(container: HTMLElement): void {
   const wrapper = container.querySelector(
     "#chat-input-wrapper",
   ) as HTMLElement | null;
-  const banner = container.querySelector(
-    `#${BANNER_ID}`,
-  ) as HTMLElement | null;
+  const banner = container.querySelector(`#${BANNER_ID}`) as HTMLElement | null;
   if (!wrapper) {
     return;
   }
 
   const bannerVisible =
-    !!banner &&
-    banner.style.display !== "none" &&
-    banner.offsetHeight > 0;
+    !!banner && banner.style.display !== "none" && banner.offsetHeight > 0;
   const inputPaddingTop = bannerVisible ? 8 : 14;
-  const top = bannerVisible && banner
-    ? banner.offsetHeight + inputPaddingTop
-    : inputPaddingTop;
+  const top =
+    bannerVisible && banner
+      ? banner.offsetHeight + inputPaddingTop
+      : inputPaddingTop;
 
   wrapper.style.setProperty("--chat-composer-hint-top", `${top}px`);
 }

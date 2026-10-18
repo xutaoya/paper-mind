@@ -10,22 +10,30 @@ on:
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       GITHUB_TOKEN: ${{ secrets.GitHub_TOKEN }}
     steps:
-      - name: Setup JS
-        uses: zotero-plugin-dev/workflows/setup-js@main
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - name: Run Lint
         run: npm run lint:check
 
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       GITHUB_TOKEN: ${{ secrets.GitHub_TOKEN }}
     steps:
-      - name: Setup JS
-        uses: zotero-plugin-dev/workflows/setup-js@main
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - name: Run Build
         run: npm run build
       - name: Upload build result
@@ -35,12 +43,26 @@ jobs:
           path: .scaffold/build
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     needs:
       - build
     steps:
-      - name: Setup JS
-        uses: zotero-plugin-dev/workflows/setup-js@main
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - run: npm run test:chat-search
+      - run: npm run test:unit
+      - name: Install stable Zotero
+        run: |
+          mkdir -p "$RUNNER_TEMP/papermind-zotero"
+          curl --fail --location --retry 3 \
+            'https://www.zotero.org/download/client/dl?platform=linux-x86_64&channel=release' \
+            --output "$RUNNER_TEMP/papermind-zotero/zotero.tar.bz2"
+          tar -xjf "$RUNNER_TEMP/papermind-zotero/zotero.tar.bz2" -C "$RUNNER_TEMP/papermind-zotero"
+          echo "ZOTERO_PLUGIN_ZOTERO_BIN_PATH=$RUNNER_TEMP/papermind-zotero/Zotero_linux-x86_64/zotero" >> "$GITHUB_ENV"
       - run: npm run test:online-release-upgrade
       - run: npm run test

@@ -70,7 +70,9 @@ export function trackPaperChatPresentationEntryClicked(
   ..._args: unknown[]
 ): void {}
 
-export function trackPaperChatPurchaseButtonClicked(..._args: unknown[]): void {}
+export function trackPaperChatPurchaseButtonClicked(
+  ..._args: unknown[]
+): void {}
 export function trackPaperChatPurchaseEntryClicked(..._args: unknown[]): void {}
 
 export function buildErrorProps(

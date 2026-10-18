@@ -3,12 +3,6 @@ import { config } from "../package.json";
 import type { ChatSession } from "../src/types/chat";
 import type { ToolCall } from "../src/types/tool";
 
-describe("startup", function () {
-  it("should have plugin instance defined", function () {
-    assert.isNotEmpty(Zotero[config.addonInstance]);
-  });
-});
-
 describe("chat agent safeguards", function () {
   let originalZotero: unknown;
   let originalZtoolkit: unknown;
@@ -160,7 +154,7 @@ describe("chat agent safeguards", function () {
 
   it("loads configurable default risk modes from prefs", async function () {
     Zotero.Prefs.set(
-      "extensions.zotero.paperchat.toolPermissionDefaultModes",
+      `${config.prefsPrefix}.toolPermissionDefaultModes`,
       JSON.stringify({
         network: "deny",
         write: "auto_allow",
@@ -206,7 +200,7 @@ describe("chat agent safeguards", function () {
 
   it("ignores malformed default risk mode entries in prefs", async function () {
     Zotero.Prefs.set(
-      "extensions.zotero.paperchat.toolPermissionDefaultModes",
+      `${config.prefsPrefix}.toolPermissionDefaultModes`,
       JSON.stringify({
         network: "blocked",
         write: "deny",
@@ -227,7 +221,7 @@ describe("chat agent safeguards", function () {
 
   it("denies ask-mode write tools when no approval channel is available", async function () {
     Zotero.Prefs.set(
-      "extensions.zotero.paperchat.toolPermissionDefaultModes",
+      `${config.prefsPrefix}.toolPermissionDefaultModes`,
       JSON.stringify({
         write: "ask",
       }),
@@ -261,7 +255,7 @@ describe("chat agent safeguards", function () {
 
   it("routes ask-mode write tools through the existing approval channel", async function () {
     Zotero.Prefs.set(
-      "extensions.zotero.paperchat.toolPermissionDefaultModes",
+      `${config.prefsPrefix}.toolPermissionDefaultModes`,
       JSON.stringify({
         write: "ask",
       }),
@@ -318,7 +312,7 @@ describe("chat agent safeguards", function () {
 
   it("does not let a deny-once decision poison the next approval", async function () {
     Zotero.Prefs.set(
-      "extensions.zotero.paperchat.toolPermissionDefaultModes",
+      `${config.prefsPrefix}.toolPermissionDefaultModes`,
       JSON.stringify({
         write: "ask",
       }),

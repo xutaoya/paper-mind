@@ -96,9 +96,7 @@ export async function fetchSearchHtml(
         if (/challenge|anomaly|blocked|unusual traffic/i.test(message)) {
           throw error;
         }
-        ztoolkit.log(
-          `[WebSearch] XHR page rejected for ${url}: ${message}`,
-        );
+        ztoolkit.log(`[WebSearch] XHR page rejected for ${url}: ${message}`);
       }
     }
   } catch (error) {
@@ -106,13 +104,12 @@ export async function fetchSearchHtml(
     if (/challenge|anomaly|blocked|unusual traffic/i.test(message)) {
       throw error;
     }
-    ztoolkit.log(
-      `[WebSearch] XHR fetch failed for ${url}: ${message}`,
-    );
+    ztoolkit.log(`[WebSearch] XHR fetch failed for ${url}: ${message}`);
   }
 
   const pageData = await loadPageWithHiddenBrowser(url, {
-    timeoutMs: options.hiddenBrowserTimeoutMs ?? Math.max(options.timeoutMs, 15000),
+    timeoutMs:
+      options.hiddenBrowserTimeoutMs ?? Math.max(options.timeoutMs, 15000),
     settleDelayMs: 1200,
   });
   if (!pageData.html) {

@@ -100,7 +100,5 @@ export function markdownToNoteHtml(markdown: string): string {
   });
   const withEmphasis = preserveEmphasisInMarkdownForNotes(processed, preserved);
   const html = noteMarkdown.render(withEmphasis).trim();
-  return unwrapBlockMathParagraphs(
-    restorePreservedNoteMarkup(html, preserved),
-  );
+  return unwrapBlockMathParagraphs(restorePreservedNoteMarkup(html, preserved));
 }

@@ -334,9 +334,9 @@ export async function exportStatsJsonToClipboard(
     }
     const raw = await IOUtils.readJSON(path);
     const text = JSON.stringify(raw, null, 2);
-    const clipboard =
-      (Zotero.getMainWindow() as Window & { navigator?: Navigator })
-        ?.navigator?.clipboard;
+    const clipboard = (
+      Zotero.getMainWindow() as Window & { navigator?: Navigator }
+    )?.navigator?.clipboard;
     if (clipboard?.writeText) {
       await clipboard.writeText(text);
       return true;
@@ -375,9 +375,7 @@ export function fillReadingTrackerStatus(
   active: boolean,
 ): void {
   host.textContent = "";
-  host.style.color = active
-    ? theme.sendButtonBg || "#16a34a"
-    : theme.textMuted;
+  host.style.color = active ? theme.sendButtonBg || "#16a34a" : theme.textMuted;
   const dot = createElement(doc, "span", {
     width: "6px",
     height: "6px",

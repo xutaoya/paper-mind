@@ -54,11 +54,7 @@ export function applyOverlayPanelsShellTheme(
   ) as HTMLElement | null;
   if (statsPanel) {
     statsPanel.dataset.theme = isDark ? "dark" : "light";
-    applyPanelChrome(
-      statsPanel,
-      theme,
-      "#chat-reading-stats-panel-body",
-    );
+    applyPanelChrome(statsPanel, theme, "#chat-reading-stats-panel-body");
   }
   const bookmarkPanel = container.querySelector(
     "#chat-bookmark-panel",

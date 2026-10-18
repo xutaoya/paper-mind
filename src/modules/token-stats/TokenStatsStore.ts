@@ -111,9 +111,7 @@ function normalize(raw: unknown): TokenStatsFile {
   return emptyStats();
 }
 
-function sortModelsByTotal(
-  entries: TokenModelRecord[],
-): TokenModelRecord[] {
+function sortModelsByTotal(entries: TokenModelRecord[]): TokenModelRecord[] {
   return entries
     .filter((entry) => entry.inputTokens + entry.outputTokens > 0)
     .sort(
@@ -195,7 +193,7 @@ export async function recordTokenUsage(
   const data = await loadTokenStats();
   const dayKey = formatLocalDayKey();
   const day = data.daily[dayKey] || emptyDay();
-  let input = usage.inputTokens;
+  const input = usage.inputTokens;
   let output = usage.outputTokens;
   if ((input ?? 0) <= 0 && (output ?? 0) <= 0 && (usage.totalTokens ?? 0) > 0) {
     output = usage.totalTokens;
@@ -211,12 +209,7 @@ export async function recordTokenUsage(
       ...emptyDay(),
       model: modelName,
     };
-    applyUsageToDayRecord(
-      existing,
-      input,
-      output,
-      usage.reasoningTokens,
-    );
+    applyUsageToDayRecord(existing, input, output, usage.reasoningTokens);
     data.models[modelName] = existing;
 
     const dayModels = data.dailyModels[dayKey] || {};
@@ -224,12 +217,7 @@ export async function recordTokenUsage(
       ...emptyDay(),
       model: modelName,
     };
-    applyUsageToDayRecord(
-      dayModel,
-      input,
-      output,
-      usage.reasoningTokens,
-    );
+    applyUsageToDayRecord(dayModel, input, output, usage.reasoningTokens);
     dayModels[modelName] = dayModel;
     data.dailyModels[dayKey] = dayModels;
   }

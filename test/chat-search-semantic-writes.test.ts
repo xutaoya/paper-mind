@@ -212,8 +212,8 @@ class SemanticWriteFakeDatabase {
       return [];
     }
     if (statement.startsWith("UPDATE messages SET content = ?")) {
-      const message = this.messages.get(String(params[9]));
-      if (message && message.session_id === params[10]) {
+      const message = this.messages.get(String(params[10]));
+      if (message && message.session_id === params[11]) {
         message.content = String(params[0] || "");
         message.reasoning = (params[1] as string | null) || null;
         message.timestamp = Number(params[2]);
@@ -224,6 +224,8 @@ class SemanticWriteFakeDatabase {
         message.search_text = String(params[6] || "");
         message.search_index_version = Number(params[7]);
         message.presentation_artifacts = (params[8] as string | null) || null;
+        message.turn_started_at =
+          (params[9] as number | null) ?? message.turn_started_at;
       }
       return [];
     }

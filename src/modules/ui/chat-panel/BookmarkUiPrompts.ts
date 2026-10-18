@@ -346,7 +346,12 @@ function createPromptShell(
   doc: Document,
   theme: ThemeColors,
   title: string,
-): { overlay: HTMLElement; dialog: HTMLElement; body: HTMLElement; footer: HTMLElement } {
+): {
+  overlay: HTMLElement;
+  dialog: HTMLElement;
+  body: HTMLElement;
+  footer: HTMLElement;
+} {
   const overlay = mountOverlay(doc);
   const dialog = doc.createElementNS(HTML_NS, "div") as HTMLElement;
   Object.assign(dialog.style, {

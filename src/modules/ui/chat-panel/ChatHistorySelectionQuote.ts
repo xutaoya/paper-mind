@@ -49,7 +49,10 @@ export function resolveAssistantSelectionQuote(
     return null;
   }
 
-  const excerpt = selection.toString().replace(/\u00a0/g, " ").trim();
+  const excerpt = selection
+    .toString()
+    .replace(/\u00a0/g, " ")
+    .trim();
   if (!excerpt) {
     return null;
   }

@@ -25,9 +25,7 @@ export function normalizeBlockquoteListIndentation(content: string): string {
 }
 
 export function deltaContainsMathMarkup(delta: string): boolean {
-  return (
-    delta.includes("$") || delta.includes("\\(") || delta.includes("\\[")
-  );
+  return delta.includes("$") || delta.includes("\\(") || delta.includes("\\[");
 }
 
 function escapeHtmlText(text: string): string {
@@ -124,7 +122,11 @@ export function repairIncompleteInlineMath(content: string): string {
         }
 
         let backslashes = 0;
-        for (let cursor = index - 1; cursor >= 0 && line[cursor] === "\\"; cursor -= 1) {
+        for (
+          let cursor = index - 1;
+          cursor >= 0 && line[cursor] === "\\";
+          cursor -= 1
+        ) {
           backslashes += 1;
         }
         if (backslashes % 2 === 1) {

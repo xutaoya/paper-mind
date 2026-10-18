@@ -1616,7 +1616,9 @@ export class StorageDatabase {
         ),
       );
       if (!messageColumns.has("edited_at")) {
-        await db.queryAsync("ALTER TABLE messages ADD COLUMN edited_at INTEGER");
+        await db.queryAsync(
+          "ALTER TABLE messages ADD COLUMN edited_at INTEGER",
+        );
       }
       await db.queryAsync(
         "UPDATE schema_version SET version = ?, updated_at = ? WHERE id = 1",

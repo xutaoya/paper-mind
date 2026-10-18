@@ -37,7 +37,10 @@ interface ReaderOutlineController {
   dispose: () => void;
 }
 
-const readerOutlineControllers = new WeakMap<HTMLElement, ReaderOutlineController>();
+const readerOutlineControllers = new WeakMap<
+  HTMLElement,
+  ReaderOutlineController
+>();
 
 export type BookmarkReaderToggleResult =
   | { status: "saved"; bookmark: BookmarkRecord }
@@ -432,7 +435,9 @@ function injectReaderStyles(doc: Document): void {
   doc.head.appendChild(style);
 }
 
-function collectReaderHeadings(markdownRoot: HTMLElement | null): ReaderHeading[] {
+function collectReaderHeadings(
+  markdownRoot: HTMLElement | null,
+): ReaderHeading[] {
   if (!markdownRoot) {
     return [];
   }
@@ -499,12 +504,16 @@ function setReaderOutlineActive(
   panel: HTMLElement,
   activeIndex: number,
 ): void {
-  rail.querySelectorAll(".paperchat-reader-outline-tick").forEach((node, index) => {
-    node.classList.toggle("is-active", index === activeIndex);
-  });
-  panel.querySelectorAll(".paperchat-reader-outline-item").forEach((node, index) => {
-    node.classList.toggle("is-active", index === activeIndex);
-  });
+  rail
+    .querySelectorAll(".paperchat-reader-outline-tick")
+    .forEach((node, index) => {
+      node.classList.toggle("is-active", index === activeIndex);
+    });
+  panel
+    .querySelectorAll(".paperchat-reader-outline-item")
+    .forEach((node, index) => {
+      node.classList.toggle("is-active", index === activeIndex);
+    });
 }
 
 function setupReaderOutline(
@@ -720,16 +729,15 @@ function paintReaderBody(
   },
   readerActions?: BookmarkReaderActions,
 ): void {
-  const evidenceAction =
-    turn.evidenceRecords?.length
-      ? createEvidenceMarkdownAction({
-          onError: (error) => {
-            readerActions?.onBookmarkError?.(
-              `${getString("chat-open-source-failed")}: ${error.message}`,
-            );
-          },
-        })
-      : undefined;
+  const evidenceAction = turn.evidenceRecords?.length
+    ? createEvidenceMarkdownAction({
+        onError: (error) => {
+          readerActions?.onBookmarkError?.(
+            `${getString("chat-open-source-failed")}: ${error.message}`,
+          );
+        },
+      })
+    : undefined;
   const body = host.querySelector(
     "#chat-bookmark-reader-body",
   ) as HTMLElement | null;
@@ -1148,7 +1156,8 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
           if (isPersistedBookmarkRecord(bookmark)) {
             bookmarks.splice(currentIndex, 1);
             if (!bookmarks.length) {
-              const win = readerHosts.get(host) ?? host.ownerDocument.defaultView;
+              const win =
+                readerHosts.get(host) ?? host.ownerDocument.defaultView;
               closeBookmarkReader(win);
               return;
             }
@@ -1261,7 +1270,9 @@ function isReaderWindow(win: Window): boolean {
     return true;
   }
   try {
-    return win.document?.documentURI?.includes("bookmark-reader.xhtml") ?? false;
+    return (
+      win.document?.documentURI?.includes("bookmark-reader.xhtml") ?? false
+    );
   } catch {
     return false;
   }

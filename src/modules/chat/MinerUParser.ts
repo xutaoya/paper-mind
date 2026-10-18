@@ -74,8 +74,7 @@ function normalizeExtractResults(
   const raw = data.extract_result;
   if (Array.isArray(raw)) {
     return raw.filter(
-      (item): item is MineruExtractResult =>
-        !!item && typeof item === "object",
+      (item): item is MineruExtractResult => !!item && typeof item === "object",
     );
   }
   if (raw && typeof raw === "object") {
@@ -87,7 +86,9 @@ function normalizeExtractResults(
 async function downloadZipBytes(zipUrl: string): Promise<Uint8Array> {
   const response = await getFetch()(zipUrl);
   if (!response.ok) {
-    throw new Error(`Failed to download MinerU result zip: HTTP ${response.status}`);
+    throw new Error(
+      `Failed to download MinerU result zip: HTTP ${response.status}`,
+    );
   }
   return new Uint8Array(await response.arrayBuffer());
 }
@@ -238,7 +239,8 @@ export async function parsePdfAttachmentWithMinerU(
 
   try {
     if (!options.forceRefresh) {
-      const cached = await getMinerUCacheService().getCachedMarkdown(attachment);
+      const cached =
+        await getMinerUCacheService().getCachedMarkdown(attachment);
       if (cached) {
         ztoolkit.log(
           "[MinerUParser] Using cached MinerU markdown, length:",
@@ -269,7 +271,10 @@ export async function parsePdfAttachmentWithMinerU(
     try {
       await getMinerUCacheService().markFailed(attachment, message);
     } catch (cacheError) {
-      ztoolkit.log("[MinerUParser] Failed to record cache failure:", cacheError);
+      ztoolkit.log(
+        "[MinerUParser] Failed to record cache failure:",
+        cacheError,
+      );
     }
     return null;
   }

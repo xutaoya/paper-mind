@@ -1,4 +1,6 @@
 import { assert } from "chai";
+import { config } from "../package.json";
+import "../src/utils/setImmediatePolyfill.ts";
 import JSZip from "jszip";
 import {
   extractMarkdownFromZipBytes,
@@ -6,16 +8,29 @@ import {
   normalizeZipEntryPath,
 } from "../src/modules/chat/MinerUZipArchive.ts";
 
-describe("MinerUParser", function () {
+describe("MinerU archive extraction in Zotero", function () {
+  let originalZtoolkit: PropertyDescriptor | undefined;
+
+  before(function () {
+    originalZtoolkit = Object.getOwnPropertyDescriptor(globalThis, "ztoolkit");
+    Object.defineProperty(globalThis, "ztoolkit", {
+      configurable: true,
+      get: () => (Zotero as any)[config.addonInstance].data.ztoolkit,
+    });
+  });
+
+  after(function () {
+    if (originalZtoolkit)
+      Object.defineProperty(globalThis, "ztoolkit", originalZtoolkit);
+    else delete (globalThis as any).ztoolkit;
+  });
+
   it("normalizes unsafe zip entry paths", function () {
     assert.equal(
       normalizeZipEntryPath("demo:folder/full.md"),
       "demo_folder/full.md",
     );
-    assert.equal(
-      normalizeZipEntryPath("C:/demo/full.md"),
-      "demo/full.md",
-    );
+    assert.equal(normalizeZipEntryPath("C:/demo/full.md"), "demo/full.md");
     assert.isNull(normalizeZipEntryPath("../full.md"));
   });
 
@@ -52,8 +67,10 @@ describe("MinerUParser", function () {
       assert.isTrue(
         await IOUtils.exists(PathUtils.join(targetDir, "layout.json")),
       );
+    } catch (error) {
+      assert.fail(String(error));
     } finally {
-      await IOUtils.remove(targetDir, { recursive: true });
+      await IOUtils.remove(targetDir, { recursive: true, ignoreAbsent: true });
     }
   });
 
@@ -83,8 +100,10 @@ describe("MinerUParser", function () {
       const markdown = await extractMineruZipToDirectory(bytes, targetDir);
       assert.equal(markdown, "# Unsafe path\n\nBody");
       assert.isTrue(await IOUtils.exists(PathUtils.join(targetDir, "full.md")));
+    } catch (error) {
+      assert.fail(String(error));
     } finally {
-      await IOUtils.remove(targetDir, { recursive: true });
+      await IOUtils.remove(targetDir, { recursive: true, ignoreAbsent: true });
     }
   });
 });

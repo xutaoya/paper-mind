@@ -53,7 +53,9 @@ function bookmarkDropLineColor(): string {
 }
 
 function bookmarkDropLineGlow(): string {
-  return isDarkMode() ? "0 0 0 1px rgba(96, 165, 250, 0.35)" : "0 0 0 1px #eff6ff";
+  return isDarkMode()
+    ? "0 0 0 1px rgba(96, 165, 250, 0.35)"
+    : "0 0 0 1px #eff6ff";
 }
 
 export async function reapplyBookmarkManagerPanelTheme(
@@ -202,9 +204,7 @@ export function showBookmarkManagerToast(
   if (!doc) {
     return;
   }
-  panel
-    .querySelector(`.${BOOKMARK_MANAGER_TOAST_CLASS}`)
-    ?.remove();
+  panel.querySelector(`.${BOOKMARK_MANAGER_TOAST_CLASS}`)?.remove();
 
   const isError = kind === "error";
   const toast = createElement(
@@ -242,11 +242,7 @@ export function showBookmarkManagerToast(
         : isDarkMode()
           ? "1px solid rgba(52, 211, 153, 0.45)"
           : "1px solid #a7f3d0",
-      color: isDarkMode()
-        ? "#f4f4f5"
-        : isError
-          ? "#991b1b"
-          : "#065f46",
+      color: isDarkMode() ? "#f4f4f5" : isError ? "#991b1b" : "#065f46",
     },
     {
       class: BOOKMARK_MANAGER_TOAST_CLASS,
@@ -334,7 +330,10 @@ function normalizeBookmarkSearchQuery(query: string): string {
   return query.trim().toLowerCase();
 }
 
-function bookmarkMatchesSearch(bookmark: BookmarkRecord, query: string): boolean {
+function bookmarkMatchesSearch(
+  bookmark: BookmarkRecord,
+  query: string,
+): boolean {
   const normalized = normalizeBookmarkSearchQuery(query);
   if (!normalized) {
     return true;
@@ -343,7 +342,10 @@ function bookmarkMatchesSearch(bookmark: BookmarkRecord, query: string): boolean
   return haystack.includes(normalized);
 }
 
-function folderNameMatchesSearch(folder: BookmarkFolder, query: string): boolean {
+function folderNameMatchesSearch(
+  folder: BookmarkFolder,
+  query: string,
+): boolean {
   const normalized = normalizeBookmarkSearchQuery(query);
   if (!normalized) {
     return false;
@@ -370,7 +372,8 @@ function filterBookmarksForSearch(
   return bookmarks.filter(
     (bookmark) =>
       bookmarkMatchesSearch(bookmark, query) ||
-      (bookmark.folderId != null && folderNameMatchedIds.has(bookmark.folderId)),
+      (bookmark.folderId != null &&
+        folderNameMatchedIds.has(bookmark.folderId)),
   );
 }
 
@@ -651,7 +654,11 @@ async function renderBookmarkManagerBody(
   });
   const searchQuery = state.query;
   const isSearchActive = normalizeBookmarkSearchQuery(searchQuery).length > 0;
-  const bookmarks = filterBookmarksForSearch(allBookmarks, folders, searchQuery);
+  const bookmarks = filterBookmarksForSearch(
+    allBookmarks,
+    folders,
+    searchQuery,
+  );
   state.lastSearchResultCount = bookmarks.length;
   state.lastTotalFolderCount = folders.length;
   state.lastTotalBookmarkCount = allBookmarks.length;
@@ -845,7 +852,9 @@ function readDragPayload(event: DragEvent): DragPayload | null {
   return null;
 }
 
-async function rerenderBookmarkManager(context: BookmarkDropContext): Promise<void> {
+async function rerenderBookmarkManager(
+  context: BookmarkDropContext,
+): Promise<void> {
   const state = getBookmarkManagerState(context.panel);
   await renderBookmarkManagerBody(
     context.panel,
@@ -908,7 +917,9 @@ async function reorderFolderRelative(
   setBookmarkManagerState(context.panel, state);
   await rerenderBookmarkManager(context);
   context.actions.onSuccess?.(
-    getString("chat-bookmark-folder-reordered", { args: { title: folder.name } }),
+    getString("chat-bookmark-folder-reordered", {
+      args: { title: folder.name },
+    }),
   );
 }
 
@@ -920,7 +931,11 @@ async function moveFolderToParent(
   const service = getBookmarkService();
   const folders = await service.listFolders();
   const folder = folders.find((entry) => entry.id === folderId);
-  if (!folder || folder.parentId === targetParentId || folderId === targetParentId) {
+  if (
+    !folder ||
+    folder.parentId === targetParentId ||
+    folderId === targetParentId
+  ) {
     return;
   }
   try {
@@ -986,7 +1001,8 @@ function attachFolderRowDropTarget(
   row.addEventListener("drop", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    const placement = (row.dataset.dropPlacement as FolderDropPlacement) || "inside";
+    const placement =
+      (row.dataset.dropPlacement as FolderDropPlacement) || "inside";
     clearDropTargetStyle(row);
     row.style.background = expanded
       ? bookmarkFolderExpandedBg()
@@ -1104,7 +1120,11 @@ function openBookmarkReader(
   allBookmarks: BookmarkRecord[],
   actions: BookmarkManagerActions,
 ): void {
-  if (bookmark.type !== "message" || !bookmark.sessionId || !bookmark.messageId) {
+  if (
+    bookmark.type !== "message" ||
+    !bookmark.sessionId ||
+    !bookmark.messageId
+  ) {
     actions.onError?.(getString("chat-bookmark-open-unavailable"));
     return;
   }
@@ -1120,7 +1140,11 @@ function jumpToBookmarkChat(
   bookmark: BookmarkRecord,
   actions: BookmarkManagerActions,
 ): void {
-  if (bookmark.type !== "message" || !bookmark.sessionId || !bookmark.messageId) {
+  if (
+    bookmark.type !== "message" ||
+    !bookmark.sessionId ||
+    !bookmark.messageId
+  ) {
     actions.onError?.(getString("chat-bookmark-open-unavailable"));
     return;
   }
@@ -1128,13 +1152,15 @@ function jumpToBookmarkChat(
     openBookmarkReader(bookmark, [bookmark], actions);
     return;
   }
-  void Promise.resolve(actions.onJumpToChat(bookmark)).catch((error: unknown) => {
-    actions.onError?.(
-      error instanceof Error
-        ? error.message
-        : getString("chat-bookmark-open-unavailable"),
-    );
-  });
+  void Promise.resolve(actions.onJumpToChat(bookmark)).catch(
+    (error: unknown) => {
+      actions.onError?.(
+        error instanceof Error
+          ? error.message
+          : getString("chat-bookmark-open-unavailable"),
+      );
+    },
+  );
 }
 
 function createBookmarkRow(
@@ -1246,24 +1272,30 @@ function createBookmarkRow(
     }),
   );
   actionBar.appendChild(
-    createBookmarkIconButton(doc, theme, "write", getString("chat-bookmark-edit"), async () => {
-      const nextTitle = await openBookmarkTextPrompt(doc, theme, {
-        title: getString("chat-bookmark-edit"),
-        label: getString("chat-bookmark-field-title"),
-        defaultValue: bookmark.title,
-        confirmLabel: getString("chat-bookmark-save"),
-      });
-      if (!nextTitle) return;
-      await getBookmarkService().updateBookmark(bookmark.id, {
-        title: nextTitle.trim(),
-      });
-      await renderBookmarkManagerBody(
-        panel,
-        theme,
-        actions,
-        getBookmarkManagerState(panel),
-      );
-    }),
+    createBookmarkIconButton(
+      doc,
+      theme,
+      "write",
+      getString("chat-bookmark-edit"),
+      async () => {
+        const nextTitle = await openBookmarkTextPrompt(doc, theme, {
+          title: getString("chat-bookmark-edit"),
+          label: getString("chat-bookmark-field-title"),
+          defaultValue: bookmark.title,
+          confirmLabel: getString("chat-bookmark-save"),
+        });
+        if (!nextTitle) return;
+        await getBookmarkService().updateBookmark(bookmark.id, {
+          title: nextTitle.trim(),
+        });
+        await renderBookmarkManagerBody(
+          panel,
+          theme,
+          actions,
+          getBookmarkManagerState(panel),
+        );
+      },
+    ),
   );
   const dragHandle = createBookmarkDragHandle(
     doc,
@@ -1273,22 +1305,29 @@ function createBookmarkRow(
   attachBookmarkRowDrag(dragHandle, row, bookmark);
   actionBar.appendChild(dragHandle);
   actionBar.appendChild(
-    createBookmarkIconButton(doc, theme, "trash", getString("chat-bookmark-delete"), async () => {
-      const confirmed = await openBookmarkConfirm(doc, theme, {
-        title: getString("chat-bookmark-delete"),
-        message: getString("chat-bookmark-delete-confirm"),
-        confirmLabel: getString("chat-bookmark-delete"),
-        danger: true,
-      });
-      if (!confirmed) return;
-      await getBookmarkService().deleteBookmark(bookmark.id);
-      await renderBookmarkManagerBody(
-        panel,
-        theme,
-        actions,
-        getBookmarkManagerState(panel),
-      );
-    }, { danger: true }),
+    createBookmarkIconButton(
+      doc,
+      theme,
+      "trash",
+      getString("chat-bookmark-delete"),
+      async () => {
+        const confirmed = await openBookmarkConfirm(doc, theme, {
+          title: getString("chat-bookmark-delete"),
+          message: getString("chat-bookmark-delete-confirm"),
+          confirmLabel: getString("chat-bookmark-delete"),
+          danger: true,
+        });
+        if (!confirmed) return;
+        await getBookmarkService().deleteBookmark(bookmark.id);
+        await renderBookmarkManagerBody(
+          panel,
+          theme,
+          actions,
+          getBookmarkManagerState(panel),
+        );
+      },
+      { danger: true },
+    ),
   );
 
   bindBookmarkRowHoverEffects(row, theme, date, actionBar, theme.inputBg);
@@ -1416,22 +1455,28 @@ function createFolderRow(
     ),
   );
   actionBar.appendChild(
-    createBookmarkIconButton(doc, theme, "write", getString("chat-bookmark-edit"), async () => {
-      const nextName = await openBookmarkTextPrompt(doc, theme, {
-        title: getString("chat-bookmark-edit"),
-        label: getString("chat-bookmark-new-folder-prompt"),
-        defaultValue: folder.name,
-        confirmLabel: getString("chat-bookmark-save"),
-      });
-      if (!nextName) return;
-      await getBookmarkService().renameFolder(folder.id, nextName);
-      await renderBookmarkManagerBody(
-        panel,
-        theme,
-        actions,
-        getBookmarkManagerState(panel),
-      );
-    }),
+    createBookmarkIconButton(
+      doc,
+      theme,
+      "write",
+      getString("chat-bookmark-edit"),
+      async () => {
+        const nextName = await openBookmarkTextPrompt(doc, theme, {
+          title: getString("chat-bookmark-edit"),
+          label: getString("chat-bookmark-new-folder-prompt"),
+          defaultValue: folder.name,
+          confirmLabel: getString("chat-bookmark-save"),
+        });
+        if (!nextName) return;
+        await getBookmarkService().renameFolder(folder.id, nextName);
+        await renderBookmarkManagerBody(
+          panel,
+          theme,
+          actions,
+          getBookmarkManagerState(panel),
+        );
+      },
+    ),
   );
   const dragHandle = createBookmarkDragHandle(
     doc,
@@ -1441,22 +1486,29 @@ function createFolderRow(
   attachFolderRowDrag(dragHandle, row, folder, panel);
   actionBar.appendChild(dragHandle);
   actionBar.appendChild(
-    createBookmarkIconButton(doc, theme, "trash", getString("chat-bookmark-delete"), async () => {
-      const confirmed = await openBookmarkConfirm(doc, theme, {
-        title: getString("chat-bookmark-delete"),
-        message: getString("chat-bookmark-delete-folder-confirm"),
-        confirmLabel: getString("chat-bookmark-delete"),
-        danger: true,
-      });
-      if (!confirmed) return;
-      await getBookmarkService().deleteFolder(folder.id);
-      await renderBookmarkManagerBody(
-        panel,
-        theme,
-        actions,
-        getBookmarkManagerState(panel),
-      );
-    }, { danger: true }),
+    createBookmarkIconButton(
+      doc,
+      theme,
+      "trash",
+      getString("chat-bookmark-delete"),
+      async () => {
+        const confirmed = await openBookmarkConfirm(doc, theme, {
+          title: getString("chat-bookmark-delete"),
+          message: getString("chat-bookmark-delete-folder-confirm"),
+          confirmLabel: getString("chat-bookmark-delete"),
+          danger: true,
+        });
+        if (!confirmed) return;
+        await getBookmarkService().deleteFolder(folder.id);
+        await renderBookmarkManagerBody(
+          panel,
+          theme,
+          actions,
+          getBookmarkManagerState(panel),
+        );
+      },
+      { danger: true },
+    ),
   );
 
   const restingBackground = theme.inputBg;

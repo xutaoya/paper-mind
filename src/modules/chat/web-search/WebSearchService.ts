@@ -97,9 +97,7 @@ function explicitSourceProviderOrder(
     case "openalex":
       return ["openalex", "google_scholar"];
     case "exa":
-      return isExaWebSearchEnabled()
-        ? ["exa", "bing", "duckduckgo"]
-        : ["exa"];
+      return isExaWebSearchEnabled() ? ["exa", "bing", "duckduckgo"] : ["exa"];
     case "bing":
       return ["bing", "duckduckgo"];
     case "duckduckgo":
@@ -230,7 +228,8 @@ function buildProviderOrder(
         ["openalex", "google_scholar", "bing", "duckduckgo"],
         request,
       ),
-      reason: "intent=discover prefers API discovery, then browser scholarly scrape, then general web",
+      reason:
+        "intent=discover prefers API discovery, then browser scholarly scrape, then general web",
     };
   }
 
@@ -240,7 +239,8 @@ function buildProviderOrder(
         ["openalex", "google_scholar", "bing", "duckduckgo"],
         request,
       ),
-      reason: "intent=related prefers API discovery, then browser scholarly scrape, then general web",
+      reason:
+        "intent=related prefers API discovery, then browser scholarly scrape, then general web",
     };
   }
 
@@ -249,7 +249,8 @@ function buildProviderOrder(
       ["openalex", "google_scholar", "bing", "duckduckgo"],
       request,
     ),
-    reason: "auto routing prefers API discovery, then browser scholarly scrape, then general web",
+    reason:
+      "auto routing prefers API discovery, then browser scholarly scrape, then general web",
   };
 }
 

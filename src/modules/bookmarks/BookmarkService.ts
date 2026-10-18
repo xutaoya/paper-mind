@@ -38,10 +38,7 @@ export function deriveBookmarkTitleForAssistantReply(
   assistantMessageId: string,
   fallbackContent = "",
 ): string {
-  const user = findPrecedingUserMessage(
-    [...messages],
-    assistantMessageId,
-  );
+  const user = findPrecedingUserMessage([...messages], assistantMessageId);
   if (user) {
     const question =
       extractEditableUserMessageContent(user) || user.content.trim();
@@ -93,10 +90,7 @@ export class BookmarkService {
     await this.repository().deleteFolder(folderId);
   }
 
-  async moveFolder(
-    folderId: string,
-    parentId: string | null,
-  ): Promise<void> {
+  async moveFolder(folderId: string, parentId: string | null): Promise<void> {
     const folders = await this.listFolders();
     if (folderId === parentId) {
       return;
@@ -155,7 +149,11 @@ export class BookmarkService {
       }
     }
 
-    await this.repository().reorderFolder(folderId, referenceFolderId, placement);
+    await this.repository().reorderFolder(
+      folderId,
+      referenceFolderId,
+      placement,
+    );
   }
 
   private isFolderDescendant(
@@ -257,7 +255,11 @@ export class BookmarkService {
   }
 
   async importAll(payload: BookmarkExportPayload): Promise<void> {
-    if (payload.version !== 1 || !Array.isArray(payload.folders) || !Array.isArray(payload.bookmarks)) {
+    if (
+      payload.version !== 1 ||
+      !Array.isArray(payload.folders) ||
+      !Array.isArray(payload.bookmarks)
+    ) {
       throw new Error(getString("chat-bookmark-import-invalid"));
     }
     await this.repository().replaceAll(payload.folders, payload.bookmarks);

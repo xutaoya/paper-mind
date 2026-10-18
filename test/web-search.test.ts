@@ -652,7 +652,8 @@ describe("web search", function () {
     prefStore.set("extensions.zotero.paperchat.webSearchProvider", "auto");
     queueHiddenBrowserPageData({
       title: "Google Scholar",
-      bodyText: "Our systems have detected unusual traffic from your computer network.",
+      bodyText:
+        "Our systems have detected unusual traffic from your computer network.",
       html: "<html><body>not a robot</body></html>",
     });
     queueJsonResponse({

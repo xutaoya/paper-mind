@@ -101,8 +101,7 @@ function findLastUserRequestMessage(
   return [...messages]
     .reverse()
     .find(
-      (message) =>
-        message.role === "user" && !isRuntimeContextMessage(message),
+      (message) => message.role === "user" && !isRuntimeContextMessage(message),
     );
 }
 
@@ -361,7 +360,9 @@ export class ExecutionPlanManager {
   }
 
   private completePlanningStep(plan: ExecutionPlan, now: number): void {
-    const planningStep = plan.steps.find((step) => step.id === PLANNING_STEP_ID);
+    const planningStep = plan.steps.find(
+      (step) => step.id === PLANNING_STEP_ID,
+    );
     if (!planningStep || planningStep.status !== "in_progress") {
       return;
     }

@@ -43,7 +43,9 @@ export function formatRuntimeContextUserContent(content: string): string {
   return `${RUNTIME_CONTEXT_USER_PREFIX}${content}`;
 }
 
-export function buildCacheCheckpointMessage(timestamp = Date.now()): ChatMessage {
+export function buildCacheCheckpointMessage(
+  timestamp = Date.now(),
+): ChatMessage {
   return {
     id: CACHE_CHECKPOINT_MESSAGE_ID,
     role: "system",

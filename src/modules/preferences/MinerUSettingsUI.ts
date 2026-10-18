@@ -6,9 +6,7 @@ import { getPref, setPref } from "../../utils/prefs";
 import { getString } from "../../utils/locale";
 import { getErrorMessage } from "../../utils/common";
 import { testMineruApiToken } from "../chat/MinerUParser";
-import {
-  getMinerUCacheService,
-} from "../chat/MinerUCacheService";
+import { getMinerUCacheService } from "../chat/MinerUCacheService";
 import { parsePdfAttachmentWithMinerU } from "../chat/MinerUParser";
 import {
   buildCollectionTree,
@@ -226,7 +224,8 @@ export async function refreshMineruCacheUI(doc: Document): Promise<void> {
 
 async function renderMineruCacheUI(doc: Document): Promise<void> {
   const cacheItems = await getMinerUCacheService().listItems();
-  const scopeAttachments = await listPdfAttachmentsForScope(activeCollectionKey);
+  const scopeAttachments =
+    await listPdfAttachmentsForScope(activeCollectionKey);
   const rows = buildLibraryRows(scopeAttachments, cacheItems, {
     tag: activeTag,
     search: cacheSearch,
@@ -249,7 +248,9 @@ async function renderMineruCacheUI(doc: Document): Promise<void> {
       : 0;
   }
 
-  const collectionContainer = doc.getElementById("pref-mineru-cache-collections");
+  const collectionContainer = doc.getElementById(
+    "pref-mineru-cache-collections",
+  );
   if (collectionContainer) {
     collectionContainer.textContent = "";
     const tree = await buildCollectionTree(
@@ -521,7 +522,8 @@ function setMineruCacheStatus(
 
 async function listPendingAttachmentsInScope(): Promise<Zotero.Item[]> {
   const cacheService = getMinerUCacheService();
-  const scopeAttachments = await listPdfAttachmentsForScope(activeCollectionKey);
+  const scopeAttachments =
+    await listPdfAttachmentsForScope(activeCollectionKey);
   const pending: Zotero.Item[] = [];
   for (const attachment of scopeAttachments) {
     const cached = await cacheService.getCachedMarkdown(attachment);
@@ -533,7 +535,9 @@ async function listPendingAttachmentsInScope(): Promise<Zotero.Item[]> {
 }
 
 export function bindMineruPrefEvents(doc: Document): void {
-  if ((doc as Document & { [MINERU_PREFS_BOUND]?: boolean })[MINERU_PREFS_BOUND]) {
+  if (
+    (doc as Document & { [MINERU_PREFS_BOUND]?: boolean })[MINERU_PREFS_BOUND]
+  ) {
     return;
   }
   (doc as Document & { [MINERU_PREFS_BOUND]?: boolean })[MINERU_PREFS_BOUND] =

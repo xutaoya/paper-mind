@@ -15,15 +15,16 @@ const LAST_SECTION_STORAGE_KEY = "paperchat.prefs.lastSection";
 
 const PREFERENCES_SECTION_ID_SET = new Set<string>(PREFERENCES_SECTION_IDS);
 
-function isPreferencesSectionId(value: string | null): value is PreferencesSectionId {
+function isPreferencesSectionId(
+  value: string | null,
+): value is PreferencesSectionId {
   return !!value && PREFERENCES_SECTION_ID_SET.has(value);
 }
 
 function getStoredSection(doc: Document): PreferencesSectionId | null {
   try {
     const stored =
-      doc.defaultView?.sessionStorage.getItem(LAST_SECTION_STORAGE_KEY) ??
-      null;
+      doc.defaultView?.sessionStorage.getItem(LAST_SECTION_STORAGE_KEY) ?? null;
     return isPreferencesSectionId(stored) ? stored : null;
   } catch {
     return null;

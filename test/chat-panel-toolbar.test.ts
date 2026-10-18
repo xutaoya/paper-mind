@@ -3,7 +3,12 @@ import { createChatContainer } from "../src/modules/ui/chat-panel/ChatPanelBuild
 import { lightTheme } from "../src/modules/ui/chat-panel/ChatPanelTheme.ts";
 
 class FakeElement {
-  readonly style: Record<string, string> = {};
+  readonly style = {
+    setProperty(name: string, value: string) {
+      Object.assign(this, { [name]: value });
+    },
+  };
+  readonly dataset: Record<string, string> = {};
   readonly attributes = new Map<string, string>();
   readonly children: FakeElement[] = [];
   parentElement: FakeElement | null = null;
@@ -135,6 +140,9 @@ describe("chat panel toolbar", function () {
 
     assert.isNotNull(primary);
     assert.strictEqual(panelMode?.parentElement, primary);
-    assert.equal(primary?.children[0]?.getAttribute("id"), "chat-panel-mode-btn");
+    assert.equal(
+      primary?.children[0]?.getAttribute("id"),
+      "chat-panel-mode-btn",
+    );
   });
 });

@@ -32,7 +32,9 @@ export function updateContextWindowUsageDisplay(
   theme: ThemeColors,
   session: ChatSession | null,
 ): void {
-  const root = container.querySelector("#chat-context-usage") as HTMLElement | null;
+  const root = container.querySelector(
+    "#chat-context-usage",
+  ) as HTMLElement | null;
   const button = container.querySelector(
     "#chat-context-usage-btn",
   ) as HTMLButtonElement | null;

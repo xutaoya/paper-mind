@@ -7,7 +7,10 @@ import {
 
 describe("chatUIFontScale", function () {
   it("normalizes chat panel scale to 10% steps within 80-180", function () {
-    assert.equal(normalizeChatUIFontScale(undefined), DEFAULT_CHAT_UI_FONT_SCALE);
+    assert.equal(
+      normalizeChatUIFontScale(undefined),
+      DEFAULT_CHAT_UI_FONT_SCALE,
+    );
     assert.equal(normalizeChatUIFontScale(100), 100);
     assert.equal(normalizeChatUIFontScale(84), 80);
     assert.equal(normalizeChatUIFontScale(86), 90);

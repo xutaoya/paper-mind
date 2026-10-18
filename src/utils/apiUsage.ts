@@ -5,7 +5,9 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 function readFiniteNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
 }
 
 function readReasoningTokensFromDetails(details: unknown): number | undefined {
@@ -22,7 +24,9 @@ function readReasoningTokensFromDetails(details: unknown): number | undefined {
 /**
  * Extract provider-reported reasoning / thinking token usage when present.
  */
-export function extractReasoningTokensFromUsage(usage: unknown): number | undefined {
+export function extractReasoningTokensFromUsage(
+  usage: unknown,
+): number | undefined {
   if (!isPlainObject(usage)) {
     return undefined;
   }
@@ -49,7 +53,10 @@ export function extractReasoningTokensFromUsage(usage: unknown): number | undefi
   return undefined;
 }
 
-function readUsageNumber(usage: Record<string, unknown>, ...keys: string[]): number | undefined {
+function readUsageNumber(
+  usage: Record<string, unknown>,
+  ...keys: string[]
+): number | undefined {
   for (const key of keys) {
     const value = readFiniteNumber(usage[key]);
     if (value !== undefined) {
@@ -62,7 +69,9 @@ function readUsageNumber(usage: Record<string, unknown>, ...keys: string[]): num
 /**
  * Normalize a single provider usage payload into a turn delta.
  */
-export function extractTurnTokenUsage(usage: unknown): ChatMessageTurnUsage | null {
+export function extractTurnTokenUsage(
+  usage: unknown,
+): ChatMessageTurnUsage | null {
   if (!isPlainObject(usage)) {
     return null;
   }
@@ -114,7 +123,10 @@ export function mergeTurnTokenUsage(
   return {
     inputTokens: mergeUsageNumber(base?.inputTokens, delta.inputTokens),
     outputTokens: mergeUsageNumber(base?.outputTokens, delta.outputTokens),
-    reasoningTokens: mergeUsageNumber(base?.reasoningTokens, delta.reasoningTokens),
+    reasoningTokens: mergeUsageNumber(
+      base?.reasoningTokens,
+      delta.reasoningTokens,
+    ),
     totalTokens: mergeUsageNumber(base?.totalTokens, delta.totalTokens),
   };
 }

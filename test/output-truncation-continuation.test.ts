@@ -28,10 +28,7 @@ describe("output truncation continuation", function () {
 
   it("uses a reasoning-specific continuation prompt when content is empty", function () {
     assert.equal(
-      getOutputTruncationContinuationUserMessage(
-        "",
-        "Partial reasoning chain",
-      ),
+      getOutputTruncationContinuationUserMessage("", "Partial reasoning chain"),
       REASONING_TRUNCATION_CONTINUATION_USER_MESSAGE,
     );
   });

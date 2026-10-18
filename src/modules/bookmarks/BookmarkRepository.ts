@@ -62,7 +62,10 @@ export class BookmarkRepository {
     return rows.map((row) => mapFolderRow(row as Record<string, unknown>));
   }
 
-  async createFolder(name: string, parentId: string | null = null): Promise<BookmarkFolder> {
+  async createFolder(
+    name: string,
+    parentId: string | null = null,
+  ): Promise<BookmarkFolder> {
     const db = await getStorageDatabase().ensureInit();
     const now = Date.now();
     const folder: BookmarkFolder = {
@@ -130,10 +133,7 @@ export class BookmarkRepository {
     });
   }
 
-  async moveFolder(
-    folderId: string,
-    parentId: string | null,
-  ): Promise<void> {
+  async moveFolder(folderId: string, parentId: string | null): Promise<void> {
     const db = await getStorageDatabase().ensureInit();
     const now = Date.now();
     await db.queryAsync(
@@ -169,7 +169,9 @@ export class BookmarkRepository {
           }),
       );
 
-    let insertIndex = siblings.findIndex((entry) => entry.id === referenceFolderId);
+    let insertIndex = siblings.findIndex(
+      (entry) => entry.id === referenceFolderId,
+    );
     if (insertIndex < 0) {
       return;
     }
@@ -301,9 +303,7 @@ export class BookmarkRepository {
 
   async updateBookmark(
     bookmarkId: string,
-    patch: Partial<
-      Pick<BookmarkRecord, "title" | "content" | "folderId">
-    >,
+    patch: Partial<Pick<BookmarkRecord, "title" | "content" | "folderId">>,
   ): Promise<void> {
     const db = await getStorageDatabase().ensureInit();
     const fields: string[] = ["updated_at = ?"];

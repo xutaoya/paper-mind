@@ -106,7 +106,6 @@ export async function initializePrefsUI(): Promise<void> {
     trackProviderView: true,
     providerViewSource: "settings_opened",
   });
-
 }
 
 function resolveCurrentProviderId(

@@ -14,6 +14,8 @@ function shortHash(value: string): string {
 }
 
 function sanitizeZipPathComponent(part: string): string | null {
+  // Strip control characters from archive paths before writing to disk.
+  // eslint-disable-next-line no-control-regex
   const trimmed = part.trim().replace(/[\u0000-\u001f\u007f]/g, "");
   if (!trimmed || trimmed === "." || trimmed === "..") {
     return null;
@@ -68,7 +70,7 @@ export function normalizeZipEntryPath(name: string): string | null {
 
 function safeJoinPath(baseDir: string, relativePath: string): string | null {
   try {
-    return PathUtils.join(baseDir, relativePath);
+    return PathUtils.join(baseDir, ...relativePath.split("/"));
   } catch (error) {
     ztoolkit.log(
       `[MinerUZip] Skipping invalid zip entry path "${relativePath}":`,

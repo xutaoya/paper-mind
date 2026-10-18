@@ -21,7 +21,11 @@ function scheduleNextFrame(callback: () => void, doc: Document): void {
   scheduleTimeout(callback, 0, doc);
 }
 
-function scheduleTimeout(callback: () => void, delayMs: number, doc: Document): number {
+function scheduleTimeout(
+  callback: () => void,
+  delayMs: number,
+  doc: Document,
+): number {
   const view = resolveDocumentView(doc);
   if (view && typeof view.setTimeout === "function") {
     return view.setTimeout(callback, delayMs);
@@ -49,7 +53,8 @@ function positionChatPanelToast(
   if (anchor) {
     const viewportRect = viewport.getBoundingClientRect();
     const anchorRect = anchor.getBoundingClientRect();
-    const relativeTop = anchorRect.top - viewportRect.top + TOAST_VIEWPORT_PADDING_PX;
+    const relativeTop =
+      anchorRect.top - viewportRect.top + TOAST_VIEWPORT_PADDING_PX;
     const maxTop = Math.max(
       TOAST_VIEWPORT_PADDING_PX,
       viewportHeight - toast.offsetHeight - TOAST_VIEWPORT_PADDING_PX,
@@ -70,7 +75,9 @@ export function showChatPanelToast(
     return;
   }
 
-  const viewport = container.querySelector("#chat-viewport") as HTMLElement | null;
+  const viewport = container.querySelector(
+    "#chat-viewport",
+  ) as HTMLElement | null;
   const doc = container.ownerDocument;
   if (!viewport || !doc) {
     return;

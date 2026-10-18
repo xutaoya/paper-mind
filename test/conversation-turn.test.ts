@@ -21,13 +21,13 @@ describe("conversation turn slice", function () {
       message("assistant-2", "assistant"),
     ];
 
-    assert.deepEqual(
-      resolveConversationTurnSlice(messages, "assistant-1"),
-      { start: 0, end: 2 },
-    );
-    assert.deepEqual(
-      resolveConversationTurnSlice(messages, "assistant-2"),
-      { start: 2, end: 5 },
-    );
+    assert.deepEqual(resolveConversationTurnSlice(messages, "assistant-1"), {
+      start: 0,
+      end: 2,
+    });
+    assert.deepEqual(resolveConversationTurnSlice(messages, "assistant-2"), {
+      start: 2,
+      end: 5,
+    });
   });
 });

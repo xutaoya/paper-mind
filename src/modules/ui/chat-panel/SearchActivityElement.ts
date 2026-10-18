@@ -61,10 +61,7 @@ function isTextTruncated(el: HTMLElement, fullText?: string): boolean {
   return measureTextOverflow(el, text);
 }
 
-export function measureTextOverflow(
-  el: HTMLElement,
-  text: string,
-): boolean {
+export function measureTextOverflow(el: HTMLElement, text: string): boolean {
   const doc = el.ownerDocument;
   const win = doc.defaultView;
   if (!win) {
@@ -267,7 +264,10 @@ function showFixedTooltip(anchor: HTMLElement, text: string): void {
   tip.textContent = text;
   positionTooltip(tip, anchor, ctx.win);
   scheduleAfterLayout(ctx.doc, () => {
-    if (activeTooltipContext?.mount !== ctx.mount || tip.style.display === "none") {
+    if (
+      activeTooltipContext?.mount !== ctx.mount ||
+      tip.style.display === "none"
+    ) {
       return;
     }
     positionTooltip(tip, anchor, ctx.win);

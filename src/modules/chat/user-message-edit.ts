@@ -1,7 +1,9 @@
 import type { ChatMessage } from "../../types/chat";
 import type { AttachmentState } from "../ui/chat-panel/types";
 
-export function extractEditableUserMessageContent(message: ChatMessage): string {
+export function extractEditableUserMessageContent(
+  message: ChatMessage,
+): string {
   if (message.role !== "user" || message.isSystemNotice) {
     return "";
   }

@@ -157,8 +157,7 @@ describe("conversation navigator", function () {
     }));
 
     const makeMessageElement = (id: string, top: number) => ({
-      getAttribute: (name: string) =>
-        name === "data-message-id" ? id : null,
+      getAttribute: (name: string) => (name === "data-message-id" ? id : null),
       getBoundingClientRect: () => ({
         top,
         height: 80,

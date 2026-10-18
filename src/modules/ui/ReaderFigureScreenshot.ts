@@ -62,7 +62,9 @@ export function getPageCanvas(page: HTMLElement): HTMLCanvasElement | null {
 }
 
 function getPageNumber(page: HTMLElement): string {
-  return page.getAttribute("data-page-number") || page.dataset.pageNumber || "1";
+  return (
+    page.getAttribute("data-page-number") || page.dataset.pageNumber || "1"
+  );
 }
 
 function captureSelection(
@@ -112,7 +114,10 @@ function captureSelection(
       name: `figure-screenshot-page-${getPageNumber(page)}.png`,
     });
   } catch (error) {
-    ztoolkit.log("[ReaderFigureScreenshot] Failed to capture selection:", error);
+    ztoolkit.log(
+      "[ReaderFigureScreenshot] Failed to capture selection:",
+      error,
+    );
   }
 }
 

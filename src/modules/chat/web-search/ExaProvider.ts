@@ -55,7 +55,9 @@ export class ExaProvider implements WebSearchProvider {
     const response = await searchExa(body, this.timeoutMs);
     const rawResults = (response.results || [])
       .map((result) => this.mapResult(result, request))
-      .filter((result) => matchesDomainFilter(result.url, request.domainFilter));
+      .filter((result) =>
+        matchesDomainFilter(result.url, request.domainFilter),
+      );
 
     return {
       providerId: this.id,
@@ -71,10 +73,7 @@ export class ExaProvider implements WebSearchProvider {
     const title = cleanText(result.title || "");
     const url = cleanText(result.url || "");
     const snippet = cleanText(
-      result.highlights?.join(" ") ||
-        result.summary ||
-        result.text ||
-        "",
+      result.highlights?.join(" ") || result.summary || result.text || "",
     );
     const authors = cleanText(result.author || "")
       ? [cleanText(result.author || "")]

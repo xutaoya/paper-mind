@@ -156,7 +156,9 @@ export function resolveFeedbackBubbleColors(
   kind: "error" | "success",
   isDark: boolean,
 ): FeedbackBubbleColors {
-  const palette = isDark ? feedbackBubbleColors.dark : feedbackBubbleColors.light;
+  const palette = isDark
+    ? feedbackBubbleColors.dark
+    : feedbackBubbleColors.light;
   return palette[kind];
 }
 

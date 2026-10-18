@@ -251,7 +251,10 @@ export function applyComposerChromeTheme(
 
   if (inputWrapper) {
     inputWrapper.style.boxShadow = theme.composerShadow;
-    inputWrapper.style.setProperty("--composer-shadow-idle", theme.composerShadow);
+    inputWrapper.style.setProperty(
+      "--composer-shadow-idle",
+      theme.composerShadow,
+    );
   }
 
   const editBanner = container.querySelector(
@@ -286,7 +289,9 @@ export function applyComposerChromeTheme(
     "#chat-send-icon",
   ) as HTMLElement | null;
   if (sendIcon) {
-    sendIcon.style.filter = isDark ? "brightness(0)" : "brightness(0) invert(1)";
+    sendIcon.style.filter = isDark
+      ? "brightness(0)"
+      : "brightness(0) invert(1)";
   }
 
   applyQuickActionsTheme(container, theme);

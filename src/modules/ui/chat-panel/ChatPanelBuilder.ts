@@ -802,7 +802,10 @@ export function createChatContainer(
     "--composer-border-focus",
     theme.inputFocusBorderColor,
   );
-  inputWrapper.style.setProperty("--composer-shadow-idle", theme.composerShadow);
+  inputWrapper.style.setProperty(
+    "--composer-shadow-idle",
+    theme.composerShadow,
+  );
   inputWrapper.style.setProperty("--composer-context-focus", theme.textPrimary);
 
   inputWrapper.style.position = "relative";

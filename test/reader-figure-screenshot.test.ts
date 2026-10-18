@@ -18,7 +18,9 @@ function createReaderWindow(
         selector.includes("canvas") ||
         selector.includes("canvasWrapper")
       ) {
-        return pages.some((page) => page.withCanvas) ? { tagName: "CANVAS" } : null;
+        return pages.some((page) => page.withCanvas)
+          ? { tagName: "CANVAS" }
+          : null;
       }
       return null;
     },
@@ -48,7 +50,8 @@ describe("reader figure screenshot", function () {
         return name === "data-page-number" ? "3" : null;
       },
       closest(selector: string) {
-        return selector.includes("data-page-number") || selector.includes(".page")
+        return selector.includes("data-page-number") ||
+          selector.includes(".page")
           ? page
           : null;
       },
