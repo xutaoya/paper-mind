@@ -568,7 +568,9 @@ function buildToolCallStatusDot(
 ): HTMLElement {
   const dot = doc.createElementNS(HTML_NS, "span") as HTMLElement;
   dot.className =
-    status === "calling" ? "paperchat-tool-call-dot is-calling" : "paperchat-tool-call-dot";
+    status === "calling"
+      ? "paperchat-tool-call-dot is-calling"
+      : "paperchat-tool-call-dot";
   dot.style.width = "6px";
   dot.style.height = "6px";
   dot.style.borderRadius = "50%";
@@ -1225,13 +1227,27 @@ function stripEscapedEvidenceReferenceMarkup(content: string): string {
     .replace(/<\/evidence-ref\s*>/gi, "");
 }
 
+function stripIncompleteTrailingEvidenceReference(content: string): string {
+  const start = content.lastIndexOf("<");
+  if (start < 0) return content;
+  const tail = content.slice(start).toLowerCase();
+  const marker = "<evidence-ref";
+  if (
+    (tail.length > 1 && marker.startsWith(tail)) ||
+    (/^<evidence-ref\b/.test(tail) && !tail.includes(">"))
+  ) {
+    return content.slice(0, start);
+  }
+  return content;
+}
+
 function renderMarkdownFragment(
   doc: Document,
   parent: HTMLElement,
   content: string,
   options: MarkdownRenderOptions = {},
 ): void {
-  const normalized = content.trim();
+  const normalized = stripIncompleteTrailingEvidenceReference(content).trim();
   if (!normalized) return;
 
   const { content: evidencePrepared } = sanitizeEvidenceReferences(
@@ -2320,8 +2336,7 @@ function renderToolCallCards(
  */
 function preprocessMathDelimiters(content: string): string {
   const needsCodeProtect = content.includes("`");
-  const needsEmphasis =
-    content.includes("*") || content.includes("_");
+  const needsEmphasis = content.includes("*") || content.includes("_");
   const needsDisplayMath = content.includes("\\[");
   const needsInlineParenMath = content.includes("\\(");
 
@@ -2600,7 +2615,9 @@ function appendInlineTextWithEvidenceRefs(
 
   EVIDENCE_REF_INLINE_PATTERN.lastIndex = 0;
   const trustedIds = new Set(
-    normalizeEvidenceRecords(options.evidenceRecords).map((record) => record.id),
+    normalizeEvidenceRecords(options.evidenceRecords).map(
+      (record) => record.id,
+    ),
   );
   let lastIndex = 0;
   let match: RegExpExecArray | null;

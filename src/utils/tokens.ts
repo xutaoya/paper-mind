@@ -2,14 +2,36 @@
  * Rough token estimate for UI display (not billing-accurate).
  */
 export function estimateTextTokens(text: string): number {
-  if (!text) {
-    return 0;
+  return Math.ceil(estimateTextTokenUnits(text) / 12);
+}
+
+function estimateTextTokenUnits(text: string): number {
+  let units = text.length * 3;
+  for (let index = 0; index < text.length; index++) {
+    const code = text.charCodeAt(index);
+    if (
+      (code >= 0x4e00 && code <= 0x9fff) ||
+      (code >= 0x3040 && code <= 0x30ff)
+    ) {
+      units += 5;
+    }
   }
-  const cjkCount = (
-    text.match(/[\u4e00-\u9fff\u3040-\u309f\u30a0-\u30ff]/g) || []
-  ).length;
-  const otherCount = text.length - cjkCount;
-  return Math.ceil(cjkCount / 1.5 + otherCount / 4);
+  return units;
+}
+
+/** Estimate appended chunks without rescanning the whole text or rounding each delta. */
+export function createTextTokenEstimator(): (text: string) => number {
+  let previous = "";
+  let units = 0;
+  return (text) => {
+    if (text !== previous) {
+      units = text.startsWith(previous)
+        ? units + estimateTextTokenUnits(text.slice(previous.length))
+        : estimateTextTokenUnits(text);
+      previous = text;
+    }
+    return Math.ceil(units / 12);
+  };
 }
 
 /** Compact display for token counts, e.g. 2711 → "2.7k", 1.2M → "1.2M". */

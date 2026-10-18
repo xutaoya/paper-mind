@@ -280,6 +280,7 @@ paperchat-chat-agent-activity-searching-web = 正在搜索网页…
 paperchat-chat-agent-activity-searching-scholarly = 正在搜索学术资料…
 
 paperchat-chat-agent-activity-token-suffix = · { $tokens } tokens
+paperchat-chat-agent-activity-token-estimate-title = 生成中为实时估算，结束后按服务商返回的用量校准。
 
 paperchat-chat-tool-result-running = 运行中
 paperchat-chat-tool-result-completed = 已完成

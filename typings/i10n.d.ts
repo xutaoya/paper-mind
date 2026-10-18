@@ -39,6 +39,7 @@ export type FluentMessageId =
   | 'paperchat-chat-agent-activity-summary-thought'
   | 'paperchat-chat-agent-activity-summary-tools'
   | 'paperchat-chat-agent-activity-thinking'
+  | 'paperchat-chat-agent-activity-token-estimate-title'
   | 'paperchat-chat-agent-activity-token-suffix'
   | 'paperchat-chat-approval-card-args-label'
   | 'paperchat-chat-approval-card-risk-label'

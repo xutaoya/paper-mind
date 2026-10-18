@@ -5,7 +5,11 @@
 import { isDarkMode } from "./ChatPanelTheme";
 import { getString } from "../../../utils/locale";
 import { getTurnTokenTotal } from "../../../utils/apiUsage";
-import { formatCompactTokenCount, estimateTextTokens } from "../../../utils/tokens";
+import {
+  createTextTokenEstimator,
+  formatCompactTokenCount,
+  formatTokenCount,
+} from "../../../utils/tokens";
 import type { ChatMessageTurnUsage } from "../../../types/chat";
 import type { ThemeColors } from "./types";
 import { HTML_NS } from "./types";
@@ -13,6 +17,7 @@ import { createUiChevron, setUiChevronExpanded } from "./UiChevron";
 import {
   isPresentationToolCallEntry,
   parseToolCallFragments,
+  renderMarkdownToElement,
   type ParsedToolCallEntry,
 } from "./MarkdownRenderer";
 import {
@@ -32,8 +37,22 @@ const ACTIVITY_ENDED_AT_ATTR = "data-agent-activity-ended-at";
 const ACTIVITY_TURN_USAGE_ATTR = "data-agent-turn-usage";
 const AGENT_ACTIVITY_THINKING_LABEL = "Thinking...";
 const MAX_REASONING_LINES_WHILE_WORKING = 12;
+const REASONING_MARKDOWN_RENDER_INTERVAL_MS = 240;
 
 const agentActivityStyledDocuments = new WeakSet<Document>();
+const liveTurnTokenTrackers = new WeakMap<
+  HTMLElement,
+  ReturnType<typeof createLiveTurnTokenTracker>
+>();
+const reasoningRenderStates = new WeakMap<
+  HTMLElement,
+  {
+    pendingContent: string;
+    renderedContent: string | null;
+    renderedAt: number;
+    timeoutId: ReturnType<typeof setTimeout> | null;
+  }
+>();
 
 function ensureAgentActivityStyles(doc: Document): void {
   if (agentActivityStyledDocuments.has(doc)) {
@@ -63,7 +82,9 @@ function ensureAgentActivityStyles(doc: Document): void {
 
 function prefersReducedMotion(doc: Document): boolean {
   const view = (doc.defaultView ?? Zotero.getMainWindow()) as Window | null;
-  return Boolean(view?.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches);
+  return Boolean(
+    view?.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches,
+  );
 }
 
 function createThinkingShimmerLabel(doc: Document, dark: boolean): HTMLElement {
@@ -313,19 +334,44 @@ function formatActivitySummary(
   })}`;
 }
 
-function getLiveTurnTokenDisplay(
+export function createLiveTurnTokenTracker(): (
   turnUsage: ChatMessageTurnUsage | undefined,
   reasoning: string,
-): number | undefined {
-  const apiTotal = getTurnTokenTotal(turnUsage);
-  if (apiTotal) {
-    return apiTotal;
-  }
-  const normalizedReasoning = reasoning.trim();
-  if (!normalizedReasoning) {
-    return undefined;
-  }
-  return estimateTextTokens(normalizedReasoning);
+  content: string,
+) => number | undefined {
+  const estimateReasoning = createTextTokenEstimator();
+  const estimateContent = createTextTokenEstimator();
+  let reportedTotal = 0;
+  let estimateAtReport = 0;
+  let displayedTotal = 0;
+  let previousContent = "";
+  let visibleContent = "";
+
+  return (turnUsage, reasoning, content) => {
+    if (content !== previousContent) {
+      // Tool-result cards are app-authored, not newly generated answer tokens.
+      visibleContent = content.replace(
+        /<tool-call\b[\s\S]*?(?:<\/tool-call>|$)/gi,
+        "",
+      );
+      previousContent = content;
+    }
+    const estimatedTotal =
+      estimateReasoning(reasoning) + estimateContent(visibleContent);
+    const apiTotal = getTurnTokenTotal(turnUsage);
+    if (apiTotal && apiTotal !== reportedTotal) {
+      reportedTotal = apiTotal;
+      estimateAtReport = estimatedTotal;
+    }
+    // Usage usually arrives only at request boundaries. Add only text received
+    // since the latest report so earlier tool rounds do not freeze the counter.
+    displayedTotal = Math.max(
+      displayedTotal,
+      estimatedTotal,
+      reportedTotal + Math.max(0, estimatedTotal - estimateAtReport),
+    );
+    return displayedTotal || undefined;
+  };
 }
 
 function syncActivityHeaderTokens(
@@ -333,6 +379,7 @@ function syncActivityHeaderTokens(
   isWorking: boolean,
   turnUsage: ChatMessageTurnUsage | undefined,
   reasoning: string,
+  content: string,
 ): void {
   const liveTokens = container.querySelector(
     "[data-agent-activity-live-tokens]",
@@ -342,12 +389,18 @@ function syncActivityHeaderTokens(
   }
 
   if (!isWorking) {
+    liveTurnTokenTrackers.delete(container);
     liveTokens.style.display = "none";
     liveTokens.textContent = "";
     return;
   }
 
-  const total = getLiveTurnTokenDisplay(turnUsage, reasoning);
+  let trackTokens = liveTurnTokenTrackers.get(container);
+  if (!trackTokens) {
+    trackTokens = createLiveTurnTokenTracker();
+    liveTurnTokenTrackers.set(container, trackTokens);
+  }
+  const total = trackTokens(turnUsage, reasoning, content);
   if (!total) {
     liveTokens.style.display = "none";
     liveTokens.textContent = "";
@@ -355,8 +408,9 @@ function syncActivityHeaderTokens(
   }
 
   liveTokens.textContent = getString("chat-agent-activity-token-suffix", {
-    args: { tokens: formatCompactTokenCount(total) },
+    args: { tokens: `≈ ${formatTokenCount(total)}` },
   });
+  liveTokens.title = getString("chat-agent-activity-token-estimate-title");
   liveTokens.style.display = "inline";
 }
 
@@ -437,30 +491,58 @@ export function buildAgentActivityItems(
   return items;
 }
 
-function renderTextRow(
-  doc: Document,
-  theme: ThemeColors,
-  item: AgentActivityTextItem,
-): HTMLElement {
-  const row = createElement(
-    doc,
-    "div",
-    {
-      padding: "4px 6px",
-      fontSize: "12px",
-      lineHeight: "1.5",
-      color: theme.textMuted,
-      borderRadius: "6px",
-      wordBreak: "break-word",
-    },
-    {
-      "data-agent-activity-row": "text",
-      "data-agent-activity-item-id": item.id,
-    },
-  );
-  row.className = "paperchat-agent-activity-row paperchat-agent-activity-text-row";
-  row.textContent = item.content;
-  return row;
+export function renderAgentActivityReasoning(
+  element: HTMLElement,
+  reasoning: string,
+  isWorking: boolean,
+): void {
+  const content = isWorking
+    ? splitReasoningIntoLines(reasoning)
+        .slice(-MAX_REASONING_LINES_WHILE_WORKING)
+        .join("\n")
+    : reasoning.trim();
+  let state = reasoningRenderStates.get(element);
+  if (!state) {
+    state = {
+      pendingContent: content,
+      renderedContent: null,
+      renderedAt: 0,
+      timeoutId: null,
+    };
+    reasoningRenderStates.set(element, state);
+  }
+  state.pendingContent = content;
+  if (state.renderedContent === content) {
+    if (state.timeoutId !== null) {
+      clearTimeout(state.timeoutId);
+      state.timeoutId = null;
+    }
+    return;
+  }
+  const currentState = state;
+  const render = () => {
+    currentState.timeoutId = null;
+    renderMarkdownToElement(element, currentState.pendingContent, undefined, {
+      suppressSourceGroupCards: true,
+      suppressToolCallCards: true,
+    });
+    currentState.renderedContent = currentState.pendingContent;
+    currentState.renderedAt = Date.now();
+  };
+  const elapsed = Date.now() - state.renderedAt;
+  if (
+    !isWorking ||
+    state.renderedContent === null ||
+    elapsed >= REASONING_MARKDOWN_RENDER_INTERVAL_MS
+  ) {
+    if (state.timeoutId !== null) clearTimeout(state.timeoutId);
+    render();
+  } else if (state.timeoutId === null) {
+    state.timeoutId = setTimeout(() => {
+      currentState.timeoutId = null;
+      if (element.isConnected !== false) render();
+    }, REASONING_MARKDOWN_RENDER_INTERVAL_MS - elapsed);
+  }
 }
 
 function renderSearchRow(
@@ -482,6 +564,7 @@ function renderActivityItems(
   theme: ThemeColors,
   list: HTMLElement,
   items: AgentActivityItem[],
+  reasoning: string,
 ): { reasoningLines: number; toolCount: number } {
   list.textContent = "";
   let reasoningLines = 0;
@@ -491,7 +574,13 @@ function renderActivityItems(
   for (const item of items) {
     if (item.kind === "text") {
       reasoningLines++;
-      list.appendChild(renderTextRow(doc, theme, item));
+      if (reasoningLines === 1) {
+        renderAgentActivityReasoning(
+          ensureReasoningStreamElement(doc, theme, list),
+          reasoning,
+          false,
+        );
+      }
       continue;
     }
     toolCount++;
@@ -631,7 +720,7 @@ function ensureReasoningStreamElement(
       color: theme.textMuted,
       borderRadius: "6px",
       wordBreak: "break-word",
-      whiteSpace: "pre-wrap",
+      whiteSpace: "normal",
     },
     {
       "data-agent-activity-reasoning-stream": "true",
@@ -683,9 +772,7 @@ function syncActivityRowsIncremental(
 
   if (reasoningText) {
     const reasoningEl = ensureReasoningStreamElement(doc, theme, list);
-    if (reasoningEl.textContent !== reasoningText) {
-      reasoningEl.textContent = reasoningText;
-    }
+    renderAgentActivityReasoning(reasoningEl, reasoning, true);
     reasoningEl.style.display = "block";
   } else {
     const reasoningEl = list.querySelector(
@@ -744,7 +831,7 @@ function syncActivityRows(
   if (hideTools) {
     removeToolActivityRows(list);
   }
-  return renderActivityItems(doc, theme, list, items);
+  return renderActivityItems(doc, theme, list, items, reasoning);
 }
 
 function syncViewportScroll(
@@ -795,8 +882,11 @@ function setDisclosureOpen(
     : open
       ? `${Math.min(
           ACTIVITY_MAX_HEIGHT_PX,
-          (disclosure.querySelector("[data-agent-activity-list]") as HTMLElement)
-            ?.offsetHeight || 0,
+          (
+            disclosure.querySelector(
+              "[data-agent-activity-list]",
+            ) as HTMLElement
+          )?.offsetHeight || 0,
         )}px`
       : "0px";
 }
@@ -820,9 +910,7 @@ export function createAgentActivityPanel(
       "data-agent-activity-for": options.messageId,
       "data-streaming-reasoning-container-for": options.messageId,
       [ACTIVITY_STARTED_AT_ATTR]: String(startedAt),
-      ...(endedAt != null
-        ? { [ACTIVITY_ENDED_AT_ATTR]: String(endedAt) }
-        : {}),
+      ...(endedAt != null ? { [ACTIVITY_ENDED_AT_ATTR]: String(endedAt) } : {}),
       ...(options.hideToolActivityRows
         ? { [HIDE_TOOL_ACTIVITY_ATTR]: "true" }
         : {}),
@@ -963,15 +1051,30 @@ export function createAgentActivityPanel(
   const updateSummary = () => {
     const isWorkingNow =
       container.getAttribute("data-agent-working") === "true";
+    const reasoning =
+      container.getAttribute("data-agent-reasoning") ?? options.reasoning;
+    const content =
+      container.getAttribute("data-agent-content") ?? options.content;
+    const turnUsage = parseTurnUsageAttribute(
+      container.getAttribute(ACTIVITY_TURN_USAGE_ATTR),
+    );
+    syncActivityHeaderTokens(
+      container,
+      isWorkingNow,
+      turnUsage,
+      reasoning,
+      content,
+    );
     const currentStats = syncActivityRows(
       doc,
       theme,
       list,
-      container.getAttribute("data-agent-reasoning") || options.reasoning,
-      container.getAttribute("data-agent-content") || options.content,
+      reasoning,
+      content,
       isWorkingNow,
     );
-    const started = Number(container.getAttribute(ACTIVITY_STARTED_AT_ATTR)) || startedAt;
+    const started =
+      Number(container.getAttribute(ACTIVITY_STARTED_AT_ATTR)) || startedAt;
     const endedRaw = container.getAttribute(ACTIVITY_ENDED_AT_ATTR);
     const ended = endedRaw ? Number(endedRaw) : endedAt;
     const duration = resolveActivityDurationSeconds(
@@ -983,15 +1086,7 @@ export function createAgentActivityPanel(
       currentStats.reasoningLines,
       currentStats.toolCount,
       duration,
-      parseTurnUsageAttribute(
-        container.getAttribute(ACTIVITY_TURN_USAGE_ATTR),
-      ),
-    );
-    syncActivityHeaderTokens(
-      container,
-      isWorkingNow,
-      parseTurnUsageAttribute(container.getAttribute(ACTIVITY_TURN_USAGE_ATTR)),
-      container.getAttribute("data-agent-reasoning") || options.reasoning,
+      turnUsage,
     );
     syncViewportScroll(viewport, list, isWorkingNow);
     if (isWorkingNow) {
@@ -1042,8 +1137,9 @@ export function createAgentActivityPanel(
     "data-agent-working",
     options.isWorking ? "true" : "false",
   );
-  (container as HTMLElement & { __updateAgentActivity?: () => void }).__updateAgentActivity =
-    updateSummary;
+  (
+    container as HTMLElement & { __updateAgentActivity?: () => void }
+  ).__updateAgentActivity = updateSummary;
   updateSummary();
 
   return container;
@@ -1068,7 +1164,10 @@ export function updateAgentActivityPanel(
 
   activityPanel.setAttribute("data-agent-reasoning", reasoning);
   activityPanel.setAttribute("data-agent-content", content);
-  activityPanel.setAttribute("data-agent-working", isWorking ? "true" : "false");
+  activityPanel.setAttribute(
+    "data-agent-working",
+    isWorking ? "true" : "false",
+  );
   activityPanel.setAttribute(
     HIDE_TOOL_ACTIVITY_ATTR,
     hideToolActivityRows ? "true" : "false",
@@ -1081,7 +1180,10 @@ export function updateAgentActivityPanel(
     hideToolActivityRows ? "true" : "false",
   );
   setTurnUsageAttribute(activityPanel, turnUsage);
-  activityPanel.classList.toggle("paperchat-agent-activity--working", isWorking);
+  activityPanel.classList.toggle(
+    "paperchat-agent-activity--working",
+    isWorking,
+  );
 
   const hasContent =
     Boolean(reasoning.trim()) ||

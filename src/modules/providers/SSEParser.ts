@@ -307,12 +307,16 @@ export async function parseSSEStream(
   try {
     while (true) {
       const result = await reader.read();
-      if (result.done) break;
-      const value = result.value as Uint8Array;
-
-      buffer += decoder.decode(value, { stream: true });
+      buffer += result.done
+        ? decoder.decode()
+        : decoder.decode(result.value, { stream: true });
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
+      // Some compatible endpoints close after a complete data line without LF.
+      if (result.done && buffer.trim()) {
+        lines.push(buffer);
+        buffer = "";
+      }
 
       for (const line of lines) {
         const trimmed = line.trim();
@@ -381,6 +385,7 @@ export async function parseSSEStream(
           // Ignore JSON parse errors for incomplete chunks
         }
       }
+      if (result.done) break;
     }
     onDone();
   } catch (error) {
@@ -416,12 +421,15 @@ export async function parseSSEStreamWithToolCalling(
   try {
     while (true) {
       const result = await reader.read();
-      if (result.done) break;
-      const value = result.value as Uint8Array;
-
-      buffer += decoder.decode(value, { stream: true });
+      buffer += result.done
+        ? decoder.decode()
+        : decoder.decode(result.value, { stream: true });
       const lines = buffer.split("\n");
       buffer = lines.pop() || "";
+      if (result.done && buffer.trim()) {
+        lines.push(buffer);
+        buffer = "";
+      }
 
       for (const line of lines) {
         const trimmed = line.trim();
@@ -477,6 +485,7 @@ export async function parseSSEStreamWithToolCalling(
           }
         }
       }
+      if (result.done) break;
     }
 
     // 如果流结束但没有收到 done 事件，发送一个

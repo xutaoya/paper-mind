@@ -22,7 +22,6 @@ import { getAuthManager } from "../../auth";
 import { getProviderManager } from "../../providers";
 import { providerSupportsToolCalling } from "../../providers/provider-capabilities";
 import { getPref, setPref } from "../../../utils/prefs";
-import { deltaContainsMathMarkup } from "../../../utils/chatMathMarkdown";
 import {
   createNoteSummaryContext,
   type NoteSummarySourceItem,
@@ -87,12 +86,7 @@ import {
   formatMarkdownForMessageCopy,
   messageHasAgentActivityContent,
   assistantContentHasVisibleAnswer,
-  deltaContainsSourceGroupMarkup,
-  getStreamingAssistantTextTail,
   renderMarkdownToElement,
-  stripIncompleteTrailingSourceGroup,
-  stripIncompleteTrailingToolCall,
-  stripSourceGroupMarkup,
 } from "./MarkdownRenderer";
 import { getDataPath } from "../../../utils/common";
 import { markdownToNoteHtml } from "../../../utils/markdownToNoteHtml";
@@ -131,9 +125,7 @@ import {
 } from "./ChatPanelEvents";
 import { Guide } from "../Guide";
 import { ANALYTICS_EVENTS, getAnalyticsService } from "../../analytics";
-import {
-  NextQuestionHintController,
-} from "./NextQuestionHintController";
+import { NextQuestionHintController } from "./NextQuestionHintController";
 import { UserMessageEditController } from "./UserMessageEditController";
 import {
   resolveFloatingWindowSize,
@@ -155,9 +147,7 @@ export type ChatPanelOpenSource =
 
 const APPROVAL_RESOLVED_ANIMATION_MS = 260;
 const APPROVAL_ENTER_ANIMATION_MS = 220;
-const STREAMING_TEXT_RENDER_INTERVAL_MS = 80;
-const STREAMING_MARKDOWN_RENDER_INTERVAL_MS = 1200;
-const STREAMING_TEXT_TAIL_ATTR = "data-streaming-text-tail";
+const STREAMING_TEXT_RENDER_INTERVAL_MS = 240;
 
 type PendingApprovalRequest = ToolApprovalState["pendingRequests"][number];
 
@@ -175,10 +165,8 @@ type StreamingTextRenderState = {
   messageId: string;
   pendingContent: string;
   lastRenderedContent: string;
-  lastMarkdownContent: string;
   lastPresentationArtifactSignature: string;
   lastRenderAt: number;
-  lastMarkdownRenderAt: number;
   timeoutId: ReturnType<typeof setTimeout> | null;
 };
 
@@ -207,44 +195,12 @@ function cancelPendingStreamingTextRender(container: HTMLElement): void {
     clearTimeout(state.timeoutId);
   }
   streamingTextRenderStates.delete(container);
-  const chatHistory = container.querySelector("#chat-history") as HTMLElement | null;
+  const chatHistory = container.querySelector(
+    "#chat-history",
+  ) as HTMLElement | null;
   if (chatHistory) {
     cancelPendingHistoryRender(chatHistory);
   }
-}
-
-function shouldForceStreamingMarkdownRender(
-  content: string,
-  state: StreamingTextRenderState,
-): boolean {
-  if (stripIncompleteTrailingSourceGroup(content) !== content) {
-    return true;
-  }
-
-  if (stripIncompleteTrailingToolCall(content) !== content) {
-    return true;
-  }
-
-  const incrementalContent = content.startsWith(state.lastMarkdownContent)
-    ? content.slice(state.lastMarkdownContent.length)
-    : content;
-
-  if (deltaContainsSourceGroupMarkup(incrementalContent)) {
-    return true;
-  }
-
-  if (!content.includes("<tool-call")) {
-    return false;
-  }
-
-  if (!state.lastMarkdownContent) {
-    return true;
-  }
-
-  return (
-    incrementalContent.includes("<tool-call") ||
-    incrementalContent.includes("</tool-call>")
-  );
 }
 
 function renderStreamingTextNow(
@@ -273,79 +229,28 @@ function renderStreamingTextNow(
     return false;
   }
 
-  const contentReplacedAfterMarkdownRender =
-    Boolean(state.lastMarkdownContent) &&
-    !content.startsWith(state.lastMarkdownContent);
-  if (contentReplacedAfterMarkdownRender) {
-    state.lastMarkdownContent = "";
-  }
-
-  const now = Date.now();
   const presentationArtifactSignature =
     getPresentationArtifactSignature(activeMessage);
-  const incrementalContent =
-    state.lastMarkdownContent && content.startsWith(state.lastMarkdownContent)
-      ? content.slice(state.lastMarkdownContent.length)
-      : content;
-  const suppressSourceGroupCards =
-    activeMessage.streamingState === "in_progress";
-  const shouldRenderMarkdown =
-    contentReplacedAfterMarkdownRender ||
-    presentationArtifactSignature !== state.lastPresentationArtifactSignature ||
-    shouldForceStreamingMarkdownRender(content, state) ||
-    deltaContainsMathMarkup(incrementalContent) ||
-    now - state.lastMarkdownRenderAt >= STREAMING_MARKDOWN_RENDER_INTERVAL_MS;
-
-  if (shouldRenderMarkdown) {
-    const activeMarkdownOptions = {
-      ...(getMessageMarkdownRenderOptions(
-        markdownOptions,
-        activeMessage.streamingState,
-        activeMessage.evidence,
-        activeMessage.presentationArtifacts,
-      ) || markdownOptions),
-      ...(messageHasAgentActivityContent(
-        activeMessage.reasoning,
-        content,
-        true,
-      )
-        ? { suppressToolCallCards: true }
-        : {}),
-    };
-    renderMarkdownToElement(
-      streamingEl,
-      content,
-      messageId,
-      activeMarkdownOptions,
-    );
-    const tail = streamingEl.ownerDocument.createElement("span");
-    tail.setAttribute(STREAMING_TEXT_TAIL_ATTR, "true");
-    streamingEl.appendChild(tail);
-    state.lastMarkdownContent = content;
-    state.lastPresentationArtifactSignature = presentationArtifactSignature;
-    state.lastMarkdownRenderAt = now;
-  } else if (state.lastMarkdownContent) {
-    let tail = streamingEl.querySelector(
-      `[${STREAMING_TEXT_TAIL_ATTR}]`,
-    ) as HTMLElement | null;
-    if (!tail) {
-      tail = streamingEl.ownerDocument.createElement("span");
-      tail.setAttribute(STREAMING_TEXT_TAIL_ATTR, "true");
-      streamingEl.appendChild(tail);
-    }
-    tail.textContent = getStreamingAssistantTextTail(
-      content,
-      state.lastMarkdownContent,
-      suppressSourceGroupCards,
-    );
-  } else if (streamingEl.textContent !== content) {
-    const visibleContent = suppressSourceGroupCards
-      ? stripSourceGroupMarkup(content)
-      : content;
-    if (streamingEl.textContent !== visibleContent) {
-      streamingEl.textContent = visibleContent;
-    }
-  }
+  const activeMarkdownOptions = {
+    ...(getMessageMarkdownRenderOptions(
+      markdownOptions,
+      activeMessage.streamingState,
+      activeMessage.evidence,
+      activeMessage.presentationArtifacts,
+    ) || markdownOptions),
+    ...(messageHasAgentActivityContent(activeMessage.reasoning, content, true)
+      ? { suppressToolCallCards: true }
+      : {}),
+  };
+  // Always parse the current snapshot: a raw-text tail can remain on screen
+  // indefinitely when the provider switches from answer text back to reasoning.
+  renderMarkdownToElement(
+    streamingEl,
+    content,
+    messageId,
+    activeMarkdownOptions,
+  );
+  state.lastPresentationArtifactSignature = presentationArtifactSignature;
 
   if (assistantContentHasVisibleAnswer(content)) {
     collapseDockedExecutionPlan(container);
@@ -390,10 +295,8 @@ function scheduleStreamingTextRender(
       messageId,
       pendingContent: content,
       lastRenderedContent: "",
-      lastMarkdownContent: "",
       lastPresentationArtifactSignature: "",
       lastRenderAt: 0,
-      lastMarkdownRenderAt: 0,
       timeoutId: null,
     };
     streamingTextRenderStates.set(container, state);
@@ -877,7 +780,10 @@ function handleNoteToolCompleted(
   context: ChatPanelContext,
   event: AgentRuntimeToolCompletedEvent,
 ): void {
-  if (event.status !== "completed" || event.resultPreview.startsWith("Error:")) {
+  if (
+    event.status !== "completed" ||
+    event.resultPreview.startsWith("Error:")
+  ) {
     return;
   }
 
@@ -972,7 +878,10 @@ async function saveBookmarkFromMessage(
     formatMarkdownForMessageCopy(message.content, {
       evidenceRecords: message.evidence,
     }) || message.content;
-  const navigationItem = getQuoteNavigationItem(session, context.getCurrentItem());
+  const navigationItem = getQuoteNavigationItem(
+    session,
+    context.getCurrentItem(),
+  );
   const result = await openBookmarkSaveDialog(
     context.container.ownerDocument!,
     context.getTheme(),
@@ -987,9 +896,7 @@ async function saveBookmarkFromMessage(
       messageId: message.id,
       itemKey: navigationItem?.key ?? session.lastActiveItemKey ?? null,
       itemLibraryId:
-        navigationItem?.libraryID ??
-        session.lastActiveItemLibraryID ??
-        null,
+        navigationItem?.libraryID ?? session.lastActiveItemLibraryID ?? null,
     },
   );
   if (!result) {
@@ -1032,8 +939,7 @@ async function toggleReaderBookmark(
   const navigationItem = session
     ? getQuoteNavigationItem(session, context.getCurrentItem())
     : null;
-  const dialogDoc =
-    readerHost?.document ?? context.container.ownerDocument!;
+  const dialogDoc = readerHost?.document ?? context.container.ownerDocument!;
   const dialogTheme = readerHost?.theme ?? context.getTheme();
   readerHost?.present?.();
   const dialogResult = await openBookmarkSaveDialog(
@@ -2201,7 +2107,9 @@ function showSidebarPanel(): boolean {
   const MutationObserverClass = mainWin.MutationObserver;
   const sidebar = getSidebar();
   if (!sidebarObserver && MutationObserverClass && sidebar) {
-    sidebarObserver = new MutationObserverClass(() => scheduleSidebarSizeSync());
+    sidebarObserver = new MutationObserverClass(() =>
+      scheduleSidebarSizeSync(),
+    );
     sidebarObserver.observe(sidebar, {
       attributes: true,
       attributeFilter: ["collapsed", "width", "style", "hidden"],
@@ -3023,10 +2931,7 @@ async function restoreSessionNavigation(
   );
   context.setCurrentItem(item);
   await context.updatePdfCheckboxVisibility(item);
-  if (
-    !isLatestNavigation() ||
-    manager.getActiveSession()?.id !== restored.id
-  ) {
+  if (!isLatestNavigation() || manager.getActiveSession()?.id !== restored.id) {
     return;
   }
   context.renderMessages(restored.messages);
@@ -3055,13 +2960,13 @@ async function renderSessionAndScrollToMessage(
     context.renderMessages(session.messages, () => {
       void attemptScrollToQuotedMessage(context, messageId, options).then(
         (scrolled) => {
-        if (
-          !isLatestNavigation() ||
-          manager.getActiveSession()?.id !== session.id
-        ) {
-          resolve(false);
-          return;
-        }
+          if (
+            !isLatestNavigation() ||
+            manager.getActiveSession()?.id !== session.id
+          ) {
+            resolve(false);
+            return;
+          }
           resolve(scrolled);
         },
       );

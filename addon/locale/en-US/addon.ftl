@@ -280,6 +280,7 @@ paperchat-chat-agent-activity-searching-web = Searching the web...
 paperchat-chat-agent-activity-searching-scholarly = Searching scholarly sources...
 
 paperchat-chat-agent-activity-token-suffix = · { $tokens } tokens
+paperchat-chat-agent-activity-token-estimate-title = Live estimate while generating; finalized using provider-reported usage.
 
 paperchat-chat-tool-result-running = Running
 paperchat-chat-tool-result-completed = Completed

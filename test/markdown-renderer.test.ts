@@ -15,6 +15,7 @@ import { sanitizeSourceGroupTargets } from "../src/modules/chat/note-source-prov
 import { getMessageMarkdownRenderOptions } from "../src/modules/ui/chat-panel/MessageRenderer.ts";
 import { createPdfPassageEvidenceRecord } from "../src/modules/chat/evidence/index.ts";
 import { MAX_ITERATIONS_MESSAGE } from "../src/modules/chat/agent-runtime/messages.ts";
+import { renderAgentActivityReasoning } from "../src/modules/ui/chat-panel/AgentActivityPanel.ts";
 
 class FakeElement {
   readonly ELEMENT_NODE = 1;
@@ -148,6 +149,207 @@ describe("markdown renderer emphasis", function () {
     } finally {
       (globalThis as { Zotero?: unknown }).Zotero = originalZotero;
     }
+  });
+});
+
+describe("interleaved reasoning and answer rendering", function () {
+  let originalZotero: unknown;
+
+  beforeEach(function () {
+    originalZotero = (globalThis as { Zotero?: unknown }).Zotero;
+    (globalThis as { Zotero?: unknown }).Zotero = {
+      getMainWindow: () => null,
+    };
+  });
+
+  afterEach(function () {
+    (globalThis as { Zotero?: unknown }).Zotero = originalZotero;
+  });
+
+  it("formats reasoning headings and bold without exposing evidence tags", function () {
+    const doc = new FakeDocument();
+    const root = new FakeElement(doc, "div");
+    const reasoning = [
+      "### 7.2 融合需求预测的滚动 VDN 算法",
+      "",
+      '**值分解网络（VDN）算法**用于联合训练。<evidence-ref ids="ev-120c4b8afd64ccbc"/>',
+    ].join("\n");
+
+    for (const isWorking of [true, false]) {
+      renderAgentActivityReasoning(
+        root as unknown as HTMLElement,
+        reasoning,
+        isWorking,
+      );
+      const text = collectRenderedText(root);
+      assert.notInclude(text, "###");
+      assert.notInclude(text, "**");
+      assert.notInclude(text, "evidence-ref");
+      assert.notInclude(text, "ev-120c4b8afd64ccbc");
+      assert.isNotNull(findElementByTagName(root, "h3"));
+      assert.equal(
+        collectRenderedText(findElementByTagName(root, "strong")!),
+        "值分解网络（VDN）算法",
+      );
+    }
+  });
+
+  it("keeps completed reasoning as one Markdown block across line breaks", function () {
+    const doc = new FakeDocument();
+    const root = new FakeElement(doc, "div");
+    renderAgentActivityReasoning(
+      root as unknown as HTMLElement,
+      "**第一行\n第二行**\n\n- 保留列表结构",
+      false,
+    );
+    const strong = findElementByTagName(root, "strong");
+    assert.isNotNull(strong);
+    assert.include(collectRenderedText(strong!), "第一行");
+    assert.include(collectRenderedText(strong!), "第二行");
+    assert.isNotNull(findElementByTagName(root, "ul"));
+  });
+
+  it("does not rebuild unchanged reasoning when only the answer changes", function () {
+    const doc = new FakeDocument();
+    const root = new FakeElement(doc, "div");
+    renderAgentActivityReasoning(
+      root as unknown as HTMLElement,
+      "**思考**",
+      true,
+    );
+    const firstChild = root.firstChild;
+    renderAgentActivityReasoning(
+      root as unknown as HTMLElement,
+      "**思考**",
+      true,
+    );
+    assert.strictEqual(root.firstChild, firstChild);
+  });
+
+  it("restores all reasoning lines when streaming finishes", function () {
+    const doc = new FakeDocument();
+    const root = new FakeElement(doc, "div");
+    const reasoning = Array.from(
+      { length: 20 },
+      (_, i) => `Line ${i + 1}.`,
+    ).join("\n");
+    renderAgentActivityReasoning(
+      root as unknown as HTMLElement,
+      reasoning,
+      true,
+    );
+    assert.notInclude(collectRenderedText(root), "Line 1.");
+    renderAgentActivityReasoning(
+      root as unknown as HTMLElement,
+      reasoning,
+      false,
+    );
+    assert.include(collectRenderedText(root), "Line 1.");
+    assert.include(collectRenderedText(root), "Line 20.");
+  });
+
+  it("flushes the latest reasoning after a pause and cancels pending work on completion", function () {
+    const originalNow = Date.now;
+    const originalSetTimeout = globalThis.setTimeout;
+    const originalClearTimeout = globalThis.clearTimeout;
+    let now = 1000;
+    let callback: (() => void) | null = null;
+    let delay = 0;
+    Date.now = () => now;
+    globalThis.setTimeout = ((fn: () => void, ms: number) => {
+      callback = fn;
+      delay = ms;
+      return 1;
+    }) as unknown as typeof setTimeout;
+    globalThis.clearTimeout = (() => {
+      callback = null;
+    }) as typeof clearTimeout;
+
+    try {
+      const doc = new FakeDocument();
+      const root = new FakeElement(doc, "div");
+      const element = root as unknown as HTMLElement;
+      renderAgentActivityReasoning(element, "**开始**", true);
+      now += 10;
+      renderAgentActivityReasoning(element, "**继续**", true);
+      renderAgentActivityReasoning(element, "**最新思考**", true);
+      assert.equal(collectRenderedText(root), "开始");
+      assert.isAbove(delay, 0);
+      assert.isNotNull(callback);
+      now += delay;
+      (callback as unknown as () => void)();
+      assert.equal(collectRenderedText(root), "最新思考");
+
+      now += 10;
+      renderAgentActivityReasoning(element, "**待刷新**", true);
+      renderAgentActivityReasoning(element, "**完成**", false);
+      assert.equal(collectRenderedText(root), "完成");
+      assert.isNull(callback);
+    } finally {
+      Date.now = originalNow;
+      globalThis.setTimeout = originalSetTimeout;
+      globalThis.clearTimeout = originalClearTimeout;
+    }
+  });
+
+  it("keeps answer formatting intact while reasoning resumes between chunks", function () {
+    const doc = new FakeDocument();
+    const answer = new FakeElement(doc, "div");
+    const thinking = new FakeElement(doc, "div");
+    const options = getMessageMarkdownRenderOptions({}, "in_progress");
+    const prefix = "### 联合训练\n\n**改进解需要转换为 RL 形式**。\n\n";
+
+    renderMarkdownToElement(
+      answer as unknown as HTMLElement,
+      prefix,
+      "turn",
+      options,
+    );
+    renderAgentActivityReasoning(
+      thinking as unknown as HTMLElement,
+      "继续核对图 4。",
+      true,
+    );
+    assert.isNotNull(findElementByTagName(answer, "h3"));
+    assert.isNotNull(findElementByTagName(answer, "strong"));
+    assert.notInclude(collectRenderedText(answer), "**");
+
+    renderMarkdownToElement(
+      answer as unknown as HTMLElement,
+      `${prefix}**Fig4**：训练流程。`,
+      "turn",
+      options,
+    );
+    renderAgentActivityReasoning(
+      thinking as unknown as HTMLElement,
+      "核对完成。",
+      true,
+    );
+    assert.include(collectRenderedText(answer), "Fig4");
+    assert.notInclude(collectRenderedText(answer), "**");
+  });
+
+  it("hides split evidence tags at every chunk boundary", function () {
+    const doc = new FakeDocument();
+    const root = new FakeElement(doc, "div");
+    const options = getMessageMarkdownRenderOptions({}, "in_progress");
+    const tag = '<evidence-ref ids="ev-120c4b8afd64ccbc"/>';
+    for (let length = 2; length <= tag.length; length++) {
+      renderMarkdownToElement(
+        root as unknown as HTMLElement,
+        `**结论**${tag.slice(0, length)}`,
+        "turn",
+        options,
+      );
+      assert.equal(collectRenderedText(root), "结论", `chunk length ${length}`);
+    }
+    renderMarkdownToElement(
+      root as unknown as HTMLElement,
+      `**结论**${tag} 后续正文`,
+      "turn",
+      options,
+    );
+    assert.equal(collectRenderedText(root), "结论 后续正文");
   });
 });
 
@@ -1252,7 +1454,11 @@ Missing label should not be parsed.
     const doc = new FakeDocument();
     const root = new FakeElement(doc, "div");
     try {
-      renderMarkdownToElement(root as unknown as HTMLElement, markdown, "hoist-msg");
+      renderMarkdownToElement(
+        root as unknown as HTMLElement,
+        markdown,
+        "hoist-msg",
+      );
       const cards = root.children.filter((child) =>
         child.className.includes("chat-source-group"),
       );
@@ -1559,8 +1765,7 @@ Missing label should not be parsed.
     it("never renders an unknown evidence ID as a citation action", function () {
       const doc = new FakeDocument();
       const root = new FakeElement(doc, "div");
-      const markdown =
-        'Claim.<evidence-ref ids="ev-ffffffffffffffff"/> After.';
+      const markdown = 'Claim.<evidence-ref ids="ev-ffffffffffffffff"/> After.';
       renderMarkdownToElement(
         root as unknown as HTMLElement,
         markdown,
@@ -1585,9 +1790,14 @@ Missing label should not be parsed.
       const root = new FakeElement(doc, "div");
       const markdown = `Fig. 5."<evidence-ref ids="${record.id}"/>——蓝色虚框`;
       try {
-        renderMarkdownToElement(root as unknown as HTMLElement, markdown, "msg-fig5", {
-          evidenceRecords: [record],
-        });
+        renderMarkdownToElement(
+          root as unknown as HTMLElement,
+          markdown,
+          "msg-fig5",
+          {
+            evidenceRecords: [record],
+          },
+        );
         const rendered = collectRenderedText(root);
         assert.notInclude(rendered, "<evidence-ref");
         assert.include(rendered, "Fig. 5.");
@@ -2012,7 +2222,11 @@ describe("markdown renderer math", function () {
 > 7.     用公式(12)计算 $D(\\Phi_F)$ 的损失`;
 
     try {
-      renderMarkdownToElement(root as unknown as HTMLElement, algorithm, "math-test");
+      renderMarkdownToElement(
+        root as unknown as HTMLElement,
+        algorithm,
+        "math-test",
+      );
 
       assert.equal(collectByTag(root, "pre").length, 0);
       assert.notInclude(root.textContent || "", "$D(\\Phi_F)$");

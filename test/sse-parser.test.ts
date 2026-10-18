@@ -20,6 +20,75 @@ function readerFromSSE(
 }
 
 describe("SSEParser", function () {
+  it("keeps alternating Bailian answer and reasoning deltas in separate channels", async function () {
+    const deltas = [
+      { reasoning_content: "先检查论文。", content: null },
+      { reasoning_content: null, content: "**Fig4" },
+      { reasoning_content: "再核对训练步骤。", content: "**：训练流程。" },
+      { reasoning_content: null, content: "完整结论。" },
+    ];
+    const chunks = deltas.map(
+      (delta) =>
+        `data: ${JSON.stringify({ choices: [{ index: 0, delta }] })}\n\n`,
+    );
+    chunks.push(
+      `data: ${JSON.stringify({ choices: [{ index: 0, delta: {}, finish_reason: "stop" }] })}\n\n`,
+      "data: [DONE]\n\n",
+    );
+    const events: SSEToolCallingEvent[] = [];
+    await parseSSEStreamWithToolCalling(readerFromSSE(chunks), "openai", {
+      onEvent: (event) => events.push(event),
+    });
+    assert.equal(
+      events
+        .filter((event) => event.type === "text_delta")
+        .map((event) => event.text)
+        .join(""),
+      "**Fig4**：训练流程。完整结论。",
+    );
+    assert.equal(
+      events
+        .filter((event) => event.type === "reasoning_delta")
+        .map((event) => event.text)
+        .join(""),
+      "先检查论文。再核对训练步骤。",
+    );
+    assert.deepEqual(events.at(-1), { type: "done", stopReason: "stop" });
+
+    const text: string[] = [];
+    const reasoning: string[] = [];
+    await parseSSEStream(readerFromSSE(chunks), "openai", {
+      onText: (chunk) => text.push(chunk),
+      onReasoning: (chunk) => reasoning.push(chunk),
+      onDone: () => undefined,
+    });
+    assert.equal(text.join(""), "**Fig4**：训练流程。完整结论。");
+    assert.equal(reasoning.join(""), "先检查论文。再核对训练步骤。");
+  });
+
+  it("preserves a final answer chunk and truncation signal without a trailing newline", async function () {
+    const sse = `data: ${JSON.stringify({
+      choices: [
+        { delta: { content: "**Fig4**：最后一段。" }, finish_reason: "length" },
+      ],
+    })}`;
+    const events: SSEToolCallingEvent[] = [];
+    await parseSSEStreamWithToolCalling(readerFromSSE([sse]), "openai", {
+      onEvent: (event) => events.push(event),
+    });
+    assert.deepEqual(events, [
+      { type: "text_delta", text: "**Fig4**：最后一段。" },
+      { type: "done", stopReason: "max_tokens" },
+    ]);
+
+    const text: string[] = [];
+    await parseSSEStream(readerFromSSE([sse]), "openai", {
+      onText: (chunk) => text.push(chunk),
+      onDone: () => undefined,
+    });
+    assert.equal(text.join(""), "**Fig4**：最后一段。");
+  });
+
   it("parses OpenAI-compatible tool calls packaged with finish_reason", async function () {
     const events: SSEToolCallingEvent[] = [];
     const sse = [
