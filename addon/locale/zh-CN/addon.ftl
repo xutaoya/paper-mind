@@ -47,6 +47,9 @@ paperchat-chat-reader-ask = 向 AI 提问
 paperchat-chat-reader-ask-tooltip = 将选中文本发送到 AI 对话并提问
 
 paperchat-chat-reader-figure-screenshot = 框选图片截图
+paperchat-chat-image-screenshot = 第 { $page } 页截图
+paperchat-chat-image-attachment = 图片
+paperchat-chat-image-remove = 移除图片
 
 paperchat-chat-reader-figure-screenshot-no-pdf = 请先在阅读器中打开 PDF，再框选截图。
 

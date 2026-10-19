@@ -75,7 +75,7 @@
           data-l10n-id="pref-nav-models"
         ></html:h2>
         <!-- Main layout: Sidebar + Content -->
-        <hbox flex="1" style="min-height: 400px">
+        <hbox class="paperchat-prefs-model-layout">
           <!-- Provider Sidebar -->
           <vbox class="paperchat-prefs-provider-sidebar">
             <label><html:h3 data-l10n-id="pref-providers"></html:h3></label>
@@ -95,212 +95,142 @@
           <vbox flex="1" class="paperchat-prefs-provider-content">
             <!-- API Key Provider Panel Template (used for OpenAI, Claude, Gemini, etc.) -->
             <vbox id="pref-panel-apikey" class="provider-panel">
-              <label
-                id="pref-provider-title"
-                style="font-size: 16px; font-weight: bold; margin-bottom: 8px"
-              ></label>
-              <label
-                id="pref-provider-description"
-                style="margin-bottom: 12px; opacity: 0.7"
-              ></label>
+              <label id="pref-provider-title"></label>
+              <label id="pref-provider-description"></label>
 
               <!-- API Key -->
-              <hbox align="center" style="margin-bottom: 8px">
+              <vbox class="paperchat-prefs-field">
                 <label
                   for="pref-provider-apikey"
                   data-l10n-id="pref-api-key"
-                  style="width: 70px; text-align: right"
                 ></label>
-                <html:input
-                  type="password"
-                  id="pref-provider-apikey"
-                  style="flex: 1; margin-left: 8px; min-width: 150px"
-                ></html:input>
-                <button
-                  id="pref-toggle-apikey"
-                  data-l10n-id="pref-show-key"
-                  style="margin-left: 8px; cursor: pointer"
-                ></button>
-              </hbox>
+                <hbox class="paperchat-prefs-control-row">
+                  <html:input
+                    type="password"
+                    id="pref-provider-apikey"
+                  ></html:input>
+                  <button
+                    id="pref-toggle-apikey"
+                    data-l10n-id="pref-show-key"
+                  ></button>
+                </hbox>
+              </vbox>
 
               <!-- Base URL -->
-              <hbox align="center" style="margin-bottom: 8px">
+              <vbox class="paperchat-prefs-field">
                 <label
                   for="pref-provider-baseurl"
                   data-l10n-id="pref-base-url"
-                  style="width: 70px; text-align: right"
                 ></label>
-                <html:input
-                  type="text"
-                  id="pref-provider-baseurl"
-                  style="flex: 1; margin-left: 8px; min-width: 150px"
-                ></html:input>
-              </hbox>
+                <html:input type="text" id="pref-provider-baseurl"></html:input>
+              </vbox>
 
               <!-- Model Selection -->
-              <hbox align="center" style="margin-bottom: 8px">
+              <vbox class="paperchat-prefs-field">
                 <label
                   for="pref-provider-model"
                   data-l10n-id="pref-model"
-                  style="width: 70px; text-align: right"
                 ></label>
-                <menulist
-                  id="pref-provider-model"
-                  style="flex: 1; margin-left: 8px; min-width: 120px"
-                >
-                  <menupopup id="pref-provider-model-popup">
-                    <!-- Models populated by JS -->
-                  </menupopup>
-                </menulist>
-                <button
-                  id="pref-refresh-models"
-                  data-l10n-id="pref-refresh-models"
-                  style="margin-left: 8px; cursor: pointer"
-                ></button>
-              </hbox>
+                <hbox class="paperchat-prefs-control-row">
+                  <menulist id="pref-provider-model">
+                    <menupopup id="pref-provider-model-popup">
+                      <!-- Models populated by JS -->
+                    </menupopup>
+                  </menulist>
+                  <button
+                    id="pref-refresh-models"
+                    data-l10n-id="pref-refresh-models"
+                  ></button>
+                </hbox>
+              </vbox>
 
               <!-- Model List -->
-              <vbox style="margin-top: 12px; margin-bottom: 8px">
-                <hbox align="center" style="margin-bottom: 8px">
-                  <label
-                    data-l10n-id="pref-model-list"
-                    style="width: 70px; text-align: right; font-weight: bold"
-                  ></label>
+              <vbox class="paperchat-prefs-models-group">
+                <hbox class="paperchat-prefs-group-heading">
+                  <label data-l10n-id="pref-model-list"></label>
                   <button
                     id="pref-add-model-btn"
                     data-l10n-id="pref-add-model"
-                    style="margin-left: 8px; cursor: pointer"
                   ></button>
                 </hbox>
-                <vbox
-                  id="pref-model-list"
-                  style="
-                    margin-left: 78px;
-                    max-height: 120px;
-                    overflow-y: auto;
-                    border: 1px solid var(--color-border, #ddd);
-                    border-radius: 4px;
-                    padding: 4px;
-                  "
-                >
+                <vbox id="pref-model-list">
                   <!-- Model list populated by JS -->
                 </vbox>
               </vbox>
 
               <!-- Advanced Options (Collapsible) -->
-              <html:details style="margin-top: 12px; margin-bottom: 12px">
+              <html:details class="paperchat-prefs-advanced">
                 <html:summary
                   data-l10n-id="pref-advanced-options"
-                  style="cursor: pointer; font-weight: bold; margin-bottom: 8px"
                 ></html:summary>
 
                 <!-- Max Tokens -->
-                <hbox
-                  align="center"
-                  style="margin-bottom: 8px; margin-left: 12px"
-                >
+                <vbox class="paperchat-prefs-field">
                   <label
                     for="pref-provider-maxtokens"
                     data-l10n-id="pref-max-tokens"
-                    style="width: 70px; text-align: right"
                   ></label>
                   <html:input
                     type="number"
                     id="pref-provider-maxtokens"
-                    style="width: 100px; margin-left: 8px"
                     min="256"
                     max="128000"
                   ></html:input>
-                </hbox>
+                </vbox>
 
                 <!-- Temperature -->
-                <hbox
-                  align="center"
-                  style="margin-bottom: 8px; margin-left: 12px"
-                >
+                <vbox class="paperchat-prefs-field">
                   <label
                     for="pref-provider-temperature"
                     data-l10n-id="pref-temperature"
-                    style="width: 70px; text-align: right"
                   ></label>
                   <html:input
                     type="number"
                     id="pref-provider-temperature"
-                    style="width: 80px; margin-left: 8px"
                     min="0"
                     max="2"
                     step="0.1"
                   ></html:input>
-                </hbox>
+                </vbox>
 
                 <!-- System Prompt -->
-                <hbox
-                  align="start"
-                  style="margin-bottom: 8px; margin-left: 12px"
-                >
+                <vbox class="paperchat-prefs-field">
                   <label
                     for="pref-provider-systemprompt"
                     data-l10n-id="pref-system-prompt"
-                    style="width: 70px; text-align: right; margin-top: 4px"
                   ></label>
                   <html:textarea
                     id="pref-provider-systemprompt"
-                    style="
-                      flex: 1;
-                      height: 60px;
-                      margin-left: 8px;
-                      min-width: 200px;
-                    "
                   ></html:textarea>
-                </hbox>
+                </vbox>
 
                 <!-- Extra Request Body -->
-                <hbox
-                  align="start"
-                  style="margin-bottom: 8px; margin-left: 12px"
-                >
+                <vbox class="paperchat-prefs-field">
                   <label
                     for="pref-provider-extra-request-body"
                     data-l10n-id="pref-extra-request-body"
-                    style="width: 70px; text-align: right; margin-top: 4px"
                   ></label>
                   <html:textarea
                     id="pref-provider-extra-request-body"
-                    style="
-                      flex: 1;
-                      height: 80px;
-                      margin-left: 8px;
-                      min-width: 200px;
-                      font-family: monospace;
-                    "
+                    class="paperchat-prefs-json"
                   ></html:textarea>
-                </hbox>
+                </vbox>
 
                 <!-- Per-Model Extra Request Body -->
-                <hbox
-                  align="start"
-                  style="margin-bottom: 8px; margin-left: 12px"
-                >
+                <vbox class="paperchat-prefs-field">
                   <label
                     for="pref-provider-model-extra-request-body"
                     data-l10n-id="pref-model-extra-request-body"
-                    style="width: 70px; text-align: right; margin-top: 4px"
                   ></label>
                   <html:textarea
                     id="pref-provider-model-extra-request-body"
-                    style="
-                      flex: 1;
-                      height: 100px;
-                      margin-left: 8px;
-                      min-width: 200px;
-                      font-family: monospace;
-                    "
+                    class="paperchat-prefs-json"
                   ></html:textarea>
-                </hbox>
+                </vbox>
               </html:details>
 
               <!-- Test Connection & Delete -->
-              <hbox align="center" style="margin-top: 16px">
+              <hbox class="paperchat-prefs-actions">
                 <button
                   id="pref-test-connection"
                   data-l10n-id="pref-test-connection"
@@ -319,9 +249,9 @@
           </vbox>
         </hbox>
 
-        <html:div class="paperchat-prefs-block">
+        <html:div class="paperchat-prefs-block paperchat-prefs-active-provider">
           <label><html:h3 data-l10n-id="pref-active-provider"></html:h3></label>
-          <hbox align="center">
+          <hbox class="paperchat-prefs-control-row">
             <label
               for="pref-active-provider-select"
               data-l10n-id="pref-current-provider"

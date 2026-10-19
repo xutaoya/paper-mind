@@ -331,16 +331,19 @@ function injectReaderStyles(doc: Document): void {
     }
     .paperchat-reader-outline-panel {
       position: absolute;
-      top: 18px;
-      right: 44px;
+      top: 16px;
+      right: 40px;
       z-index: 5;
-      width: min(320px, calc(100% - 72px));
-      max-height: min(420px, calc(100% - 36px));
-      overflow: auto;
-      border-radius: 14px;
-      border: 1px solid rgba(148, 163, 184, 0.45);
-      background: rgba(255, 255, 255, 0.98);
-      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.14);
+      width: min(360px, calc(100% - 64px));
+      max-height: min(480px, calc(100% - 32px));
+      overflow-x: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+      border-radius: 12px;
+      border: 1px solid #e2e5eb;
+      background: #ffffff;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
       padding: 8px;
       box-sizing: border-box;
     }
@@ -348,19 +351,30 @@ function injectReaderStyles(doc: Document): void {
       display: none;
     }
     .paperchat-reader-outline-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      appearance: none;
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr);
+      align-items: start;
+      gap: 8px;
       width: 100%;
+      min-width: 0;
+      height: auto;
+      min-height: 36px;
+      max-height: none;
+      margin: 0;
       border: none;
-      border-radius: 10px;
+      border-radius: 8px;
       background: transparent;
       color: inherit;
       text-align: left;
-      padding: 8px 10px;
+      padding: 8px 12px;
+      padding-inline-start: calc(12px + var(--reader-outline-indent, 0px));
       cursor: pointer;
       font: inherit;
+      line-height: 20px;
+      white-space: normal;
       box-sizing: border-box;
+      transition: background-color 160ms cubic-bezier(0.32, 0.72, 0, 1);
     }
     .paperchat-reader-outline-item:hover {
       background: #f8fafc;
@@ -369,27 +383,27 @@ function injectReaderStyles(doc: Document): void {
       background: #eff6ff;
       color: #2563eb;
     }
+    .paperchat-reader-outline-item:focus-visible {
+      outline: 2px solid #93c5fd;
+      outline-offset: -2px;
+    }
     .paperchat-reader-outline-level {
-      flex: 0 0 auto;
-      font-size: 11px;
-      font-weight: 600;
+      font-size: 12px;
+      font-weight: 500;
       color: #94a3b8;
-      line-height: 1.2;
+      line-height: 20px;
     }
     .paperchat-reader-outline-item.is-active .paperchat-reader-outline-level {
       color: #60a5fa;
     }
     .paperchat-reader-outline-title {
-      flex: 1 1 auto;
       min-width: 0;
-      font-size: 13px;
-      line-height: 1.45;
+      font-size: 14px;
+      line-height: 20px;
       color: #334155;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
+      display: block;
+      white-space: normal;
+      overflow-wrap: anywhere;
     }
     .paperchat-reader-outline-item.is-active .paperchat-reader-outline-title {
       color: #2563eb;
@@ -408,13 +422,13 @@ function injectReaderStyles(doc: Document): void {
       filter: none !important;
     }
     [data-theme="dark"] .paperchat-reader-outline-panel {
-      background: rgba(37, 37, 37, 0.98);
-      border-color: rgba(75, 85, 99, 0.65);
+      background: #1f1f1f;
+      border-color: #313131;
       box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
       color: #e5e7eb;
     }
     [data-theme="dark"] .paperchat-reader-outline-item:hover {
-      background: rgba(255, 255, 255, 0.06);
+      background: #272727;
     }
     [data-theme="dark"] .paperchat-reader-outline-item.is-active {
       background: rgba(59, 130, 246, 0.22);
@@ -425,6 +439,11 @@ function injectReaderStyles(doc: Document): void {
     }
     [data-theme="dark"] .paperchat-reader-outline-item.is-active .paperchat-reader-outline-title {
       color: #93c5fd;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .paperchat-reader-outline-item {
+        transition: none;
+      }
     }
     [data-theme="dark"] .paperchat-reader-bookmark-btn.is-saved {
       background: rgba(245, 158, 11, 0.32) !important;
@@ -565,6 +584,7 @@ function setupReaderOutline(
     }, 180);
   };
 
+  const baseLevel = Math.min(...headings.map((heading) => heading.level));
   headings.forEach((heading, index) => {
     const tick = createElement(
       doc,
@@ -592,7 +612,12 @@ function setupReaderOutline(
       {
         type: "button",
         class: "paperchat-reader-outline-item",
+        title: heading.text,
       },
+    );
+    item.style.setProperty(
+      "--reader-outline-indent",
+      `${(heading.level - baseLevel) * 8}px`,
     );
     const level = createElement(
       doc,

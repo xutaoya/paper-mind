@@ -784,7 +784,7 @@ export function createChatContainer(
       overflow: "hidden",
       flexShrink: "0",
       transition:
-        "border-color 0.22s ease, box-shadow 0.22s ease, transform 0.22s cubic-bezier(0.22, 1, 0.36, 1)",
+        "border-color 220ms cubic-bezier(0.32, 0.72, 0, 1), box-shadow 260ms cubic-bezier(0.32, 0.72, 0, 1), background-color 220ms cubic-bezier(0.32, 0.72, 0, 1)",
     },
     { id: "chat-input-wrapper" },
   );
@@ -810,22 +810,78 @@ export function createChatContainer(
 
   inputWrapper.style.position = "relative";
 
-  const focusLamp = createElement(
+  const composerFrame = createElement(
     doc,
     "div",
     {
-      position: "absolute",
-      top: "0",
-      left: "0",
-      right: "0",
-      height: "52px",
-      pointerEvents: "none",
-      borderRadius: "inherit",
-      zIndex: "0",
+      position: "relative",
+      width: "100%",
+      minWidth: "0",
+      borderRadius: "16px",
     },
-    { id: "chat-composer-focus-lamp", "aria-hidden": "true" },
+    { id: "chat-composer-frame" },
   );
-  inputWrapper.appendChild(focusLamp);
+  const focusFx = createElement(
+    doc,
+    "div",
+    { position: "absolute", inset: "0", pointerEvents: "none", zIndex: "3" },
+    { class: "chat-composer-focus-fx", "aria-hidden": "true" },
+  );
+  const focusAura = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "chat-composer-focus-aura",
+    },
+  );
+  focusFx.appendChild(focusAura);
+  const svgNamespace = "http://www.w3.org/2000/svg";
+  const focusGlint = doc.createElementNS(svgNamespace, "svg");
+  focusGlint.setAttribute("class", "chat-composer-focus-glint");
+  focusGlint.setAttribute("viewBox", "0 0 100 2");
+  focusGlint.setAttribute("preserveAspectRatio", "none");
+  focusGlint.setAttribute("height", "2");
+  focusGlint.setAttribute("focusable", "false");
+  const glintPath = doc.createElementNS(svgNamespace, "path");
+  glintPath.setAttribute("d", "M0 1H26");
+  glintPath.setAttribute("fill", "none");
+  glintPath.setAttribute("stroke", "currentColor");
+  glintPath.setAttribute("stroke-width", "2");
+  glintPath.setAttribute("stroke-linecap", "round");
+  glintPath.setAttribute("vector-effect", "non-scaling-stroke");
+  focusGlint.appendChild(glintPath);
+  focusFx.appendChild(focusGlint);
+
+  const focusSparks = doc.createElementNS(svgNamespace, "svg");
+  focusSparks.setAttribute("class", "chat-composer-focus-sparks");
+  focusSparks.setAttribute("viewBox", "0 0 36 28");
+  focusSparks.setAttribute("width", "36");
+  focusSparks.setAttribute("height", "28");
+  focusSparks.setAttribute("focusable", "false");
+  const focusSpark = doc.createElementNS(svgNamespace, "g");
+  focusSpark.setAttribute("class", "chat-composer-focus-spark");
+  const sparkPath = doc.createElementNS(svgNamespace, "path");
+  sparkPath.setAttribute(
+    "d",
+    "M12 2C13.2 11.3 14.7 12.8 24 14C14.7 15.2 13.2 16.7 12 26C10.8 16.7 9.3 15.2 0 14C9.3 12.8 10.8 11.3 12 2Z",
+  );
+  const sparkCore = doc.createElementNS(svgNamespace, "circle");
+  sparkCore.setAttribute("cx", "12");
+  sparkCore.setAttribute("cy", "14");
+  sparkCore.setAttribute("r", "1.5");
+  sparkCore.setAttribute("fill", "#ffffff");
+  focusSpark.appendChild(sparkPath);
+  focusSpark.appendChild(sparkCore);
+  const satellite = doc.createElementNS(svgNamespace, "path");
+  satellite.setAttribute("class", "chat-composer-focus-satellite");
+  satellite.setAttribute(
+    "d",
+    "M29 2C29.5 5 30 5.5 33 6C30 6.5 29.5 7 29 10C28.5 7 28 6.5 25 6C28 5.5 28.5 5 29 2Z",
+  );
+  focusSparks.appendChild(focusSpark);
+  focusSparks.appendChild(satellite);
+  focusFx.appendChild(focusSparks);
 
   const contextItemBanner = createContextItemBanner(doc, theme);
   inputWrapper.appendChild(contextItemBanner);
@@ -1279,7 +1335,9 @@ export function createChatContainer(
 
   composerFloat.appendChild(turnQueue);
   composerFloat.appendChild(quickActionsBar);
-  composerFloat.appendChild(inputWrapper);
+  composerFrame.appendChild(inputWrapper);
+  composerFrame.appendChild(focusFx);
+  composerFloat.appendChild(composerFrame);
   inputArea.appendChild(composerFloat);
 
   // History dropdown panel - append to container for proper positioning

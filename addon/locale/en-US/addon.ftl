@@ -47,6 +47,9 @@ paperchat-chat-reader-ask = Ask AI
 paperchat-chat-reader-ask-tooltip = Send the selected text to AI chat
 
 paperchat-chat-reader-figure-screenshot = Select figure screenshot
+paperchat-chat-image-screenshot = Page { $page } screenshot
+paperchat-chat-image-attachment = Image
+paperchat-chat-image-remove = Remove image
 
 paperchat-chat-reader-figure-screenshot-no-pdf = Open a PDF in the reader before selecting a screenshot.
 

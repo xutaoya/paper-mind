@@ -144,25 +144,51 @@ function startSelection(doc: Document): void {
   doc.head.appendChild(blockStyle);
 
   const overlay = doc.createElement("div");
+  overlay.setAttribute("data-paperchat-figure-overlay", "true");
   Object.assign(overlay.style, {
     position: "fixed",
     inset: "0",
-    background: "rgba(0, 0, 0, 0.22)",
+    background: "rgba(0, 0, 0, 0.4)",
     cursor: "crosshair",
     pointerEvents: "auto",
+    outline: "none",
     zIndex: "2147483646",
   });
   overlay.tabIndex = -1;
   const marquee = doc.createElement("div");
+  marquee.setAttribute("data-paperchat-figure-selection", "true");
+  marquee.setAttribute("aria-hidden", "true");
   Object.assign(marquee.style, {
     position: "fixed",
     display: "none",
     pointerEvents: "none",
-    border: "1px solid #000",
-    background: "rgba(255, 255, 255, 0.28)",
+    border: "1px solid #ffffff",
+    outline: "2px solid #3b82f6",
+    background: "transparent",
+    boxShadow: "0 0 0 100vmax rgba(0, 0, 0, 0.55)",
     boxSizing: "border-box",
     zIndex: "2147483647",
   });
+  for (const [vertical, horizontal] of [
+    ["top", "left"],
+    ["top", "right"],
+    ["bottom", "left"],
+    ["bottom", "right"],
+  ]) {
+    const corner = doc.createElement("div");
+    Object.assign(corner.style, {
+      position: "absolute",
+      width: "12px",
+      height: "12px",
+      pointerEvents: "none",
+      border: "0 solid #60a5fa",
+      [vertical]: "-3px",
+      [horizontal]: "-3px",
+      [`border${vertical === "top" ? "Top" : "Bottom"}Width`]: "3px",
+      [`border${horizontal === "left" ? "Left" : "Right"}Width`]: "3px",
+    });
+    marquee.appendChild(corner);
+  }
   const prompt = doc.createElement("div");
   prompt.textContent = "拖拽选择图片区域，按 Esc 取消";
   Object.assign(prompt.style, {
@@ -221,6 +247,7 @@ function startSelection(doc: Document): void {
     marquee.style.width = `${Math.abs(event.clientX - selection.startX)}px`;
     marquee.style.height = `${Math.abs(event.clientY - selection.startY)}px`;
     marquee.style.display = "block";
+    overlay.style.background = "transparent";
   };
   const begin = (event: MouseEvent) => {
     if (event.button !== 0) return;

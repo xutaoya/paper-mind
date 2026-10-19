@@ -202,6 +202,7 @@ export function populateModelList(
       "http://www.w3.org/1999/xhtml",
       "div",
     ) as HTMLDivElement;
+    item.className = "paperchat-prefs-model-row";
     item.style.cssText = `
       display: flex;
       align-items: center;
@@ -215,6 +216,7 @@ export function populateModelList(
       "http://www.w3.org/1999/xhtml",
       "div",
     ) as HTMLDivElement;
+    infoContainer.className = "paperchat-prefs-model-info";
     infoContainer.style.cssText =
       "display: flex; flex-direction: column; flex: 1;";
 
@@ -229,6 +231,7 @@ export function populateModelList(
       "http://www.w3.org/1999/xhtml",
       "span",
     ) as HTMLSpanElement;
+    nameSpan.className = "paperchat-prefs-model-name";
     nameSpan.textContent = modelId;
     nameSpan.style.cssText = "font-size: 12px;";
     nameRow.appendChild(nameSpan);
@@ -286,16 +289,6 @@ export function populateModelList(
     ) as HTMLButtonElement;
     speedBtn.type = "button";
     speedBtn.textContent = getString("pref-model-speed-test");
-    speedBtn.style.cssText = `
-      border: 1px solid var(--color-border, #ddd);
-      background: #fff;
-      color: #333;
-      cursor: pointer;
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 4px;
-      line-height: 1.4;
-    `;
     speedBtn.addEventListener("click", async () => {
       saveCurrentProviderConfig(doc, config.id);
       const latestConfig = providerManager.getProviderConfig(

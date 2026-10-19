@@ -30,7 +30,7 @@ export const lightTheme: ThemeColors = {
   inputFocusBorderColor: "#9ca3af",
   inputFocusRingColor: "rgba(17, 24, 39, 0.08)",
   composerShadow:
-    "0 10px 38px rgba(15, 23, 42, 0.12), 0 2px 10px rgba(15, 23, 42, 0.06)",
+    "0 2px 8px rgba(15, 23, 42, 0.045), 0 1px 2px rgba(15, 23, 42, 0.035)",
   textPrimary: "#333",
   textSecondary: "#555",
   textMuted: "#888",
@@ -64,8 +64,7 @@ export const darkTheme: ThemeColors = {
   inputBorderColor: "#4b5563",
   inputFocusBorderColor: "#9ca3af",
   inputFocusRingColor: "rgba(243, 244, 246, 0.12)",
-  composerShadow:
-    "0 12px 40px rgba(0, 0, 0, 0.42), 0 2px 10px rgba(0, 0, 0, 0.28)",
+  composerShadow: "0 4px 16px rgba(0, 0, 0, 0.24)",
   textPrimary: "#e0e0e0",
   textSecondary: "#ccc",
   textMuted: "#999",

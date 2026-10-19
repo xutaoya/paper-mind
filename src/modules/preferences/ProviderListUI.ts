@@ -91,7 +91,20 @@ function createProviderListItem(
       "span",
     ) as HTMLSpanElement;
     activeCheck.className = "provider-active-check";
-    activeCheck.textContent = "✅";
+    const icon = doc.createElementNS("http://www.w3.org/2000/svg", "svg");
+    icon.setAttribute("width", "16");
+    icon.setAttribute("height", "16");
+    icon.setAttribute("viewBox", "0 0 16 16");
+    icon.setAttribute("aria-hidden", "true");
+    const path = doc.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", "m3 8 3 3 7-7");
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", "currentColor");
+    path.setAttribute("stroke-width", "1.75");
+    path.setAttribute("stroke-linecap", "round");
+    path.setAttribute("stroke-linejoin", "round");
+    icon.appendChild(path);
+    activeCheck.appendChild(icon);
     activeCheck.style.cssText = "font-size: 12px; flex-shrink: 0;";
     activeCheck.title = getString("pref-provider-active");
     statusContainer.appendChild(activeCheck);

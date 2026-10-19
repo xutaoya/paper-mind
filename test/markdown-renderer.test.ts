@@ -27,6 +27,8 @@ class FakeElement {
   readonly listeners = new Map<string, (event: any) => void>();
   parentNode: FakeElement | null = null;
   className = "";
+  hidden = false;
+  focusVisible = false;
   private value = "";
 
   constructor(
@@ -37,6 +39,20 @@ class FakeElement {
 
   get childNodes(): FakeElement[] {
     return this.children;
+  }
+
+  get classList() {
+    return {
+      contains: (name: string) => this.className.split(/\s+/).includes(name),
+      toggle: (name: string, force?: boolean) => {
+        const classes = new Set(this.className.split(/\s+/).filter(Boolean));
+        const add = force ?? !classes.has(name);
+        if (add) classes.add(name);
+        else classes.delete(name);
+        this.className = [...classes].join(" ");
+        return add;
+      },
+    };
   }
 
   get firstChild(): FakeElement | null {
@@ -89,14 +105,19 @@ class FakeElement {
     return null;
   }
 
+  matches(selector: string): boolean {
+    return selector === ":focus-visible" && this.focusVisible;
+  }
+
   addEventListener(type: string, listener: (event: any) => void): void {
     this.listeners.set(type, listener);
   }
 
-  dispatch(type: string): void {
+  dispatch(type: string, details: Record<string, unknown> = {}): void {
     this.listeners.get(type)?.({
       preventDefault: () => undefined,
       stopPropagation: () => undefined,
+      ...details,
     });
   }
 }
@@ -393,6 +414,48 @@ describe("Markdown rendering", function () {
   });
 
   describe("markdown renderer source groups", function () {
+    it("expands a source from the whole header and supports keyboard and focus", function () {
+      const originalZotero = (globalThis as { Zotero?: unknown }).Zotero;
+      (globalThis as { Zotero?: unknown }).Zotero = {
+        getMainWindow: () => null,
+      };
+      try {
+        const doc = new FakeDocument();
+        const root = new FakeElement(doc, "div");
+        renderMarkdownToElement(
+          root as unknown as HTMLElement,
+          '<source-group label="Mask-DiFuser: A Masked Diffusion Model for Image Fusion" type="paper" page="6">Source passage.</source-group>',
+        );
+        const card = root.children[0];
+        const toggle = card.querySelector(".chat-source-group__toggle")!;
+        const body = card.querySelector(".chat-source-group__body")!;
+        const label = card.querySelector(".chat-source-group__label")!;
+        assert.equal(toggle.getAttribute("aria-expanded"), "false");
+        assert.isTrue(body.hidden);
+        toggle.dispatch("click");
+        assert.equal(toggle.getAttribute("aria-expanded"), "true");
+        assert.isFalse(body.hidden);
+        assert.equal(label.style.whiteSpace, "normal");
+        assert.equal(label.style.webkitLineClamp, "2");
+        toggle.dispatch("keydown", { key: "Enter" });
+        assert.isTrue(body.hidden);
+        assert.equal(label.style.whiteSpace, "nowrap");
+        toggle.dispatch("keydown", { key: " " });
+        assert.isFalse(body.hidden);
+        toggle.dispatch("focus");
+        assert.equal(toggle.style.outline, "none");
+        toggle.focusVisible = true;
+        toggle.dispatch("focus");
+        assert.include(toggle.style.outline, "2px solid");
+        toggle.dispatch("pointerdown");
+        assert.equal(toggle.style.outline, "none");
+        toggle.dispatch("blur");
+        assert.equal(toggle.style.outline, "none");
+      } finally {
+        (globalThis as { Zotero?: unknown }).Zotero = originalZotero;
+      }
+    });
+
     it("renders trusted app-owned presentation previews and an open action independently of assistant markup", async function () {
       const originalPathUtils = (globalThis as { PathUtils?: unknown })
         .PathUtils;
@@ -1521,6 +1584,9 @@ Missing label should not be parsed.
         );
         assert.equal(cards.length, 1);
         assert.include(cards[0]!.className, "chat-source-group--citation-only");
+        const toggle = cards[0]!.querySelector(".chat-source-group__toggle")!;
+        assert.isNull(toggle.getAttribute("role"));
+        assert.equal((toggle as unknown as HTMLElement).tabIndex, -1);
         const rendered = collectRenderedText(root);
         assert.include(rendered, "核心内容总结");
         assert.include(rendered, "第六段总结主要贡献");

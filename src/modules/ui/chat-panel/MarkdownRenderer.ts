@@ -297,17 +297,19 @@ type SourceGroupFragment =
 const sourceGroupStyles = {
   light: {
     cardBg: "#ffffff",
-    cardBorder: "#d0d7de",
-    headerBg: "#f6f8fa",
-    labelText: "#24292f",
-    bodyText: "#334155",
+    cardBorder: "#e4e5e8",
+    headerBg: "#f7f8fa",
+    labelText: "#25272b",
+    bodyText: "#525866",
+    mutedText: "#787e89",
   },
   dark: {
-    cardBg: "#161b22",
-    cardBorder: "#30363d",
-    headerBg: "#21262d",
-    labelText: "#e6edf3",
-    bodyText: "#c9d1d9",
+    cardBg: "#1f1f1f",
+    cardBorder: "#313131",
+    headerBg: "#272727",
+    labelText: "#e5e7eb",
+    bodyText: "#b5bac4",
+    mutedText: "#a0a4ad",
   },
 };
 
@@ -1554,7 +1556,7 @@ export function getStreamingAssistantTextTail(
 function getSourceGroupPalette(
   type: string,
   dark: boolean,
-): { badgeBg: string; badgeText: string; accent: string; wash: string } {
+): { badgeBg: string; badgeText: string } {
   const normalizedType = type.toLowerCase() as SourceGroupType;
   switch (normalizedType) {
     case "paper":
@@ -1563,84 +1565,60 @@ function getSourceGroupPalette(
         ? {
             badgeBg: "#1f6feb33",
             badgeText: "#79c0ff",
-            accent: "#58a6ff",
-            wash: "rgba(56, 139, 253, 0.1)",
           }
         : {
             badgeBg: "#dbeafe",
             badgeText: "#1d4ed8",
-            accent: "#2563eb",
-            wash: "#f4f8ff",
           };
     case "note":
       return dark
         ? {
             badgeBg: "#9a670033",
             badgeText: "#e3b341",
-            accent: "#d29922",
-            wash: "rgba(210, 153, 34, 0.1)",
           }
         : {
             badgeBg: "#fef3c7",
             badgeText: "#b45309",
-            accent: "#d97706",
-            wash: "#fffbeb",
           };
     case "annotation":
       return dark
         ? {
             badgeBg: "#bc4c0033",
             badgeText: "#ffb77c",
-            accent: "#fb8500",
-            wash: "rgba(251, 133, 0, 0.1)",
           }
         : {
             badgeBg: "#ffedd5",
             badgeText: "#c2410c",
-            accent: "#ea580c",
-            wash: "#fff7ed",
           };
     case "web":
       return dark
         ? {
             badgeBg: "#0f766e33",
             badgeText: "#5eead4",
-            accent: "#14b8a6",
-            wash: "rgba(20, 184, 166, 0.1)",
           }
         : {
             badgeBg: "#ccfbf1",
             badgeText: "#0f766e",
-            accent: "#0d9488",
-            wash: "#f0fdfa",
           };
     case "collection":
       return dark
         ? {
             badgeBg: "#7e22ce33",
             badgeText: "#d8b4fe",
-            accent: "#a855f7",
-            wash: "rgba(168, 85, 247, 0.1)",
           }
         : {
             badgeBg: "#f3e8ff",
             badgeText: "#7e22ce",
-            accent: "#7c3aed",
-            wash: "#faf5ff",
           };
     case "memory":
       return dark
         ? {
             badgeBg: "#16653433",
             badgeText: "#86efac",
-            accent: "#22c55e",
-            wash: "rgba(34, 197, 94, 0.1)",
           }
         : {
             badgeBg: "#dcfce7",
             badgeText: "#15803d",
-            accent: "#16a34a",
-            wash: "#f0fdf4",
           };
     case "library":
     default:
@@ -1648,14 +1626,10 @@ function getSourceGroupPalette(
         ? {
             badgeBg: "#6e768133",
             badgeText: "#c9d1d9",
-            accent: "#8b949e",
-            wash: "rgba(139, 148, 158, 0.1)",
           }
         : {
             badgeBg: "#e5e7eb",
             badgeText: "#475569",
-            accent: "#64748b",
-            wash: "#f8fafc",
           };
   }
 }
@@ -1750,13 +1724,17 @@ function setSourceGroupCollapsed(
   body.hidden = collapsed;
   toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
   setUiChevronExpanded(chevron, !collapsed);
-  const header = card.querySelector(
-    ".chat-source-group__header",
+  const label = toggle.querySelector(
+    ".chat-source-group__label",
   ) as HTMLElement | null;
-  if (header) {
-    header.style.borderBottom = collapsed
-      ? "none"
-      : "1px dashed rgba(128, 128, 128, 0.28)";
+  if (label) {
+    Object.assign(label.style, {
+      whiteSpace: collapsed ? "nowrap" : "normal",
+      display: collapsed ? "block" : "-webkit-box",
+      webkitBoxOrient: "vertical",
+      webkitLineClamp: collapsed ? "unset" : "2",
+      lineClamp: collapsed ? "unset" : "2",
+    });
   }
 }
 
@@ -1785,15 +1763,18 @@ function renderSourceGroupCard(
     .filter(Boolean)
     .join(" ");
   card.setAttribute("data-source-group-type", group.type);
+  card.setAttribute("data-source-group-theme", dark ? "dark" : "light");
   Object.assign(card.style, {
-    margin: "10px 0 6px",
+    margin: "12px 0 8px",
     border: `1px solid ${colors.cardBorder}`,
-    borderLeft: `3px solid ${palette.accent}`,
-    borderRadius: "8px",
-    background: palette.wash,
+    borderRadius: "12px",
+    background: colors.cardBg,
     overflow: "hidden",
     fontSize: "12px",
-    lineHeight: "1.4",
+    lineHeight: "16px",
+    fontFamily: "inherit",
+    fontWeight: "400",
+    boxShadow: dark ? "none" : "0 1px 2px rgba(15, 23, 42, 0.025)",
     boxSizing: "border-box",
   });
 
@@ -1815,38 +1796,80 @@ function renderSourceGroupCard(
   toggle.setAttribute("role", "button");
   toggle.tabIndex = 0;
   toggle.setAttribute("aria-expanded", "false");
-  toggle.setAttribute("aria-label", getString("chat-source-group-toggle"));
+  toggle.setAttribute(
+    "aria-label",
+    `${getString("chat-source-group-toggle")}: ${group.label}`,
+  );
   Object.assign(toggle.style, {
     display: "flex",
     flexDirection: "row",
     flexWrap: "nowrap",
     alignItems: "center",
-    gap: "8px",
+    gap: "12px",
     flex: "1 1 auto",
     minWidth: "0",
     margin: "0",
-    padding: "7px 8px 7px 10px",
+    padding: "8px 12px",
     border: "none",
     background: "transparent",
     cursor: "pointer",
+    color: colors.labelText,
+    textAlign: "left",
+    transition: "background-color 180ms cubic-bezier(0.32, 0.72, 0, 1)",
     boxSizing: "border-box",
   });
 
-  toggle.appendChild(createSourceGroupIcon(doc, palette.accent));
+  const iconWrap = doc.createElementNS(HTML_NS, "span") as HTMLElement;
+  iconWrap.className = "chat-source-group__icon-wrap";
+  Object.assign(iconWrap.style, {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "32px",
+    height: "32px",
+    flexShrink: "0",
+    borderRadius: "4px",
+    background: dark ? "#272727" : palette.badgeBg,
+  });
+  iconWrap.appendChild(createSourceGroupIcon(doc, palette.badgeText));
+  toggle.appendChild(iconWrap);
+
+  const identity = doc.createElementNS(HTML_NS, "span") as HTMLElement;
+  identity.className = "chat-source-group__identity";
+  Object.assign(identity.style, {
+    display: "flex",
+    flexDirection: "column",
+    gap: "2px",
+    minWidth: "0",
+    flex: "1 1 auto",
+  });
+  const metadata = doc.createElementNS(HTML_NS, "span") as HTMLElement;
+  metadata.className = "chat-source-group__metadata";
+  Object.assign(metadata.style, {
+    display: "flex",
+    alignItems: "center",
+    gap: "4px",
+    color: colors.mutedText,
+    fontSize: "12px",
+    lineHeight: "16px",
+    whiteSpace: "nowrap",
+  });
 
   const kicker = doc.createElementNS(HTML_NS, "span") as HTMLElement;
   kicker.className = "chat-source-group__kicker";
   Object.assign(kicker.style, {
-    fontSize: "10px",
-    fontWeight: "700",
-    letterSpacing: "0.06em",
-    textTransform: "uppercase",
-    color: palette.badgeText,
+    fontSize: "12px",
+    fontWeight: "400",
+    color: colors.mutedText,
     whiteSpace: "nowrap",
     flexShrink: "0",
   });
   kicker.textContent = getString("chat-source-group-caption");
-  toggle.appendChild(kicker);
+  metadata.appendChild(kicker);
+  const separator = doc.createElementNS(HTML_NS, "span") as HTMLElement;
+  separator.textContent = "·";
+  separator.setAttribute("aria-hidden", "true");
+  metadata.appendChild(separator);
 
   const badge = doc.createElementNS(HTML_NS, "span") as HTMLElement;
   badge.className = "chat-source-group__badge";
@@ -1854,18 +1877,18 @@ function renderSourceGroupCard(
     display: "inline-flex",
     alignItems: "center",
     flexShrink: "0",
-    padding: "0 6px",
+    padding: "0",
     height: "16px",
-    borderRadius: "4px",
-    fontSize: "10px",
-    fontWeight: "600",
+    fontSize: "12px",
+    fontWeight: "400",
     lineHeight: "16px",
     whiteSpace: "nowrap",
-    background: palette.badgeBg,
-    color: palette.badgeText,
+    background: "transparent",
+    color: colors.mutedText,
   });
   badge.textContent = formatSourceGroupTypeLabel(group.type);
-  toggle.appendChild(badge);
+  metadata.appendChild(badge);
+  identity.appendChild(metadata);
 
   const label = doc.createElementNS(HTML_NS, "span") as HTMLElement;
   label.className = "chat-source-group__label";
@@ -1875,43 +1898,47 @@ function renderSourceGroupCard(
     overflow: "hidden",
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
-    fontSize: "12px",
+    fontSize: "14px",
     fontWeight: "600",
-    lineHeight: "1.35",
+    lineHeight: "20px",
     color: colors.labelText,
   });
   label.setAttribute("title", group.label);
   label.textContent = group.label;
-  toggle.appendChild(label);
+  identity.appendChild(label);
+  toggle.appendChild(identity);
 
   if (group.page) {
     const pageEl = doc.createElementNS(HTML_NS, "span") as HTMLElement;
     pageEl.className = "chat-source-group__page";
     Object.assign(pageEl.style, {
-      fontSize: "10px",
-      fontWeight: "550",
-      color: colors.bodyText,
-      opacity: "0.78",
+      fontSize: "12px",
+      fontWeight: "400",
+      color: colors.mutedText,
+      marginLeft: "4px",
       whiteSpace: "nowrap",
       flexShrink: "0",
     });
     pageEl.textContent = getString("chat-source-group-page", {
       args: { page: String(group.page) },
     });
-    toggle.appendChild(pageEl);
+    metadata.appendChild(pageEl);
   }
 
   if (cardMode !== "citation-only") {
     const chevron = createUiChevron(doc, {
       className: "chat-source-group__chevron",
       size: 16,
-      color: colors.bodyText,
-      opacity: 0.52,
+      color: colors.mutedText,
+      opacity: 0.7,
     });
     setUiChevronExpanded(chevron, false);
     toggle.appendChild(chevron);
   } else {
     toggle.style.cursor = "default";
+    toggle.tabIndex = -1;
+    toggle.removeAttribute("role");
+    toggle.removeAttribute("aria-expanded");
   }
   header.appendChild(toggle);
 
@@ -1927,21 +1954,34 @@ function renderSourceGroupCard(
       alignItems: "center",
       justifyContent: "center",
       flexShrink: "0",
-      width: "28px",
-      height: "28px",
-      margin: "0 4px 0 0",
+      width: "32px",
+      height: "32px",
+      margin: "0 8px 0 0",
+      alignSelf: "center",
       padding: "0",
       border: "none",
-      borderRadius: "6px",
+      borderRadius: "8px",
       background: "transparent",
       cursor: "pointer",
-      fontSize: "13px",
       lineHeight: "1",
-      color: colors.bodyText,
+      color: colors.mutedText,
       opacity: "0.7",
       boxSizing: "border-box",
     });
-    openBtn.textContent = "↗";
+    const openIcon = doc.createElementNS(SVG_NS, "svg");
+    openIcon.setAttribute("viewBox", "0 0 16 16");
+    openIcon.setAttribute("width", "16");
+    openIcon.setAttribute("height", "16");
+    openIcon.setAttribute("aria-hidden", "true");
+    const openPath = doc.createElementNS(SVG_NS, "path");
+    openPath.setAttribute("d", "M6 3.5H3.5v9h9V10M8.5 3.5h4v4M7 9l5.5-5.5");
+    openPath.setAttribute("fill", "none");
+    openPath.setAttribute("stroke", "currentColor");
+    openPath.setAttribute("stroke-width", "1.25");
+    openPath.setAttribute("stroke-linecap", "round");
+    openPath.setAttribute("stroke-linejoin", "round");
+    openIcon.appendChild(openPath);
+    openBtn.appendChild(openIcon);
     const openSource = (event: Event): void => {
       event.preventDefault();
       event.stopPropagation();
@@ -1960,9 +2000,7 @@ function renderSourceGroupCard(
       }
     });
     openBtn.addEventListener("mouseenter", () => {
-      openBtn.style.background = dark
-        ? "rgba(255, 255, 255, 0.08)"
-        : "rgba(15, 23, 42, 0.06)";
+      openBtn.style.background = colors.headerBg;
       openBtn.style.opacity = "1";
     });
     openBtn.addEventListener("mouseleave", () => {
@@ -1981,14 +2019,21 @@ function renderSourceGroupCard(
     Object.assign(body.style, {
       color: colors.bodyText,
       background: "transparent",
+      borderTop: `1px solid ${colors.cardBorder}`,
     });
 
     const content = doc.createElementNS(HTML_NS, "div") as HTMLElement;
     content.className = "chat-source-group__content";
     Object.assign(content.style, {
-      padding: "2px 12px 10px",
+      padding: "12px 16px",
       maxHeight: "min(200px, 40vh)",
       overflow: "auto",
+      scrollbarWidth: "thin",
+      scrollbarColor: dark ? "#4b4b4b transparent" : "#d1d5db transparent",
+      fontSize: "12px",
+      lineHeight: "20px",
+      overflowWrap: "anywhere",
+      whiteSpace: "normal",
     });
     renderMarkdownFragment(doc, content, group.content, {
       ...options,
@@ -2020,13 +2065,28 @@ function renderSourceGroupCard(
     if (cardMode === "citation-only") {
       return;
     }
-    toggle.style.background = dark
-      ? "rgba(255, 255, 255, 0.04)"
-      : "rgba(15, 23, 42, 0.04)";
+    toggle.style.background = colors.headerBg;
   });
   toggle.addEventListener("mouseleave", () => {
     toggle.style.background = "transparent";
   });
+  for (const control of [toggle, ...Array.from(header.children).slice(1)]) {
+    const element = control as HTMLElement;
+    if (element.tabIndex < 0) continue;
+    element.style.outline = "none";
+    element.addEventListener("pointerdown", () => {
+      element.style.outline = "none";
+    });
+    element.addEventListener("focus", () => {
+      element.style.outline = element.matches(":focus-visible")
+        ? `2px solid ${palette.badgeText}`
+        : "none";
+      element.style.outlineOffset = "-4px";
+    });
+    element.addEventListener("blur", () => {
+      element.style.outline = "none";
+    });
+  }
 
   parent.appendChild(card);
 }

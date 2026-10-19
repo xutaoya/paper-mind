@@ -1766,7 +1766,22 @@ export function updateAttachmentsPreviewDisplay(
   attachmentState.pendingImages.forEach((image, index) => {
     const tag = createTag();
     tag.setAttribute("class", "pending-image-attachment");
+    Object.assign(tag.style, {
+      width: "auto",
+      maxWidth: "min(208px, 100%)",
+      gap: "8px",
+      padding: "4px 8px",
+      borderRadius: "8px",
+      boxSizing: "border-box",
+      color: theme.textPrimary,
+    });
     const imageSrc = getImageSrc(image);
+    const screenshotPage = image.name?.match(
+      /^figure-screenshot-page-(\d+)\.png$/i,
+    )?.[1];
+    const imageLabel = screenshotPage
+      ? getString("chat-image-screenshot", { args: { page: screenshotPage } })
+      : image.name || getString("chat-image-attachment");
     tag.appendChild(
       createElement(
         doc,
@@ -1776,25 +1791,58 @@ export function updateAttachmentsPreviewDisplay(
           width: "32px",
           height: "32px",
           borderRadius: "4px",
-          objectFit: "cover",
+          objectFit: "contain",
+          display: "block",
           background: theme.buttonBg,
         },
         {
           src: imageSrc,
-          alt: image.name || "Attached image",
-          title: image.name || "Attached image",
+          alt: image.name || imageLabel,
         },
       ),
     );
-    tag.appendChild(createLabel(image.name || "image"));
+    const title = createLabel(imageLabel);
+    Object.assign(title.style, {
+      fontSize: "12px",
+      lineHeight: "16px",
+      fontWeight: "500",
+    });
+    tag.appendChild(title);
     const hoverPreview = attachPendingImageHoverPreview(tag, imageSrc, doc);
     if (actions.onRemoveImage) {
-      tag.appendChild(
-        createRemoveButton(`Remove ${image.name || "image"}`, () => {
+      const remove = createRemoveButton(
+        `${getString("chat-image-remove")}: ${imageLabel}`,
+        () => {
           hoverPreview.cleanup();
           actions.onRemoveImage?.(index);
-        }),
+        },
       );
+      remove.setAttribute("class", "pending-image-remove");
+      Object.assign(remove.style, {
+        appearance: "none",
+        width: "24px",
+        height: "24px",
+        minWidth: "24px",
+        maxHeight: "none",
+        margin: "0",
+        borderRadius: "8px",
+      });
+      remove.textContent = "";
+      const svg = doc.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 16 16");
+      svg.setAttribute("width", "16");
+      svg.setAttribute("height", "16");
+      svg.setAttribute("aria-hidden", "true");
+      const path = doc.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", "m4 4 8 8M12 4l-8 8");
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", "currentColor");
+      path.setAttribute("stroke-width", "1.5");
+      path.setAttribute("stroke-linecap", "round");
+      svg.appendChild(path);
+      remove.appendChild(svg);
+      remove.addEventListener("mouseenter", hoverPreview.cleanup);
+      tag.appendChild(remove);
     }
     attachmentsPreview.appendChild(tag);
   });
@@ -1811,6 +1859,10 @@ export function updateAttachmentsPreviewDisplay(
     attachmentState.pendingFiles.length +
     (attachmentState.pendingSelectedText ? 1 : 0);
   attachmentsPreview.style.display = attachmentCount > 0 ? "flex" : "none";
+  attachmentsPreview.setAttribute(
+    "data-has-attachments",
+    attachmentCount > 0 ? "true" : "false",
+  );
 }
 
 function renderTurnQueue(container: HTMLElement, sessionId?: string): void {

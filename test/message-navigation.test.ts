@@ -1115,6 +1115,9 @@ describe("chat message exact navigation", function () {
     assert.equal(imageTag.getAttribute("class"), "pending-image-attachment");
     assert.equal(imageTag.children[0].tagName, "img");
     assert.equal(imageTag.children[0].style.width, "32px");
+    assert.equal(imageTag.children[0].style.objectFit, "contain");
+    assert.equal(imageTag.children[1].textContent, "figure.png");
+    assert.equal(imageTag.style.width, "auto");
     assert.equal(
       imageTag.children[0].getAttribute("src"),
       "data:image/png;base64,YWJj",
@@ -1137,6 +1140,75 @@ describe("chat message exact navigation", function () {
       0,
     );
     assert.deepEqual(removedImages, [0]);
+  });
+
+  it("labels PDF screenshots by page, preserves uploaded names, and restores the composer fade when cleared", function () {
+    (globalThis as any).addon.data.locale.current.formatMessagesSync = ([
+      request,
+    ]: Array<{ id: string; args?: { page: string } }>) => [
+      {
+        value: request.id.endsWith("chat-image-screenshot")
+          ? `Page ${request.args?.page} screenshot`
+          : request.id,
+        attributes: null,
+      },
+    ];
+    const doc = new FakeDocument();
+    const preview = new FakeElement(doc, "div");
+    const container = new AttachmentPreviewContainer(doc, preview);
+    const state = {
+      pendingImages: [
+        {
+          type: "base64" as const,
+          data: "YWJj",
+          mimeType: "image/png",
+          name: "figure-screenshot-page-2.png",
+        },
+        {
+          type: "url" as const,
+          data: "https://example.com/image.jpg",
+          mimeType: "image/jpeg",
+          name: "Uploaded experiment comparison.jpg",
+        },
+      ],
+      pendingFiles: [],
+      pendingQuotedMessages: [],
+      pendingSelectedText: null,
+    };
+    const removed: number[] = [];
+    updateAttachmentsPreviewDisplay(asElement(container), state, {
+      onRemoveImage: (index) => removed.push(index),
+    });
+
+    assert.equal(preview.getAttribute("data-has-attachments"), "true");
+    const screenshot = preview.children[0];
+    assert.equal(screenshot.children[1].textContent, "Page 2 screenshot");
+    assert.equal(
+      screenshot.children[0].getAttribute("alt"),
+      "figure-screenshot-page-2.png",
+    );
+    const uploaded = preview.children[1];
+    assert.equal(
+      uploaded.children[1].textContent,
+      "Uploaded experiment comparison.jpg",
+    );
+    assert.equal(
+      uploaded.children[0].getAttribute("src"),
+      "https://example.com/image.jpg",
+    );
+    uploaded.children[2].listeners.get("click")?.[0]?.({
+      preventDefault() {},
+      stopPropagation() {},
+    });
+    assert.deepEqual(removed, [1]);
+
+    updateAttachmentsPreviewDisplay(asElement(container), {
+      ...state,
+      pendingImages: [],
+    });
+    assert.equal(preview.style.display, "none");
+    assert.equal(preview.getAttribute("data-has-attachments"), "false");
+    assert.isEmpty(preview.children);
   });
 
   it("renders pending selected text with preview and remove button", function () {

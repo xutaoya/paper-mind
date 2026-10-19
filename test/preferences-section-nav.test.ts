@@ -3,7 +3,7 @@ import { assert } from "chai";
 import { bindPreferencesSectionNav } from "../src/modules/preferences/PreferencesSectionNav.ts";
 
 describe("preferences section navigation", function () {
-  it("defines a left nav and one panel per settings section", function () {
+  it("defines navigation and one panel per settings section", function () {
     const markup = readFileSync(
       new URL("../addon/content/preferences.xhtml", import.meta.url),
       "utf8",
