@@ -87,6 +87,58 @@ describe("chat math markdown helpers", function () {
     assert.equal(preserveStrongEmphasisAsHtml(input), input);
   });
 
+  it("preserves parenthesized bold labels immediately after CJK text", function () {
+    for (const label of [
+      "(b) Attention Parallel Feature Mixer",
+      "（b）注意力并行特征混合器",
+    ]) {
+      assert.equal(
+        preserveStrongEmphasisAsHtml(`与**${label}**（APFM 模块）。`),
+        `与<strong>${label}</strong>（APFM 模块）。`,
+      );
+    }
+  });
+
+  it("leaves spaced and escaped parenthesized bold labels unchanged", function () {
+    for (const input of [
+      "与 **(b) Attention Parallel Feature Mixer**（APFM 模块）。",
+      String.raw`与\**(b) Attention Parallel Feature Mixer\**（APFM 模块）。`,
+    ]) {
+      assert.equal(preserveStrongEmphasisAsHtml(input), input);
+    }
+  });
+
+  it("preserves multiplication-led iteration labels after CJK text", function () {
+    for (const label of ["×(T−1)", "×(T-1)", "×（T−1）"]) {
+      for (const separator of ["", " "]) {
+        assert.equal(
+          preserveStrongEmphasisAsHtml(
+            `上方标注**${label}**${separator}的自环箭头表示迭代重复。`,
+          ),
+          `上方标注<strong>${label}</strong>${separator}的自环箭头表示迭代重复。`,
+        );
+      }
+    }
+  });
+
+  it("preserves bold operator-only labels after CJK text", function () {
+    for (const operator of ["+", "−", "×", "⊙", "="]) {
+      assert.equal(
+        preserveStrongEmphasisAsHtml(`二者在底部**${operator}** 节点相加。`),
+        `二者在底部<strong>${operator}</strong> 节点相加。`,
+      );
+    }
+  });
+
+  it("escapes HTML inside repaired parenthesized bold labels", function () {
+    assert.equal(
+      preserveStrongEmphasisAsHtml(
+        '与**(b) <img src=x onerror="alert(1)">**。',
+      ),
+      "与<strong>(b) &lt;img src=x onerror=&quot;alert(1)&quot;&gt;</strong>。",
+    );
+  });
+
   it("preserves bold spans immediately followed by CJK text", function () {
     const input = "提出**弹性权重巩固（EWC）**通过正则化";
     const processed = preserveStrongEmphasisAsHtml(input);

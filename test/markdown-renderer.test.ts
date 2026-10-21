@@ -185,6 +185,90 @@ describe("Markdown rendering", function () {
   });
 
   describe("markdown renderer emphasis", function () {
+    it("renders a bold addition node label after a bold list heading", function () {
+      const doc = new FakeDocument();
+      const root = new FakeElement(doc, "div");
+      renderMarkdownToElement(
+        root as unknown as HTMLElement,
+        "4. **加权求和输出**：左乘法器计算 w ⊙ F_A，右乘法器计算 (1 − w) ⊙ F_B，二者在底部**+** 节点相加，得到重建图像。",
+        "emphasis-addition-node",
+      );
+      assert.notInclude(collectRenderedText(root), "**");
+      const labels: string[] = [];
+      function collectStrongLabels(node: FakeElement): void {
+        if (node.tagName === "strong") labels.push(collectRenderedText(node));
+        node.children.forEach(collectStrongLabels);
+      }
+      collectStrongLabels(root);
+      assert.deepEqual(labels, ["加权求和输出", "+"]);
+      assert.include(collectRenderedText(root), "得到重建图像。");
+    });
+
+    it("renders multiplication-led iteration labels alongside another bold span", function () {
+      const doc = new FakeDocument();
+      const root = new FakeElement(doc, "div");
+      renderMarkdownToElement(
+        root as unknown as HTMLElement,
+        "- 再进入绿色 **Denoising Steps** 图标（图例：一次去噪步），上方标注**×(T−1)** 的自环箭头表示迭代重复，最终输出重建图像（左下的清晰鸟图）。",
+        "emphasis-iteration-label",
+      );
+      assert.notInclude(collectRenderedText(root), "**");
+      assert.include(collectRenderedText(root), "×(T−1) 的自环箭头");
+      assert.include(collectRenderedText(root), "最终输出重建图像");
+      const labels: string[] = [];
+      function collectStrongLabels(node: FakeElement): void {
+        if (node.tagName === "strong") labels.push(collectRenderedText(node));
+        node.children.forEach(collectStrongLabels);
+      }
+      collectStrongLabels(root);
+      assert.deepEqual(labels, ["Denoising Steps", "×(T−1)"]);
+    });
+
+    it("renders figure panel labels after Chinese prose without literal asterisks", function () {
+      const doc = new FakeDocument();
+      const root = new FakeElement(doc, "div");
+      const label = "(b) Attention Parallel Feature Mixer";
+      renderMarkdownToElement(
+        root as unknown as HTMLElement,
+        `信息，即整体框架）与**${label}**（APFM 模块的内部结构放大图）。下面按数据流顺序逐块拆解。`,
+        "emphasis-figure-panel",
+      );
+      assert.notInclude(collectRenderedText(root), "**");
+      const strong = findElementByTagName(root, "strong");
+      assert.isNotNull(strong);
+      assert.equal(collectRenderedText(strong!), label);
+      assert.include(collectRenderedText(root), "下面按数据流顺序逐块拆解。");
+    });
+
+    it("keeps parenthesized bold examples literal inside code", function () {
+      const originalZotero = (globalThis as { Zotero?: unknown }).Zotero;
+      (globalThis as { Zotero?: unknown }).Zotero = {
+        getMainWindow: () => null,
+      };
+      const doc = new FakeDocument();
+      const root = new FakeElement(doc, "div");
+      const example =
+        "与**(b) Attention Parallel Feature Mixer**（APFM 模块）。";
+      try {
+        for (const markdown of [
+          `\`${example}\``,
+          `\`\`\`\n${example}\n\`\`\``,
+        ]) {
+          renderMarkdownToElement(
+            root as unknown as HTMLElement,
+            markdown,
+            "emphasis-figure-code",
+          );
+          const code = findElementByTagName(root, "code");
+          assert.isNotNull(code);
+          assert.include(collectRenderedText(code!), example);
+          assert.isNull(findElementByTagName(root, "strong"));
+        }
+      } finally {
+        (globalThis as { Zotero?: unknown }).Zotero = originalZotero;
+      }
+    });
+
     it("renders bold immediately followed by CJK text", function () {
       const originalZotero = (globalThis as { Zotero?: unknown }).Zotero;
       (globalThis as { Zotero?: unknown }).Zotero = {

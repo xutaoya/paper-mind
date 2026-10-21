@@ -58,7 +58,12 @@ export class NextQuestionHintController {
   private disposed = false;
 
   private readonly onWrapperKeyDown = (event: KeyboardEvent) => {
-    if (event.key !== "Tab" || event.shiftKey || !this.isHintActive()) {
+    if (
+      event.key !== "Tab" ||
+      event.shiftKey ||
+      event.isComposing ||
+      !this.isHintActive()
+    ) {
       return;
     }
     const target = event.target as Node | null;
@@ -70,11 +75,13 @@ export class NextQuestionHintController {
     }
     event.preventDefault();
     event.stopImmediatePropagation();
-    this.input?.focus();
     this.acceptHint();
   };
 
   private readonly onKeyDown = (event: KeyboardEvent) => {
+    if (event.isComposing || this.isComposing) {
+      return;
+    }
     if (event.key === "Escape" && this.hint) {
       event.preventDefault();
       event.stopPropagation();
@@ -155,11 +162,17 @@ export class NextQuestionHintController {
     if (!this.isHintActive()) {
       return;
     }
-    if (event instanceof MouseEvent && event.button !== 0) {
+    // Events belong to the document's window; chrome scripts may have no global
+    // MouseEvent/KeyboardEvent constructors (or constructors from another realm).
+    if (event.type === "click" && (event as MouseEvent).button !== 0) {
       return;
     }
-    if (event instanceof KeyboardEvent) {
-      if (event.key !== "Enter" && event.key !== " ") {
+    if (event.type === "keydown") {
+      const keyEvent = event as KeyboardEvent;
+      if (
+        keyEvent.isComposing ||
+        (keyEvent.key !== "Enter" && keyEvent.key !== " ")
+      ) {
         return;
       }
       event.preventDefault();
@@ -417,7 +430,8 @@ export class NextQuestionHintController {
     if (this.disposed || this.isComposing || !this.hint || !this.input) {
       return false;
     }
-    if (this.hint.expiresAt <= Date.now()) {
+    if (!this.hintMatchesCurrentTurn()) {
+      this.dismissHint({ markDismissed: false });
       return false;
     }
     if (this.isMentionPopupVisible()) {
@@ -427,6 +441,24 @@ export class NextQuestionHintController {
       return false;
     }
     return true;
+  }
+
+  private hintMatchesCurrentTurn(): boolean {
+    const session = this.context.chatManager.getActiveSession();
+    if (!this.hint || session?.id !== this.hint.sessionId) {
+      return false;
+    }
+    for (let index = session.messages.length - 1; index >= 0; index--) {
+      const message = session.messages[index];
+      if (message.apiOnly || message.isSystemNotice) continue;
+      if (message.role !== "user" && message.role !== "assistant") continue;
+      return (
+        message.role === "assistant" &&
+        message.id === this.hint.assistantMessageId &&
+        !message.streamingState
+      );
+    }
+    return false;
   }
 
   private isReady(): boolean {
@@ -498,7 +530,7 @@ export class NextQuestionHintController {
 
   private persistHintOnHost(): void {
     const host = this.context.container as HostElement;
-    if (this.hint && this.hint.expiresAt > Date.now()) {
+    if (this.hint && this.hintMatchesCurrentTurn()) {
       host[HOST_HINT_KEY] = this.hint;
       return;
     }
@@ -511,11 +543,7 @@ export class NextQuestionHintController {
 
   private restoreHintFromHost(): void {
     const persisted = (this.context.container as HostElement)[HOST_HINT_KEY];
-    if (
-      !persisted ||
-      persisted.expiresAt <= Date.now() ||
-      this.input?.value.trim()
-    ) {
+    if (!persisted || this.input?.value.trim()) {
       return;
     }
     this.showHint(persisted);
@@ -575,9 +603,10 @@ export class NextQuestionHintController {
     if (!this.hintLayer) {
       return;
     }
-    const isExpired = this.hint ? this.hint.expiresAt <= Date.now() : false;
-    if (isExpired) {
-      this.dismissHint();
+    // A visible suggestion must remain actionable after the user finishes
+    // reading. Invalidate by conversation/turn changes, not on the next focus.
+    if (this.hint && !this.hintMatchesCurrentTurn()) {
+      this.dismissHint({ markDismissed: false });
       return;
     }
     const visible =

@@ -75,11 +75,12 @@ const STRONG_EMPHASIS_FOLLOW_PATTERN =
   /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef：:，,。．；;！!？?、\s]|$/;
 const STRONG_EMPHASIS_CJK_LEAD_PATTERN =
   /^[\u4e00-\u9fff\u3040-\u30ff\uac00-\ud7af]/u;
+const STRONG_EMPHASIS_PUNCTUATION_LEAD_PATTERN = /^[\p{P}\p{S}]/u;
 
 /**
- * markdown-it can leave ** literals when bold text contains quotes and is
- * followed by CJK or fullwidth punctuation. Only rewrite that failing pattern so
- * ordinary bold does not become extra HTML on every message.
+ * markdown-it can leave ** literals at CJK/punctuation boundaries, including
+ * punctuation-led labels immediately after CJK prose. Only rewrite those spans
+ * so ordinary bold does not become extra HTML on every message.
  */
 export function preserveStrongEmphasisAsHtml(content: string): string {
   if (!content.includes("**")) {
@@ -99,6 +100,13 @@ export function preserveStrongEmphasisAsHtml(content: string): string {
         }
       }
       if (STRONG_EMPHASIS_CJK_LEAD_PATTERN.test(after)) {
+        return `<strong>${escapeHtmlText(trimmed)}</strong>`;
+      }
+      const before = source.slice(Math.max(0, offset - 1), offset);
+      if (
+        STRONG_EMPHASIS_CJK_LEAD_PATTERN.test(before) &&
+        STRONG_EMPHASIS_PUNCTUATION_LEAD_PATTERN.test(trimmed)
+      ) {
         return `<strong>${escapeHtmlText(trimmed)}</strong>`;
       }
       return match;
