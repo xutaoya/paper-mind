@@ -237,6 +237,18 @@ export class BookmarkService {
     await this.repository().deleteBookmark(bookmarkId);
   }
 
+  async reorderBookmark(
+    bookmarkId: string,
+    referenceBookmarkId: string,
+    placement: "before" | "after",
+  ): Promise<void> {
+    await this.repository().reorderBookmark(
+      bookmarkId,
+      referenceBookmarkId,
+      placement,
+    );
+  }
+
   async countBookmarksInFolder(folderId: string): Promise<number> {
     return this.repository().countBookmarksInFolder(folderId);
   }
@@ -244,7 +256,7 @@ export class BookmarkService {
   async exportAll(): Promise<BookmarkExportPayload> {
     const folders = await this.listFolders();
     const bookmarks = await this.repository().listBookmarks({
-      sort: "created_desc",
+      sort: "manual",
     });
     return {
       version: 1,

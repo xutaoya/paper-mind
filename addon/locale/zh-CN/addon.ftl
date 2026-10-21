@@ -132,6 +132,8 @@ paperchat-chat-open-settings = 打开设置
 
 paperchat-chat-switch-model-label = 切换模型
 
+paperchat-chat-switch-model-help-label = 模型选择说明
+
 paperchat-chat-switch-model-help = 模型能力越强，消耗 Token 的速度通常也越快。请根据任务复杂度选择合适的模型。
 
 paperchat-chat-select-model = 选择模型
@@ -198,7 +200,7 @@ paperchat-chat-remove-quoted-reply = 删除引用回复
 
 paperchat-chat-quoted-reply-unavailable = 当前会话中已找不到这条引用回复
 
-paperchat-chat-summarize-reply-note = 复制到条目笔记
+paperchat-chat-summarize-reply-note = 添加到条目笔记
 
 paperchat-chat-copy-reply-note-no-item = 找不到可附加笔记的条目
 
@@ -680,6 +682,8 @@ paperchat-chat-bookmark-empty = 还没有书签
 
 paperchat-chat-bookmark-ungrouped = 未分组
 
+paperchat-chat-bookmark-no-group = 不进行分组
+
 paperchat-chat-bookmark-edit = 编辑
 
 paperchat-chat-bookmark-delete = 删除
@@ -727,6 +731,10 @@ paperchat-chat-bookmark-reader-outline-empty = 当前内容没有可导航的标
 paperchat-chat-bookmark-drag-hint = 拖动以移动
 
 paperchat-chat-bookmark-moved = 已移动书签「{ $title }」
+
+paperchat-chat-bookmark-reordered = 已调整书签顺序
+
+paperchat-chat-bookmark-move-failed = 书签移动失败，请重试
 
 paperchat-chat-bookmark-open-in-chat = 在对话中打开
 

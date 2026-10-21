@@ -11,7 +11,7 @@ import { getErrorMessage } from "../../../utils/common";
 
 const DB_DIR = "paper-chat";
 const DB_FILE = "storage";
-export const SCHEMA_VERSION = 18;
+export const SCHEMA_VERSION = 19;
 
 /** Build absolute DB path so Zotero.DBConnection doesn't parse subdirectory names */
 function getDBPath(): string {
@@ -442,6 +442,7 @@ export class StorageDatabase {
         item_key TEXT,
         item_library_id INTEGER,
         page_url TEXT,
+        sort_order INTEGER,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL
       )
@@ -498,6 +499,11 @@ export class StorageDatabase {
         (column: any) => String(column.name),
       ),
     );
+    const bookmarkColumns = new Set(
+      ((await db.queryAsync("PRAGMA table_info(bookmarks)")) || []).map(
+        (column: any) => String(column.name),
+      ),
+    );
     return (
       messageColumns.has("evidence") &&
       messageColumns.has("quoted_messages") &&
@@ -505,7 +511,8 @@ export class StorageDatabase {
       messageColumns.has("presentation_artifacts") &&
       messageColumns.has("edited_at") &&
       messageColumns.has("turn_started_at") &&
-      sessionColumns.has("last_active_item_library_id")
+      sessionColumns.has("last_active_item_library_id") &&
+      bookmarkColumns.has("sort_order")
     );
   }
 
@@ -608,6 +615,10 @@ export class StorageDatabase {
         await this.upgradeToV18(db);
         currentVersion = 18;
       }
+      if (currentVersion < 19) {
+        await this.upgradeToV19(db);
+        currentVersion = 19;
+      }
       if (
         currentVersion === SCHEMA_VERSION &&
         !(await this.hasCurrentSchemaColumns(db))
@@ -623,7 +634,34 @@ export class StorageDatabase {
         await this.upgradeToV16(db);
         await this.upgradeToV17(db);
         await this.upgradeToV18(db);
+        await this.upgradeToV19(db);
       }
+    }
+  }
+
+  /** Upgrade schema v18 -> v19: persist bookmark ordering without changing dates. */
+  private async upgradeToV19(db: ZoteroDBConnection): Promise<void> {
+    await db.queryAsync("BEGIN TRANSACTION");
+    try {
+      const columns =
+        (await db.queryAsync("PRAGMA table_info(bookmarks)")) || [];
+      if (!columns.some((column: any) => column.name === "sort_order")) {
+        await db.queryAsync(
+          "ALTER TABLE bookmarks ADD COLUMN sort_order INTEGER",
+        );
+      }
+      await db.queryAsync(
+        "UPDATE schema_version SET version = ?, updated_at = ? WHERE id = 1",
+        [19, Date.now()],
+      );
+      await db.queryAsync("COMMIT");
+    } catch (error) {
+      try {
+        await db.queryAsync("ROLLBACK");
+      } catch {
+        /* ignore */
+      }
+      throw error;
     }
   }
 

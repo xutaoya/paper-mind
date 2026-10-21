@@ -233,6 +233,9 @@ describe("StorageDatabase foundation", function () {
         if (normalized === "PRAGMA table_info(sessions)") {
           return [{ name: "last_active_item_library_id" }];
         }
+        if (normalized === "PRAGMA table_info(bookmarks)") {
+          return [{ name: "sort_order" }];
+        }
         if (normalized === "SELECT version FROM schema_version WHERE id = 1") {
           return [];
         }
@@ -442,6 +445,9 @@ describe("StorageDatabase foundation", function () {
         }
         if (normalized === "PRAGMA table_info(sessions)") {
           return [{ name: "last_active_item_library_id" }];
+        }
+        if (normalized === "PRAGMA table_info(bookmarks)") {
+          return [{ name: "sort_order" }];
         }
         if (normalized === "SELECT version FROM schema_version WHERE id = 1") {
           return [{ version: SCHEMA_VERSION }];

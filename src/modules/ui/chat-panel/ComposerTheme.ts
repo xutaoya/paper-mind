@@ -4,6 +4,7 @@
 
 import { darkTheme, isDarkMode } from "./ChatPanelTheme";
 import type { ThemeColors } from "./types";
+import { applyModelSelectionHelpTheme } from "./ModelSelectionHelp";
 
 function isDarkTheme(theme: ThemeColors): boolean {
   return theme === darkTheme || isDarkMode();
@@ -162,26 +163,7 @@ export function applyModelSelectorTheme(
     modelSelectorLabel.style.color = theme.textSecondary;
   }
 
-  const modelSelectorHelp = container.querySelector(
-    "#chat-model-selector-help",
-  ) as HTMLElement | null;
-  if (modelSelectorHelp) {
-    modelSelectorHelp.style.borderColor = theme.inputBorderColor;
-    modelSelectorHelp.style.color = theme.textSecondary;
-    modelSelectorHelp.style.background = "transparent";
-  }
-
-  const modelSelectorTooltip = container.querySelector(
-    "#chat-model-selector-tooltip",
-  ) as HTMLElement | null;
-  if (modelSelectorTooltip) {
-    modelSelectorTooltip.style.background = theme.dropdownBg;
-    modelSelectorTooltip.style.borderColor = theme.borderColor;
-    modelSelectorTooltip.style.color = theme.textPrimary;
-    modelSelectorTooltip.style.boxShadow = isDark
-      ? "0 8px 22px rgba(0,0,0,0.45)"
-      : "0 6px 18px rgba(0,0,0,0.22)";
-  }
+  applyModelSelectionHelpTheme(container, theme);
 
   const modelSelectorBtn = container.querySelector(
     "#chat-model-selector-btn",

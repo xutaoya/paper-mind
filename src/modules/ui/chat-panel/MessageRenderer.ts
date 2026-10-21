@@ -79,12 +79,12 @@ type MessageActionIconName =
   | "change"
   | "copy"
   | "fork"
+  | "note-plus"
   | "quote"
   | "refresh"
   | "right-bar"
   | "thinking"
-  | "trash"
-  | "write";
+  | "trash";
 const userInputCountdownTimers = new WeakMap<
   HTMLElement,
   ReturnType<typeof setInterval>
@@ -1550,7 +1550,7 @@ function createSummarizeReplyButton(
   const label = getString("chat-summarize-reply-note");
   const btn = createMessageActionButton(doc, theme, label);
   btn.setAttribute("class", "message-action-btn summarize-reply-note-btn");
-  setIconButtonImage(btn, "write", "");
+  setIconButtonImage(btn, "note-plus", "");
 
   btn.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -1569,7 +1569,12 @@ function createSummarizeReplyButton(
       try {
         const successMessage = await onSummarizeReply(assistantMessageId);
         if (typeof successMessage === "string" && successMessage.trim()) {
-          showInlineMessageActionSuccess(btn, successMessage, "write", label);
+          showInlineMessageActionSuccess(
+            btn,
+            successMessage,
+            "note-plus",
+            label,
+          );
         }
       } catch (error: unknown) {
         const summaryError =

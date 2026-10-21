@@ -41,6 +41,7 @@ function mapBookmarkRow(row: Record<string, unknown>): BookmarkRecord {
     itemLibraryId:
       row.item_library_id == null ? null : Number(row.item_library_id),
     pageUrl: row.page_url ? String(row.page_url) : null,
+    sortOrder: row.sort_order == null ? null : Number(row.sort_order),
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
   };
@@ -223,13 +224,15 @@ export class BookmarkRepository {
     const orderBy =
       options.sort === "title_asc"
         ? "title COLLATE NOCASE ASC, created_at DESC"
-        : "created_at DESC";
+        : options.sort === "manual"
+          ? "COALESCE(sort_order, created_at) DESC, created_at DESC, id ASC"
+          : "created_at DESC";
 
     const rows =
       (await db.queryAsync(
         `SELECT id, library_id, folder_id, type, title, content,
                 session_id, message_id, item_key, item_library_id, page_url,
-                created_at, updated_at
+                sort_order, created_at, updated_at
          FROM bookmarks
          WHERE ${clauses.join(" AND ")}
          ORDER BY ${orderBy}`,
@@ -247,7 +250,7 @@ export class BookmarkRepository {
       (await db.queryAsync(
         `SELECT id, library_id, folder_id, type, title, content,
                 session_id, message_id, item_key, item_library_id, page_url,
-                created_at, updated_at
+                sort_order, created_at, updated_at
          FROM bookmarks
          WHERE library_id = ? AND session_id = ? AND message_id = ?
          ORDER BY updated_at DESC
@@ -335,6 +338,50 @@ export class BookmarkRepository {
     );
   }
 
+  async reorderBookmark(
+    bookmarkId: string,
+    referenceBookmarkId: string,
+    placement: "before" | "after",
+  ): Promise<void> {
+    if (bookmarkId === referenceBookmarkId) return;
+    await getStorageDatabase().executeTransaction(async (tx) => {
+      const rows =
+        (await tx.queryAsync(
+          `SELECT id, folder_id, sort_order, created_at FROM bookmarks
+           WHERE library_id = ?
+           ORDER BY COALESCE(sort_order, created_at) DESC, created_at DESC, id ASC`,
+          [this.libraryId],
+        )) || [];
+      const dragged = rows.find((row) => row.id === bookmarkId);
+      const reference = rows.find((row) => row.id === referenceBookmarkId);
+      if (!dragged || !reference) return;
+      const siblings = rows.filter(
+        (row) => row.folder_id === reference.folder_id && row.id !== bookmarkId,
+      );
+      const index = siblings.findIndex((row) => row.id === referenceBookmarkId);
+      siblings.splice(index + (placement === "after" ? 1 : 0), 0, dragged);
+      const now = Date.now();
+      const topOrder = siblings.reduce(
+        (maximum, row) =>
+          Math.max(maximum, Number(row.sort_order ?? row.created_at)),
+        now,
+      );
+      for (let index = 0; index < siblings.length; index++) {
+        await tx.queryAsync(
+          `UPDATE bookmarks SET folder_id = ?, sort_order = ?, updated_at = ?
+           WHERE id = ? AND library_id = ?`,
+          [
+            reference.folder_id,
+            topOrder - index,
+            now,
+            siblings[index].id,
+            this.libraryId,
+          ],
+        );
+      }
+    });
+  }
+
   async countBookmarksInFolder(folderId: string): Promise<number> {
     const db = await getStorageDatabase().ensureInit();
     const rows =
@@ -377,8 +424,8 @@ export class BookmarkRepository {
           `INSERT INTO bookmarks (
             id, library_id, folder_id, type, title, content,
             session_id, message_id, item_key, item_library_id, page_url,
-            created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            sort_order, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             bookmark.id,
             this.libraryId,
@@ -391,6 +438,7 @@ export class BookmarkRepository {
             bookmark.itemKey,
             bookmark.itemLibraryId,
             bookmark.pageUrl,
+            bookmark.sortOrder ?? null,
             bookmark.createdAt,
             bookmark.updatedAt,
           ],

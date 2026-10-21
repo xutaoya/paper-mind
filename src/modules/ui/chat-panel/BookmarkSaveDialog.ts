@@ -216,26 +216,17 @@ export async function openBookmarkSaveDialog(
 
     const renderFolders = (items: BookmarkFolder[]) => {
       folderList.textContent = "";
-      if (items.length === 0) {
-        const empty = createElement(doc, "div", {
-          fontSize: "13px",
-          color: theme.textMuted,
-          padding: "10px 12px",
-          border: `1px dashed ${theme.borderColor}`,
-          borderRadius: "10px",
-        });
-        empty.textContent = getString("chat-bookmark-no-folder-hint");
-        folderList.appendChild(empty);
-        selectedFolderId = null;
-        return;
-      }
       if (
-        !selectedFolderId ||
+        selectedFolderId !== null &&
         !items.some((folder) => folder.id === selectedFolderId)
       ) {
-        selectedFolderId = items[0]?.id ?? null;
+        selectedFolderId = null;
       }
-      for (const folder of items) {
+      const destinations: Array<{ id: string | null; name: string }> = [
+        { id: null, name: getString("chat-bookmark-no-group") },
+        ...items,
+      ];
+      for (const folder of destinations) {
         const selected = folder.id === selectedFolderId;
         const rowStyle = getBookmarkFolderRowStyle(theme, selected);
         const row = createElement(
@@ -259,7 +250,11 @@ export async function openBookmarkSaveDialog(
             textAlign: "left",
             minHeight: "44px",
           },
-          { type: "button" },
+          {
+            type: "button",
+            "data-folder-id": folder.id ?? "",
+            "aria-pressed": String(selected),
+          },
         );
         const left = createFolderLabel(doc, folder.name);
         Object.assign(left.style, {

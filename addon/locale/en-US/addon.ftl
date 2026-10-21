@@ -132,6 +132,8 @@ paperchat-chat-open-settings = Open Settings
 
 paperchat-chat-switch-model-label = Switch model
 
+paperchat-chat-switch-model-help-label = Model selection guide
+
 paperchat-chat-switch-model-help = More capable models usually consume tokens faster. Choose a model that fits your task complexity.
 
 paperchat-chat-select-model = Select Model
@@ -198,7 +200,7 @@ paperchat-chat-remove-quoted-reply = Remove quoted reply
 
 paperchat-chat-quoted-reply-unavailable = The quoted reply is no longer available in this chat
 
-paperchat-chat-summarize-reply-note = Copy to item note
+paperchat-chat-summarize-reply-note = Add to item note
 
 paperchat-chat-copy-reply-note-no-item = No item is available to attach this note
 
@@ -680,6 +682,8 @@ paperchat-chat-bookmark-empty = No bookmarks yet
 
 paperchat-chat-bookmark-ungrouped = Ungrouped
 
+paperchat-chat-bookmark-no-group = Don't group
+
 paperchat-chat-bookmark-edit = Edit
 
 paperchat-chat-bookmark-delete = Delete
@@ -727,6 +731,10 @@ paperchat-chat-bookmark-reader-outline-empty = No headings available in this con
 paperchat-chat-bookmark-drag-hint = Drag to move
 
 paperchat-chat-bookmark-moved = Moved bookmark "{ $title }"
+
+paperchat-chat-bookmark-reordered = Bookmark order updated
+
+paperchat-chat-bookmark-move-failed = Could not move the bookmark. Please try again
 
 paperchat-chat-bookmark-open-in-chat = Open in chat
 

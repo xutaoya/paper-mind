@@ -891,7 +891,7 @@ describe("chat message exact navigation", function () {
     );
   });
 
-  it("offers copy-to-item-note for completed assistant replies", async function () {
+  it("offers add-to-item-note and restores its note-plus icon after success", async function () {
     const doc = new FakeDocument();
     const history = new FakeElement(doc, "div");
     history.scrollHeight = 100;
@@ -914,6 +914,7 @@ describe("chat message exact navigation", function () {
       {
         onSummarizeReply: (messageId) => {
           summarizedMessageId = messageId;
+          return "Added to item note";
         },
       },
     );
@@ -931,19 +932,40 @@ describe("chat message exact navigation", function () {
     );
     assert.equal(
       summaryButton.children[0].getAttribute("src"),
-      "chrome://paperchat/content/icons/write.svg",
+      "chrome://paperchat/content/icons/note-plus.svg",
     );
 
-    summaryButton.listeners.get("click")?.[0]?.({
-      preventDefault: () => undefined,
-      stopPropagation: () => undefined,
-    });
-    assert.equal(summarizedMessageId, "assistant-to-summarize");
-    assert.equal(summaryButton.getAttribute("aria-busy"), "true");
+    const originalSetTimeout = globalThis.setTimeout;
+    let restoreIcon: (() => void) | undefined;
+    globalThis.setTimeout = ((callback: () => void) => {
+      restoreIcon = callback;
+      return 1;
+    }) as unknown as typeof setTimeout;
+    try {
+      summaryButton.listeners.get("click")?.[0]?.({
+        preventDefault: () => undefined,
+        stopPropagation: () => undefined,
+      });
+      assert.equal(summarizedMessageId, "assistant-to-summarize");
+      assert.equal(summaryButton.getAttribute("aria-busy"), "true");
 
-    await Promise.resolve();
-    await Promise.resolve();
-    assert.isNull(summaryButton.getAttribute("aria-busy"));
+      await Promise.resolve();
+      await Promise.resolve();
+      assert.isNull(summaryButton.getAttribute("aria-busy"));
+      assert.equal(summaryButton.getAttribute("title"), "Added to item note");
+      assert.isFunction(restoreIcon);
+      restoreIcon!();
+      assert.equal(
+        summaryButton.children[0].getAttribute("src"),
+        "chrome://paperchat/content/icons/note-plus.svg",
+      );
+      assert.equal(
+        summaryButton.getAttribute("title"),
+        "paperchat-chat-summarize-reply-note",
+      );
+    } finally {
+      globalThis.setTimeout = originalSetTimeout;
+    }
   });
 
   it("offers quoting for completed assistant replies", function () {

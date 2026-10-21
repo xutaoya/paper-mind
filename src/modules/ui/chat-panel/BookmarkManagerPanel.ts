@@ -291,7 +291,7 @@ function getBookmarkManagerState(panel: HTMLElement): BookmarkManagerState {
   if (!raw) {
     const initial: BookmarkManagerState = {
       filter: "all",
-      sort: "created_desc",
+      sort: "manual",
       query: "",
       expandedFolderIds: new Set<string>(),
       selectedFolderId: null,
@@ -1074,6 +1074,7 @@ function attachBookmarkRowDrag(
   handle: HTMLElement,
   row: HTMLElement,
   bookmark: BookmarkRecord,
+  context: BookmarkDropContext,
 ): void {
   handle.addEventListener("dragstart", (event) => {
     if (!event.dataTransfer) {
@@ -1087,6 +1088,71 @@ function attachBookmarkRowDrag(
   });
   handle.addEventListener("dragend", () => {
     row.style.opacity = "1";
+    context.panel
+      .querySelectorAll(".paperchat-bookmark-row")
+      .forEach((element) => {
+        clearDropTargetStyle(element as HTMLElement);
+        (element as HTMLElement).style.background = context.theme.inputBg;
+      });
+  });
+}
+
+function attachBookmarkRowDropTarget(
+  row: HTMLElement,
+  bookmark: BookmarkRecord,
+  context: BookmarkDropContext,
+): void {
+  const accepts = (event: DragEvent) =>
+    !isFolderDragEvent(event) &&
+    Array.from(event.dataTransfer?.types || []).includes(BOOKMARK_DRAG_MIME);
+  const placement = (event: DragEvent): "before" | "after" => {
+    const rect = row.getBoundingClientRect();
+    return event.clientY < rect.top + rect.height / 2 ? "before" : "after";
+  };
+  const clearIndicator = () => {
+    clearDropTargetStyle(row);
+    row.style.background = context.theme.inputBg;
+  };
+  row.addEventListener("dragover", (event) => {
+    if (!accepts(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+    applyFolderDropIndicator(row, placement(event), context.theme, false);
+  });
+  row.addEventListener("dragleave", (event) => {
+    const related = event.relatedTarget as Node | null;
+    if (related && row.contains(related)) return;
+    clearIndicator();
+  });
+  row.addEventListener("drop", (event) => {
+    if (!accepts(event)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    clearIndicator();
+    const payload = readDragPayload(event);
+    if (!payload || payload.type !== "bookmark" || payload.id === bookmark.id)
+      return;
+    void (async () => {
+      try {
+        await getBookmarkService().reorderBookmark(
+          payload.id,
+          bookmark.id,
+          placement(event),
+        );
+        const state = getBookmarkManagerState(context.panel);
+        state.sort = "manual";
+        setBookmarkManagerState(context.panel, state);
+        await rerenderBookmarkManager(context);
+        context.actions.onSuccess?.(getString("chat-bookmark-reordered"));
+      } catch (error) {
+        context.actions.onError?.(
+          error instanceof Error
+            ? error.message
+            : getString("chat-bookmark-move-failed"),
+        );
+      }
+    })();
   });
 }
 
@@ -1189,6 +1255,7 @@ function createBookmarkRow(
   });
   row.className = "paperchat-bookmark-row";
   row.dataset.bookmarkId = bookmark.id;
+  attachBookmarkRowDropTarget(row, bookmark, { panel, theme, actions });
 
   const checkbox = createBookmarkRowCheckbox(doc);
   Object.assign(checkbox.style, { marginTop: "2px" });
@@ -1302,7 +1369,7 @@ function createBookmarkRow(
     theme,
     getString("chat-bookmark-drag-hint"),
   );
-  attachBookmarkRowDrag(dragHandle, row, bookmark);
+  attachBookmarkRowDrag(dragHandle, row, bookmark, { panel, theme, actions });
   actionBar.appendChild(dragHandle);
   actionBar.appendChild(
     createBookmarkIconButton(

@@ -1,6 +1,6 @@
 export type BookmarkType = "message" | "page";
 
-export type BookmarkSortMode = "created_desc" | "title_asc";
+export type BookmarkSortMode = "manual" | "created_desc" | "title_asc";
 
 export type BookmarkFilterType = "all" | BookmarkType;
 
@@ -26,6 +26,7 @@ export interface BookmarkRecord {
   itemKey: string | null;
   itemLibraryId: number | null;
   pageUrl: string | null;
+  sortOrder?: number | null;
   createdAt: number;
   updatedAt: number;
 }

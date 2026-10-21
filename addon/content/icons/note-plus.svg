@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="24" height="24" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .icon-stroke { stroke: #333; }
+    @media (prefers-color-scheme: dark) {
+      .icon-stroke { stroke: #e0e0e0; }
+    }
+  </style>
+  <path d="M28 42H10V6H38V32L28 42Z" class="icon-stroke" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M28 42V32H38" class="icon-stroke" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M24 14V26M18 20H30" class="icon-stroke" stroke-width="4" stroke-linecap="round"/>
+</svg>

@@ -17,6 +17,7 @@ import {
 } from "./ContextWindowIndicator";
 import { renderQuickActionsBar } from "./QuickActionsController";
 import { getCurrentTheme } from "./ChatPanelTheme";
+import { createModelSelectionHelp } from "./ModelSelectionHelp";
 import {
   createHistoryDropdownState,
   refreshHistoryDropdownSearch,
@@ -2315,7 +2316,24 @@ function populateModelDropdown(
   const theme = getCurrentTheme();
   dropdown.textContent = "";
   dropdown.style.overflowX = "hidden";
-  dropdown.style.overflowY = "auto";
+  dropdown.style.overflowY = "hidden";
+  const menuContent = createElement(doc, "div", {
+    display: "flex",
+    flexDirection: "column",
+    maxHeight: "inherit",
+    minHeight: "0",
+  });
+  const modelList = createElement(
+    doc,
+    "div",
+    {
+      minHeight: "0",
+      overflowY: "auto",
+      overflowX: "hidden",
+      flex: "1 1 auto",
+    },
+    { id: "chat-model-dropdown-list" },
+  );
 
   const providerManager = getProviderManager();
   const providers = providerManager.getConfiguredProviders();
@@ -2337,7 +2355,7 @@ function populateModelDropdown(
       letterSpacing: "0.5px",
     });
     sectionHeader.textContent = provider.getName();
-    dropdown.appendChild(sectionHeader);
+    modelList.appendChild(sectionHeader);
 
     if (models.length === 0) {
       // No models - show placeholder
@@ -2348,7 +2366,7 @@ function populateModelDropdown(
         fontStyle: "italic",
       });
       noModels.textContent = getString("chat-no-models");
-      dropdown.appendChild(noModels);
+      modelList.appendChild(noModels);
     } else {
       // List models
       for (const model of models) {
@@ -2442,7 +2460,7 @@ function populateModelDropdown(
           }
         });
 
-        dropdown.appendChild(modelItem);
+        modelList.appendChild(modelItem);
       }
     }
   }
@@ -2456,8 +2474,11 @@ function populateModelDropdown(
       textAlign: "center",
     });
     noProviders.textContent = getString("chat-configure-provider");
-    dropdown.appendChild(noProviders);
+    modelList.appendChild(noProviders);
   }
+  menuContent.appendChild(modelList);
+  menuContent.appendChild(createModelSelectionHelp(doc, theme));
+  dropdown.appendChild(menuContent);
 }
 
 // ========== @ Mention Selector ==========

@@ -1,6 +1,13 @@
 import { assert } from "chai";
 import { createChatContainer } from "../src/modules/ui/chat-panel/ChatPanelBuilder.ts";
-import { lightTheme } from "../src/modules/ui/chat-panel/ChatPanelTheme.ts";
+import {
+  darkTheme,
+  lightTheme,
+} from "../src/modules/ui/chat-panel/ChatPanelTheme.ts";
+import {
+  createModelSelectionHelp,
+  applyModelSelectionHelpTheme,
+} from "../src/modules/ui/chat-panel/ModelSelectionHelp.ts";
 
 class FakeElement {
   readonly style = {
@@ -11,6 +18,7 @@ class FakeElement {
   readonly dataset: Record<string, string> = {};
   readonly attributes = new Map<string, string>();
   readonly children: FakeElement[] = [];
+  readonly listeners = new Map<string, Array<(event: any) => void>>();
   parentElement: FakeElement | null = null;
   textContent = "";
 
@@ -33,7 +41,28 @@ class FakeElement {
     return this.attributes.get(name) ?? null;
   }
 
-  addEventListener(): void {}
+  removeAttribute(name: string): void {
+    this.attributes.delete(name);
+  }
+
+  addEventListener(type: string, listener: (event: any) => void): void {
+    if (!this.listeners.has(type)) this.listeners.set(type, []);
+    this.listeners.get(type)!.push(listener);
+  }
+
+  emit(type: string, details: Record<string, unknown> = {}): void {
+    this.listeners.get(type)?.forEach((listener) =>
+      listener({
+        stopPropagation: () => undefined,
+        preventDefault: () => undefined,
+        ...details,
+      }),
+    );
+  }
+
+  matches(selector: string): boolean {
+    return selector === ":focus-visible";
+  }
 
   getBoundingClientRect(): DOMRect {
     return {
@@ -143,6 +172,87 @@ describe("chat panel toolbar", function () {
     assert.equal(
       primary?.children[0]?.getAttribute("id"),
       "chat-panel-mode-btn",
+    );
+  });
+
+  it("does not reserve a separate model-help button or tooltip in the composer", function () {
+    const doc = new FakeDocument();
+    const container = createChatContainer(
+      doc as unknown as Document,
+      lightTheme,
+    ) as unknown as FakeElement;
+    assert.isNull(container.querySelector("#chat-model-selector-help"));
+    assert.isNull(container.querySelector("#chat-model-selector-tooltip"));
+  });
+
+  it("keeps model guidance collapsed on hover, pointer leave and keyboard focus", function () {
+    const doc = new FakeDocument();
+    const help = createModelSelectionHelp(
+      doc as unknown as Document,
+      lightTheme,
+    ) as unknown as FakeElement;
+    const toggle = help.querySelector("#chat-model-selection-help-toggle")!;
+    const content = help.querySelector("#chat-model-selection-help-content")!;
+    assert.equal(help.style.flex, "0 0 auto");
+    assert.equal(help.style.maxHeight, "inherit");
+    assert.equal(content.style.gridTemplateRows, "0fr");
+    assert.equal(toggle.getAttribute("aria-expanded"), "false");
+    help.emit("mouseenter");
+    assert.equal(content.style.gridTemplateRows, "0fr");
+    assert.equal(toggle.getAttribute("aria-expanded"), "false");
+    help.emit("mouseleave");
+    toggle.emit("focus");
+    assert.equal(content.style.gridTemplateRows, "0fr");
+    assert.equal(toggle.getAttribute("aria-expanded"), "false");
+  });
+
+  it("toggles on click and Escape without forcing layout or scrolling", function () {
+    const doc = new FakeDocument();
+    const help = createModelSelectionHelp(
+      doc as unknown as Document,
+      lightTheme,
+    ) as unknown as FakeElement;
+    const toggle = help.querySelector("#chat-model-selection-help-toggle")!;
+    const content = help.querySelector("#chat-model-selection-help-content")!;
+    const menu = new FakeElement(doc, "div");
+    menu.appendChild(help);
+    menu.getBoundingClientRect = () => {
+      throw new Error("Unexpected layout read");
+    };
+    content.getBoundingClientRect = () => {
+      throw new Error("Unexpected layout read");
+    };
+    toggle.emit("click");
+    help.emit("mouseleave");
+    assert.equal(content.style.gridTemplateRows, "1fr");
+    assert.equal(content.getAttribute("aria-hidden"), "false");
+    assert.isNull(content.getAttribute("inert"));
+    toggle.emit("click");
+    assert.equal(content.style.gridTemplateRows, "0fr");
+    toggle.emit("focus");
+    assert.equal(toggle.getAttribute("aria-expanded"), "false");
+    toggle.emit("click");
+    toggle.emit("keydown", { key: "Escape" });
+    assert.equal(content.style.gridTemplateRows, "0fr");
+    assert.equal(content.getAttribute("aria-hidden"), "true");
+    assert.equal(content.getAttribute("inert"), "");
+    assert.equal(toggle.getAttribute("aria-expanded"), "false");
+  });
+
+  it("updates guidance colors when the menu switches to dark mode", function () {
+    const doc = new FakeDocument();
+    const help = createModelSelectionHelp(
+      doc as unknown as Document,
+      lightTheme,
+    );
+    applyModelSelectionHelpTheme(help, darkTheme);
+    assert.equal(
+      (help.style as any)["--model-help-text"],
+      darkTheme.textSecondary,
+    );
+    assert.equal(
+      (help.style as any)["--model-help-active"],
+      darkTheme.textPrimary,
     );
   });
 });
