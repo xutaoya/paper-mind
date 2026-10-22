@@ -74,7 +74,25 @@ describe("floating composer styles in Zotero", function () {
     assert.equal(win.getComputedStyle(glint).opacity, "0");
   });
 
-  it("pins the existing native window and unpins without losing a draft or conversation", function () {
+  it("pins the existing native window and unpins without losing a draft or conversation", async function () {
+    // GTK can realize the native window after the chrome document's load event.
+    // Wait for that lifecycle boundary before testing the user's click action.
+    const Ci = Components.interfaces;
+    const nativeWindow = (win as any).docShell.treeOwner
+      .QueryInterface(Ci.nsIInterfaceRequestor)
+      .getInterface(Ci.nsIAppWindow)
+      .QueryInterface(Ci.nsIBaseWindow);
+    const deadline = Date.now() + 2000;
+    const isReady = () =>
+      /^0x[0-9a-f]+$/i.test(nativeWindow.nativeHandle) &&
+      !/^0x0+$/i.test(nativeWindow.nativeHandle);
+    while (!isReady() && Date.now() < deadline) {
+      await new Promise<void>((resolve) => win.setTimeout(resolve, 20));
+    }
+    assert.isTrue(
+      isReady(),
+      `Native handle after load: ${JSON.stringify(nativeWindow.nativeHandle)}`,
+    );
     try {
       setFloatingWindowPinned(win, true);
       setFloatingWindowPinned(win, false);
