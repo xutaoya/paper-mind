@@ -22,6 +22,7 @@ declare namespace _ZoteroTypes {
       "panelMode": string;
       "floatingWindowWidth": number;
       "floatingWindowHeight": number;
+      "floatingWindowPosition": string;
       "chatUIFontScale": number;
       "debugContextExportEnabled": boolean;
       "firstInstalledVersion": string;

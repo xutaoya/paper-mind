@@ -22,6 +22,7 @@ pref("reasoningEffort", "default");
 pref("panelMode", "sidebar");
 pref("floatingWindowWidth", 420);
 pref("floatingWindowHeight", 600);
+pref("floatingWindowPosition", "");
 pref("chatUIFontScale", 100);
 pref("debugContextExportEnabled", false);
 

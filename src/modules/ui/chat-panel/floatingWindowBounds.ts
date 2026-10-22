@@ -5,6 +5,62 @@ export const MIN_FLOATING_WINDOW_HEIGHT = 400;
 export const MAX_FLOATING_WINDOW_WIDTH = 1200;
 export const MAX_FLOATING_WINDOW_HEIGHT = 1000;
 
+export interface FloatingWindowPosition {
+  // Desktop pixels, so a saved position remains tied to the correct display.
+  left: number;
+  top: number;
+}
+
+export interface FloatingWindowScreen extends FloatingWindowPosition {
+  width: number;
+  height: number;
+  cssToDesktopScale: number;
+}
+
+export function parseFloatingWindowPosition(
+  saved: string | undefined,
+): FloatingWindowPosition | undefined {
+  if (!saved) return undefined;
+  try {
+    const position = JSON.parse(saved);
+    if (
+      position &&
+      Number.isFinite(position.left) &&
+      Number.isFinite(position.top)
+    ) {
+      return { left: position.left, top: position.top };
+    }
+  } catch {
+    // Old installations have no position; malformed preferences use the default.
+  }
+  return undefined;
+}
+
+export function fitFloatingWindowToScreen(
+  size: { width: number; height: number },
+  position: FloatingWindowPosition,
+  screen: FloatingWindowScreen,
+): FloatingWindowPosition & { width: number; height: number } {
+  const scale = screen.cssToDesktopScale;
+  const width = Math.min(size.width, Math.floor(screen.width / scale));
+  const height = Math.min(size.height, Math.floor(screen.height / scale));
+  // Restore the whole window inside the work area (excluding the dock/taskbar).
+  const left = Math.max(
+    screen.left,
+    Math.min(position.left, screen.left + screen.width - width * scale),
+  );
+  const top = Math.max(
+    screen.top,
+    Math.min(position.top, screen.top + screen.height - height * scale),
+  );
+  return {
+    width,
+    height,
+    left: Math.round(left / scale),
+    top: Math.round(top / scale),
+  };
+}
+
 function clampDimension(
   value: number,
   min: number,

@@ -131,9 +131,9 @@ import { ANALYTICS_EVENTS, getAnalyticsService } from "../../analytics";
 import { NextQuestionHintController } from "./NextQuestionHintController";
 import { UserMessageEditController } from "./UserMessageEditController";
 import {
-  resolveFloatingWindowSize,
-  normalizeFloatingWindowSize,
-} from "./floatingWindowBounds";
+  getFloatingWindowOpenFeatures,
+  setupFloatingWindowBoundsPersistence,
+} from "./FloatingWindowState";
 
 // Panel display mode: 'sidebar' or 'floating'
 export type PanelMode = "sidebar" | "floating";
@@ -1249,54 +1249,7 @@ function continueApprovalTransition(
   });
 }
 
-// Floating window resize persistence
-let floatingWindowResizeHandler: (() => void) | null = null;
-let floatingWindowResizeSaveTimer: ReturnType<typeof setTimeout> | null = null;
-
-function getSavedFloatingWindowSize(): { width: number; height: number } {
-  return resolveFloatingWindowSize(
-    getPref("floatingWindowWidth"),
-    getPref("floatingWindowHeight"),
-  );
-}
-
-function persistFloatingWindowSize(win: Window): void {
-  const { width, height } = normalizeFloatingWindowSize(
-    win.outerWidth,
-    win.outerHeight,
-  );
-  setPref("floatingWindowWidth", width);
-  setPref("floatingWindowHeight", height);
-}
-
-function setupFloatingWindowSizePersistence(win: Window): void {
-  teardownFloatingWindowSizePersistence(win);
-
-  const scheduleSave = () => {
-    if (floatingWindowResizeSaveTimer) {
-      clearTimeout(floatingWindowResizeSaveTimer);
-    }
-    floatingWindowResizeSaveTimer = setTimeout(() => {
-      floatingWindowResizeSaveTimer = null;
-      persistFloatingWindowSize(win);
-    }, 300);
-  };
-
-  floatingWindowResizeHandler = scheduleSave;
-  win.addEventListener("resize", scheduleSave);
-}
-
-function teardownFloatingWindowSizePersistence(win: Window | null): void {
-  if (floatingWindowResizeSaveTimer) {
-    clearTimeout(floatingWindowResizeSaveTimer);
-    floatingWindowResizeSaveTimer = null;
-  }
-  if (win && floatingWindowResizeHandler) {
-    win.removeEventListener("resize", floatingWindowResizeHandler);
-    persistFloatingWindowSize(win);
-  }
-  floatingWindowResizeHandler = null;
-}
+let floatingWindowBoundsCleanup: (() => void) | null = null;
 
 // Initialize the events module with the getActiveReaderItem function reference
 // This is done immediately to avoid issues with early calls
@@ -1663,11 +1616,6 @@ function openFloatingWindow(): boolean {
   floatingContentInitialized = false;
 
   const mainWindow = Zotero.getMainWindow();
-  const { width, height } = getSavedFloatingWindowSize();
-
-  // Calculate position (center on main window)
-  const left = mainWindow.screenX + (mainWindow.outerWidth - width) / 2;
-  const top = mainWindow.screenY + (mainWindow.outerHeight - height) / 2;
 
   // Open new window using openDialog for better control
   floatingWindow = (
@@ -1675,7 +1623,7 @@ function openFloatingWindow(): boolean {
   ).openDialog(
     `chrome://${config.addonRef}/content/chatWindow.xhtml`,
     "paperchat-chat-window",
-    `chrome,dialog=no,resizable=yes,centerscreen,width=${width},height=${height},left=${left},top=${top}`,
+    getFloatingWindowOpenFeatures(mainWindow),
   );
 
   if (!floatingWindow) {
@@ -1687,7 +1635,8 @@ function openFloatingWindow(): boolean {
   floatingWindow.addEventListener("load", () => {
     ztoolkit.log("Floating window load event fired");
     if (floatingWindow) {
-      setupFloatingWindowSizePersistence(floatingWindow);
+      floatingWindowBoundsCleanup =
+        setupFloatingWindowBoundsPersistence(floatingWindow);
     }
     initializeFloatingWindowContent();
 
@@ -1695,7 +1644,8 @@ function openFloatingWindow(): boolean {
     const activeFloatingWindow = floatingWindow;
     activeFloatingWindow?.addEventListener("unload", () => {
       ztoolkit.log("Floating window unload event");
-      teardownFloatingWindowSizePersistence(activeFloatingWindow);
+      floatingWindowBoundsCleanup?.();
+      floatingWindowBoundsCleanup = null;
       if (!suppressFloatingUnloadTracking) {
         trackChatPanelClosed();
       }
@@ -2036,7 +1986,8 @@ function closeFloatingWindow(): void {
 
   const win = floatingWindow;
   if (win && !win.closed) {
-    teardownFloatingWindowSizePersistence(win);
+    floatingWindowBoundsCleanup?.();
+    floatingWindowBoundsCleanup = null;
     suppressFloatingUnloadTracking = true;
     win.close();
   } else {
