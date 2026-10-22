@@ -50,7 +50,11 @@ class DialogElement {
   }
 
   async click(): Promise<void> {
-    await this.listeners.get("click")?.({ target: this });
+    await this.listeners.get("click")?.({
+      target: this,
+      preventDefault() {},
+      stopPropagation() {},
+    });
   }
 
   focus(): void {}

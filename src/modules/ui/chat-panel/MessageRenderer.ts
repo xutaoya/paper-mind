@@ -589,6 +589,11 @@ interface ExecutionBannerState {
   approvalRequest?: ToolApprovalState["pendingRequests"][number];
 }
 
+export type BookmarkMessageAction = (
+  assistantMessageId: string,
+  onDialogPresent?: () => void,
+) => string | void | Promise<string | void>;
+
 export interface MessageRenderOptions {
   markdown?: MarkdownRenderOptions;
   onResumePresentation?: (
@@ -611,9 +616,7 @@ export interface MessageRenderOptions {
     assistantMessageId: string,
   ) => string | void | Promise<string | void>;
   onSummarizeReplyError?: (error: Error) => void;
-  onBookmarkMessage?: (
-    assistantMessageId: string,
-  ) => string | void | Promise<string | void>;
+  onBookmarkMessage?: BookmarkMessageAction;
   onBookmarkMessageError?: (error: Error) => void;
   onOpenMessageReader?: (assistantMessageId: string) => void | Promise<void>;
   onEditUserMessage?: (userMessageId: string) => void;
@@ -1483,23 +1486,39 @@ function createBookmarkMessageButton(
   doc: Document,
   theme: ThemeColors,
   assistantMessageId: string,
-  onBookmarkMessage: (
-    assistantMessageId: string,
-  ) => string | void | Promise<string | void>,
+  onBookmarkMessage: BookmarkMessageAction,
   onError?: (error: Error) => void,
 ): HTMLElement {
   const label = getString("chat-bookmark");
   const btn = createMessageActionButton(doc, theme, label);
   btn.setAttribute("class", "message-action-btn bookmark-message-btn");
+  Object.assign(btn.style, {
+    margin: "0",
+    minWidth: "28px",
+    flexShrink: "0",
+  });
   setIconButtonImage(btn, "bookmark", "");
+  let actionGeneration = 0;
 
   btn.addEventListener("click", (event) => {
     event.stopPropagation();
     event.preventDefault();
-    if (btn.getAttribute("data-busy") === "true") {
+    if (
+      btn.getAttribute("data-busy") === "true" ||
+      doc.querySelector(".paperchat-bookmark-dialog-overlay")
+    ) {
       return;
     }
 
+    const generation = ++actionGeneration;
+    const releaseBusy = () => {
+      if (generation !== actionGeneration) return;
+      btn.removeAttribute("data-busy");
+      btn.removeAttribute("aria-busy");
+      (btn as HTMLButtonElement).disabled = false;
+      btn.style.cursor = "pointer";
+      btn.style.opacity = "1";
+    };
     btn.setAttribute("data-busy", "true");
     btn.setAttribute("aria-busy", "true");
     (btn as HTMLButtonElement).disabled = true;
@@ -1508,7 +1527,13 @@ function createBookmarkMessageButton(
 
     void (async () => {
       try {
-        const successMessage = await onBookmarkMessage(assistantMessageId);
+        // The modal itself blocks further clicks. Only lock this button while
+        // preparing it, so cancelling cannot leave a disabled launcher behind.
+        const successMessage = await onBookmarkMessage(
+          assistantMessageId,
+          releaseBusy,
+        );
+        if (generation !== actionGeneration) return;
         if (typeof successMessage === "string" && successMessage.trim()) {
           showInlineMessageActionSuccess(
             btn,
@@ -1526,11 +1551,7 @@ function createBookmarkMessageButton(
         );
         onError?.(bookmarkError);
       } finally {
-        btn.removeAttribute("data-busy");
-        btn.removeAttribute("aria-busy");
-        (btn as HTMLButtonElement).disabled = false;
-        btn.style.cursor = "pointer";
-        btn.style.opacity = "1";
+        releaseBusy();
       }
     })();
   });
@@ -1638,9 +1659,7 @@ function createMessageActions(
     assistantMessageId: string,
   ) => string | void | Promise<string | void>,
   onSummarizeReplyError?: (error: Error) => void,
-  onBookmarkMessage?: (
-    assistantMessageId: string,
-  ) => string | void | Promise<string | void>,
+  onBookmarkMessage?: BookmarkMessageAction,
   onBookmarkMessageError?: (error: Error) => void,
   onOpenMessageReader?: (assistantMessageId: string) => void | Promise<void>,
 ): HTMLElement | null {

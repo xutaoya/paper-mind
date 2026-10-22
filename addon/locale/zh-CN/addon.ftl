@@ -155,6 +155,9 @@ paperchat-chat-toggle-panel-mode = 切换侧边栏/悬浮窗模式
 paperchat-chat-switch-to-floating = 切换为悬浮窗模式
 
 paperchat-chat-switch-to-sidebar = 切换为侧边栏模式
+paperchat-chat-pin-window = 置顶窗口
+paperchat-chat-unpin-window = 取消置顶
+paperchat-chat-pin-window-failed = 无法切换窗口置顶，请重试或检查系统支持。
 
 paperchat-chat-no-models = 暂无可用模型
 

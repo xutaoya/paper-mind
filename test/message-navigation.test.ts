@@ -968,6 +968,54 @@ describe("chat message exact navigation", function () {
     }
   });
 
+  it("unlocks the bookmark launcher when the dialog is presented, even before cancellation settles", async function () {
+    const doc = new FakeDocument();
+    const pending: Array<{ present: () => void; finish: () => void }> = [];
+    const element = createMessageElement(
+      doc as unknown as Document,
+      message("bookmark-to-cancel", { role: "assistant", content: "Answer" }),
+      darkTheme,
+      false,
+      false,
+      undefined,
+      undefined,
+      {
+        onBookmarkMessage: (_id, onPresent) =>
+          new Promise<void>((resolve) => {
+            pending.push({ present: onPresent!, finish: resolve });
+          }),
+      },
+    ) as unknown as FakeElement;
+    const button = element.querySelector(".bookmark-message-btn")!;
+    const click = () =>
+      button.listeners.get("click")![0]({
+        preventDefault() {},
+        stopPropagation() {},
+      });
+    click();
+    assert.isTrue(button.disabled);
+    click();
+    assert.lengthOf(pending, 1);
+    pending[0].present();
+    assert.isFalse(button.disabled);
+    assert.isNull(button.getAttribute("data-busy"));
+    click();
+    assert.lengthOf(pending, 2);
+    assert.isTrue(button.disabled);
+    pending[0].finish();
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.isTrue(
+      button.disabled,
+      "old cancellation must not unlock a newer launch",
+    );
+    pending[1].present();
+    assert.isFalse(button.disabled);
+    pending[1].finish();
+    await Promise.resolve();
+    assert.isNull(button.getAttribute("aria-busy"));
+  });
+
   it("offers quoting for completed assistant replies", function () {
     const doc = new FakeDocument();
     const history = new FakeElement(doc, "div");

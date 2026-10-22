@@ -8,6 +8,7 @@ import {
   createModelSelectionHelp,
   applyModelSelectionHelpTheme,
 } from "../src/modules/ui/chat-panel/ModelSelectionHelp.ts";
+import { setupFloatingWindowPin } from "../src/modules/ui/chat-panel/FloatingWindowPin.ts";
 
 class FakeElement {
   readonly style = {
@@ -183,6 +184,53 @@ describe("chat panel toolbar", function () {
     ) as unknown as FakeElement;
     assert.isNull(container.querySelector("#chat-model-selector-help"));
     assert.isNull(container.querySelector("#chat-model-selector-tooltip"));
+  });
+
+  it("hides the pin in the sidebar and toggles the native level in a floating window", function () {
+    const doc = new FakeDocument();
+    const container = createChatContainer(
+      doc as unknown as Document,
+      lightTheme,
+    ) as unknown as FakeElement;
+    const button = container.querySelector("#chat-window-pin-btn")!;
+    assert.equal(button.style.display, "none");
+    assert.equal(button.getAttribute("aria-pressed"), "false");
+    assert.isNotNull(button.querySelector("svg"));
+    const appWindow = { zLevel: 5, raisedZ: 6, normalZ: 5 };
+    const previousComponents = runtime.Components;
+    runtime.Components = { interfaces: { nsIAppWindow: {} } };
+    try {
+      setupFloatingWindowPin(
+        container as unknown as HTMLElement,
+        {
+          closed: false,
+          docShell: {
+            treeOwner: {
+              QueryInterface: () => ({ getInterface: () => appWindow }),
+            },
+          },
+        } as unknown as Window,
+      );
+      assert.equal(button.style.display, "flex");
+      for (let i = 0; i < 3; i++) {
+        button.emit("click");
+        assert.equal(appWindow.zLevel, 6);
+        assert.equal(button.getAttribute("aria-pressed"), "true");
+        assert.equal(
+          button.getAttribute("aria-label"),
+          "paperchat-chat-unpin-window",
+        );
+        button.emit("click");
+        assert.equal(appWindow.zLevel, 5);
+        assert.equal(button.getAttribute("aria-pressed"), "false");
+        assert.equal(
+          button.getAttribute("aria-label"),
+          "paperchat-chat-pin-window",
+        );
+      }
+    } finally {
+      runtime.Components = previousComponents;
+    }
   });
 
   it("keeps model guidance collapsed on hover, pointer leave and keyboard focus", function () {

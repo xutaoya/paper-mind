@@ -1496,6 +1496,39 @@
 }
 
 /* Toolbar */
+#chat-window-pin-btn {
+  color: #666 !important;
+}
+
+#chat-window-pin-btn:hover {
+  background: rgba(15, 23, 42, 0.06) !important;
+}
+
+#chat-window-pin-btn[aria-pressed="true"] {
+  color: #2563eb !important;
+  background: rgba(37, 99, 235, 0.1) !important;
+  border-color: rgba(37, 99, 235, 0.15) !important;
+}
+
+#chat-window-pin-btn:focus-visible {
+  outline: 2px solid #7ba5f7;
+  outline-offset: 2px;
+}
+
+#chat-container[data-theme="dark"] #chat-window-pin-btn {
+  color: #c4c8d0 !important;
+}
+
+#chat-container[data-theme="dark"] #chat-window-pin-btn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+#chat-container[data-theme="dark"] #chat-window-pin-btn[aria-pressed="true"] {
+  color: #a2c1ff !important;
+  background: rgba(112, 157, 255, 0.16) !important;
+  border-color: rgba(144, 179, 255, 0.22) !important;
+}
+
 .chat-toolbar {
   display: flex;
   align-items: center;
@@ -1914,23 +1947,30 @@
 }
 
 .chat-composer-focus-fx {
-  color: #7299ff;
   border-radius: inherit;
+  --composer-focus-rose: #ec91a6;
+  --composer-focus-apricot: #e8ad72;
+  --composer-focus-gold: #cecd7c;
+  --composer-focus-mint: #81cba9;
+  --composer-focus-cyan: #79c8e1;
+  --composer-focus-periwinkle: #8d9fec;
+  --composer-focus-lilac: #be99e2;
+  --composer-focus-glow: rgba(190, 153, 226, 0.38);
   --composer-focus-spectrum: conic-gradient(
     from 225deg,
-    #ec91a6,
-    #e8ad72,
-    #cecd7c,
-    #81cba9,
-    #79c8e1,
-    #8d9fec,
-    #be99e2,
-    #ec91a6
+    var(--composer-focus-rose),
+    var(--composer-focus-apricot),
+    var(--composer-focus-gold),
+    var(--composer-focus-mint),
+    var(--composer-focus-cyan),
+    var(--composer-focus-periwinkle),
+    var(--composer-focus-lilac),
+    var(--composer-focus-rose)
   );
 }
 
 #chat-input-wrapper[data-theme="dark"] + .chat-composer-focus-fx {
-  color: #bed2ff;
+  --composer-focus-glow: rgba(224, 201, 241, 0.48);
 }
 
 .chat-composer-focus-aura::before,
@@ -1977,8 +2017,7 @@
   width: 36px;
   height: 28px;
   overflow: visible;
-  fill: currentColor;
-  filter: drop-shadow(0 0 4px currentColor);
+  filter: drop-shadow(0 0 3px var(--composer-focus-glow));
 }
 
 .chat-composer-focus-spark,
@@ -2023,7 +2062,7 @@
   width: calc(100% - 32px);
   height: 2px;
   overflow: visible;
-  filter: drop-shadow(0 0 4px currentColor) drop-shadow(0 0 8px currentColor);
+  filter: drop-shadow(0 0 3px var(--composer-focus-glow));
 }
 
 .chat-composer-focus-glint path {

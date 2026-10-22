@@ -55,6 +55,8 @@ import {
   setupThemeListener,
 } from "./ChatPanelTheme";
 import { createChatContainer } from "./ChatPanelBuilder";
+import { createPanelTabObserver } from "./PanelTabLifecycle";
+import { setupFloatingWindowPin } from "./FloatingWindowPin";
 import { reapplyBookmarkManagerPanelTheme } from "./BookmarkManagerPanel";
 import { reapplyReadingStatsPanelTheme } from "./ReadingStatsPanel";
 import {
@@ -78,6 +80,7 @@ import {
   updateApprovalView,
   updateUserInputRequestView,
   type ApprovalViewTransitionState,
+  type BookmarkMessageAction,
 } from "./MessageRenderer";
 import { syncConversationNavigator } from "./ConversationNavigator";
 import {
@@ -581,9 +584,7 @@ interface ChatMessageRenderCallbacks {
     assistantMessageId: string,
   ) => string | void | Promise<string | void>;
   onSummarizeReplyError?: (error: Error) => void;
-  onBookmarkMessage?: (
-    assistantMessageId: string,
-  ) => string | void | Promise<string | void>;
+  onBookmarkMessage?: BookmarkMessageAction;
   onBookmarkMessageError?: (error: Error) => void;
   onOpenMessageReader?: (assistantMessageId: string) => void | Promise<void>;
   onResumePresentation?: (
@@ -865,6 +866,7 @@ async function copyReplyToItemNote(
 async function saveBookmarkFromMessage(
   context: ChatPanelContext,
   assistantMessageId: string,
+  onDialogPresent?: () => void,
 ): Promise<string> {
   const session = context.chatManager.getActiveSession();
   const message = session?.messages.find(
@@ -898,6 +900,7 @@ async function saveBookmarkFromMessage(
       itemLibraryId:
         navigationItem?.libraryID ?? session.lastActiveItemLibraryID ?? null,
     },
+    { onPresent: onDialogPresent },
   );
   if (!result) {
     return "";
@@ -1757,6 +1760,7 @@ function initializeFloatingWindowContent(): void {
 
   // Update mode button icon for floating mode
   updatePanelModeButtonIcon(floatingContainer, currentPanelMode);
+  setupFloatingWindowPin(floatingContainer, floatingWindow);
 
   // Initialize chat content
   initializeFloatingChatContent();
@@ -1923,8 +1927,12 @@ function renderActiveSessionInContainer(
       onSummarizeReplyError: (error) => {
         refreshContext.appendError(error.message);
       },
-      onBookmarkMessage: (assistantMessageId) =>
-        saveBookmarkFromMessage(refreshContext, assistantMessageId),
+      onBookmarkMessage: (assistantMessageId, onDialogPresent) =>
+        saveBookmarkFromMessage(
+          refreshContext,
+          assistantMessageId,
+          onDialogPresent,
+        ),
       onBookmarkMessageError: (error) => {
         refreshContext.appendError(error.message);
       },
@@ -2640,12 +2648,13 @@ function registerGlobalTabNotifier(): void {
   if (globalTabNotifierID) return;
 
   globalTabNotifierID = Zotero.Notifier.registerObserver(
-    {
-      notify: () => {
-        // Sync sidebar state when switching tabs
-        syncSidebarState();
+    createPanelTabObserver(
+      () => Zotero.getMainWindow().Zotero_Tabs,
+      () => {
+        if (isPanelShown()) hidePanel();
       },
-    },
+      syncSidebarState,
+    ),
     ["tab"],
     `${config.addonRef}-global-tab-notifier`,
   );
@@ -3447,8 +3456,12 @@ function createContext(container: HTMLElement): ChatPanelContext {
               onSummarizeReplyError: (error) => {
                 context.appendError(error.message);
               },
-              onBookmarkMessage: (assistantMessageId) =>
-                saveBookmarkFromMessage(context, assistantMessageId),
+              onBookmarkMessage: (assistantMessageId, onDialogPresent) =>
+                saveBookmarkFromMessage(
+                  context,
+                  assistantMessageId,
+                  onDialogPresent,
+                ),
               onBookmarkMessageError: (error) => {
                 context.appendError(error.message);
               },

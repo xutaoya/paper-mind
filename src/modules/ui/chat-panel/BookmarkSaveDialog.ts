@@ -279,17 +279,33 @@ export async function openBookmarkSaveDialog(
       }
     };
 
+    let settled = false;
+    let removalObserver: MutationObserver | undefined;
+    const view = doc.defaultView;
+    const onUnload = () => close(null);
     const close = (result: BookmarkSaveDialogResult | null) => {
+      if (settled) return;
+      settled = true;
+      removalObserver?.disconnect();
+      view?.removeEventListener("unload", onUnload);
       overlay.remove();
       resolve(result);
     };
 
-    closeBtn.addEventListener("click", () => close(null));
-    cancelBtn.addEventListener("click", () => close(null));
+    const cancel = (event: Event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      close(null);
+    };
+    closeBtn.addEventListener("click", cancel);
+    cancelBtn.addEventListener("click", cancel);
     overlay.addEventListener("click", (event) => {
       if (event.target === overlay) {
-        close(null);
+        cancel(event);
       }
+    });
+    overlay.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") cancel(event);
     });
     newFolderBtn.addEventListener("click", async () => {
       const name = await openBookmarkTextPrompt(doc, theme, {
@@ -357,6 +373,15 @@ export async function openBookmarkSaveDialog(
     dialog.appendChild(footer);
     overlay.appendChild(dialog);
     doc.documentElement.appendChild(overlay);
+    if (view?.MutationObserver) {
+      removalObserver = new view.MutationObserver(() => {
+        // An externally dismissed overlay must also release the caller's busy
+        // state; otherwise its pending promise leaves the bookmark button locked.
+        if (!overlay.isConnected) close(null);
+      });
+      removalObserver.observe(doc.documentElement, { childList: true });
+    }
+    view?.addEventListener("unload", onUnload, { once: true });
     options.onPresent?.();
     titleInput.focus();
     titleInput.select();

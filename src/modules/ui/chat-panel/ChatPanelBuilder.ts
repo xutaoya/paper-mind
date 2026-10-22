@@ -15,6 +15,46 @@ import { HTML_NS } from "./types";
 import { monitorChatPanelRoot } from "./chatUIFontScale";
 import { createUiChevron } from "./UiChevron";
 
+let composerFocusGradientSequence = 0;
+
+function addComposerFocusGradient(
+  doc: Document,
+  svg: SVGSVGElement,
+  width: number,
+  height: number,
+): string {
+  const ns = "http://www.w3.org/2000/svg";
+  const defs = doc.createElementNS(ns, "defs");
+  const gradient = doc.createElementNS(ns, "linearGradient");
+  const id = `${config.addonRef}-composer-spectrum-${++composerFocusGradientSequence}`;
+  gradient.setAttribute("id", id);
+  // A horizontal stroke has a zero-height bounding box, so use SVG coordinates
+  // rather than objectBoundingBox for a reliable gradient in Gecko as well.
+  gradient.setAttribute("gradientUnits", "userSpaceOnUse");
+  gradient.setAttribute("x1", "0");
+  gradient.setAttribute("y1", "0");
+  gradient.setAttribute("x2", String(width));
+  gradient.setAttribute("y2", String(height));
+  const colors = [
+    "rose",
+    "apricot",
+    "gold",
+    "mint",
+    "cyan",
+    "periwinkle",
+    "lilac",
+  ];
+  colors.forEach((color, index) => {
+    const stop = doc.createElementNS(ns, "stop");
+    stop.setAttribute("offset", `${(index / (colors.length - 1)) * 100}%`);
+    stop.style.stopColor = `var(--composer-focus-${color})`;
+    gradient.appendChild(stop);
+  });
+  defs.appendChild(gradient);
+  svg.appendChild(defs);
+  return `url(#${id})`;
+}
+
 /**
  * Helper to create an element with styles (using proper HTML namespace for XHTML)
  */
@@ -427,6 +467,7 @@ export function createChatContainer(
       overflowY: "auto",
       overflowX: "hidden",
       padding: "14px",
+      paddingLeft: "24px",
       paddingBottom: "28px",
       scrollPaddingBottom: "140px",
       background: theme.chatHistoryBg,
@@ -659,7 +700,39 @@ export function createChatContainer(
   });
   clearConversationBtn.appendChild(clearConversationIcon);
 
+  const pinWindowBtn = createElement(
+    doc,
+    "button",
+    { ...btnStyle, display: "none", flexShrink: "0" },
+    {
+      id: "chat-window-pin-btn",
+      type: "button",
+      title: getString("chat-pin-window"),
+      "aria-label": getString("chat-pin-window"),
+      "aria-pressed": "false",
+    },
+  );
+  const pinIcon = doc.createElementNS("http://www.w3.org/2000/svg", "svg");
+  for (const [name, value] of Object.entries({
+    viewBox: "0 0 24 24",
+    width: "16",
+    height: "16",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "1.8",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    "aria-hidden": "true",
+  })) {
+    pinIcon.setAttribute(name, value);
+  }
+  const pinPath = doc.createElementNS("http://www.w3.org/2000/svg", "path");
+  pinPath.setAttribute("d", "M16 3l5 5-4 1-3 5v3l-2 2-7-7 2-2h3l5-3zM2 22l6-6");
+  pinIcon.appendChild(pinPath);
+  pinWindowBtn.appendChild(pinIcon);
+
   toolbarButtons.appendChild(panelModeBtn);
+  toolbarButtons.appendChild(pinWindowBtn);
   toolbarButtons.appendChild(newChatBtn);
   toolbarButtons.appendChild(uploadFileBtn);
   toolbarButtons.appendChild(historyBtn);
@@ -846,7 +919,10 @@ export function createChatContainer(
   const glintPath = doc.createElementNS(svgNamespace, "path");
   glintPath.setAttribute("d", "M0 1H26");
   glintPath.setAttribute("fill", "none");
-  glintPath.setAttribute("stroke", "currentColor");
+  glintPath.setAttribute(
+    "stroke",
+    addComposerFocusGradient(doc, focusGlint, 26, 0),
+  );
   glintPath.setAttribute("stroke-width", "2");
   glintPath.setAttribute("stroke-linecap", "round");
   glintPath.setAttribute("vector-effect", "non-scaling-stroke");
@@ -859,6 +935,10 @@ export function createChatContainer(
   focusSparks.setAttribute("width", "36");
   focusSparks.setAttribute("height", "28");
   focusSparks.setAttribute("focusable", "false");
+  focusSparks.setAttribute(
+    "fill",
+    addComposerFocusGradient(doc, focusSparks, 36, 28),
+  );
   const focusSpark = doc.createElementNS(svgNamespace, "g");
   focusSpark.setAttribute("class", "chat-composer-focus-spark");
   const sparkPath = doc.createElementNS(svgNamespace, "path");

@@ -155,6 +155,9 @@ paperchat-chat-toggle-panel-mode = Toggle sidebar/floating mode
 paperchat-chat-switch-to-floating = Switch to floating mode
 
 paperchat-chat-switch-to-sidebar = Switch to sidebar mode
+paperchat-chat-pin-window = Keep window on top
+paperchat-chat-unpin-window = Unpin window
+paperchat-chat-pin-window-failed = Could not change window pinning. Please retry or check system support.
 
 paperchat-chat-no-models = No models available
 

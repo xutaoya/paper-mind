@@ -489,12 +489,13 @@ function renderRailTicks(
         display: "flex",
         alignItems: "center",
         justifyContent: "flex-start",
-        width: "100%",
+        width: `${RAIL_IDLE_WIDTH_PX}px`,
         height: `${RAIL_ITEM_SIZE_PX}px`,
         padding: "0",
         border: "none",
         background: "transparent",
         cursor: "pointer",
+        pointerEvents: "auto",
         color: theme.textMuted,
       },
       {
@@ -518,6 +519,7 @@ function renderRailTicks(
         opacity: "0.45",
         transformOrigin: "left center",
         transition: TICK_TRANSITION,
+        pointerEvents: "none",
       },
       { class: NAV_TICK_MARK_CLASS, "aria-hidden": "true" },
     );
@@ -607,7 +609,9 @@ export function attachConversationNavigator(
       height: "100%",
       alignContent: "center",
       justifyItems: "start",
-      pointerEvents: "auto",
+      // Only the compact tick buttons may intercept clicks, not the full-height
+      // transparent rail or its expanded visual footprint over message actions.
+      pointerEvents: "none",
     },
     { class: NAV_TICKS_CLASS },
   );
