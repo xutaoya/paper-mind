@@ -35,7 +35,10 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Run Build
-        run: npm run build
+        # Avoid scaffold's advisory update request failing an otherwise valid build.
+        run: |
+          node scripts/prepare-scaffold-ci.mjs
+          npm run build
       - name: Upload build result
         uses: actions/upload-artifact@v4
         with:
@@ -56,6 +59,8 @@ jobs:
       - run: npm ci
       - run: npm run test:chat-search
       - run: npm run test:unit
+      - name: Prepare scaffold for CI
+        run: node scripts/prepare-scaffold-ci.mjs
       - name: Install stable Zotero
         run: |
           mkdir -p "$RUNNER_TEMP/papermind-zotero"

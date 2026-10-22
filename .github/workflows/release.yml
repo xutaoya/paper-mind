@@ -35,7 +35,9 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: npm run build:release
+        run: |
+          node scripts/prepare-scaffold-ci.mjs
+          npm run build:release
 
       - name: Release
         run: npm run release -- -y
