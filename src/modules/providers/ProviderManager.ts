@@ -125,7 +125,7 @@ export class ProviderManager {
   /**
    * Set callback for when active provider changes
    */
-  setOnProviderChange(callback: (providerId: string) => void): void {
+  setOnProviderChange(callback?: (providerId: string) => void): void {
     this.onProviderChangeCallback = callback;
   }
 

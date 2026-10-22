@@ -18,6 +18,7 @@ import { getErrorMessage } from "../../utils/common";
 
 const DB_DIR = "paper-chat";
 const DB_FILE = "vectors";
+const SEARCH_BATCH_SIZE = 256;
 
 /** Build absolute DB path so Zotero.DBConnection doesn't parse subdirectory names */
 function getDBPath(): string {
@@ -144,27 +145,30 @@ export class VectorStore {
    * Deserialize BLOB to vector
    * Creates a properly aligned ArrayBuffer to ensure Float32Array works correctly
    */
-  private blobToVector(blob: number[] | Uint8Array): number[] {
+  private blobToVector(blob: number[] | Uint8Array): Float32Array {
     const source = blob instanceof Uint8Array ? blob : new Uint8Array(blob);
 
     // Validate blob length (must be non-empty and multiple of 4 for Float32)
     if (source.length === 0) {
       ztoolkit.log("[VectorStore] Warning: empty blob in blobToVector");
-      return [];
+      return new Float32Array(0);
     }
     if (source.length % 4 !== 0) {
       ztoolkit.log(
         `[VectorStore] Warning: blob length ${source.length} is not a multiple of 4`,
       );
-      return [];
+      return new Float32Array(0);
     }
 
-    // Create a new aligned ArrayBuffer and copy data
-    // This ensures proper memory alignment for Float32Array
-    const alignedBuffer = new ArrayBuffer(source.length);
-    new Uint8Array(alignedBuffer).set(source);
-    const float32 = new Float32Array(alignedBuffer);
-    return Array.from(float32);
+    if (source.byteOffset % 4 === 0) {
+      return new Float32Array(
+        source.buffer,
+        source.byteOffset,
+        source.byteLength / 4,
+      );
+    }
+    // Only unaligned BLOBs need a copy. Avoid expanding each vector into number[].
+    return new Float32Array(new Uint8Array(source).buffer);
   }
 
   /**
@@ -232,72 +236,103 @@ export class VectorStore {
       ztoolkit.log("[VectorStore] Warning: search called without modelId");
       return [];
     }
+    const limit = Math.floor(topK);
+    if (!Number.isFinite(limit) || limit <= 0 || queryVector.length === 0)
+      return [];
 
     const db = await this.ensureInit();
     const results: SemanticSearchResult[] = [];
 
     // Build query based on filters
-    let query = "SELECT * FROM vectors WHERE model_id = ?";
+    let filter = "model_id = ?";
     const params: (string | number)[] = [modelId];
 
     if (itemKeys && itemKeys.length > 0) {
       const placeholders = itemKeys.map(() => "?").join(", ");
-      query += ` AND item_key IN (${placeholders})`;
+      filter += ` AND item_key IN (${placeholders})`;
       params.push(...itemKeys);
     }
 
-    const rows = (await db.queryAsync(query, params)) || [];
+    // Bound the scan even if indexing adds/replaces vectors during a search.
+    const bounds = await db.queryAsync(
+      `SELECT MAX(rowid) AS max_rowid FROM vectors WHERE ${filter}`,
+      params,
+    );
+    const maxRowId = Number(bounds?.[0]?.max_rowid ?? 0);
+    let cursor = 0;
+    while (cursor < maxRowId) {
+      const rows =
+        (await db.queryAsync(
+          `SELECT rowid AS search_rowid, item_key, chunk_index, text, vector, metadata
+         FROM vectors WHERE ${filter} AND rowid > ? AND rowid <= ?
+         ORDER BY rowid LIMIT ?`,
+          [...params, cursor, maxRowId, SEARCH_BATCH_SIZE],
+        )) || [];
+      if (rows.length === 0) break;
+      cursor = Number(rows[rows.length - 1].search_rowid);
 
-    for (const row of rows) {
-      try {
-        // Defensive checks for required fields
-        if (!row.vector || !row.text) {
-          ztoolkit.log(
-            `[VectorStore] Skipping invalid row: missing vector or text`,
-          );
-          continue;
-        }
-
-        const vector = this.blobToVector(row.vector);
-
-        // Skip if vector conversion failed or dimension mismatch
-        if (vector.length === 0 || vector.length !== queryVector.length) {
-          ztoolkit.log(
-            `[VectorStore] Skipping row: vector dimension mismatch (${vector.length} vs ${queryVector.length})`,
-          );
-          continue;
-        }
-
-        const score = cosineSimilarity(queryVector, vector);
-
-        if (score >= minScore) {
-          // Safe metadata parsing with fallback
-          let metadata: { page?: number } = {};
-          try {
-            metadata = row.metadata ? JSON.parse(row.metadata) : {};
-          } catch {
-            // Invalid JSON in metadata, use empty object
+      for (const row of rows) {
+        try {
+          // Defensive checks for required fields
+          if (!row.vector || !row.text) {
+            ztoolkit.log(
+              `[VectorStore] Skipping invalid row: missing vector or text`,
+            );
+            continue;
           }
 
-          results.push({
-            text: row.text,
-            score,
-            itemKey: row.item_key,
-            chunkIndex: row.chunk_index,
-            page: metadata.page,
-          });
+          const vector = this.blobToVector(row.vector);
+
+          // Skip if vector conversion failed or dimension mismatch
+          if (vector.length === 0 || vector.length !== queryVector.length) {
+            ztoolkit.log(
+              `[VectorStore] Skipping row: vector dimension mismatch (${vector.length} vs ${queryVector.length})`,
+            );
+            continue;
+          }
+
+          const score = cosineSimilarity(queryVector, vector);
+
+          if (
+            score >= minScore &&
+            (results.length < limit ||
+              score > results[results.length - 1].score)
+          ) {
+            // Safe metadata parsing with fallback
+            let metadata: { page?: number } = {};
+            try {
+              metadata = row.metadata ? JSON.parse(row.metadata) : {};
+            } catch {
+              // Invalid JSON in metadata, use empty object
+            }
+
+            const result = {
+              text: row.text,
+              score,
+              itemKey: row.item_key,
+              chunkIndex: row.chunk_index,
+              page: metadata.page,
+            };
+            // Keep only topK results; equal scores retain their scan order.
+            let low = 0;
+            let high = results.length;
+            while (low < high) {
+              const middle = (low + high) >>> 1;
+              if (results[middle].score >= score) low = middle + 1;
+              else high = middle;
+            }
+            results.splice(low, 0, result);
+            if (results.length > limit) results.pop();
+          }
+        } catch (error) {
+          ztoolkit.log(
+            "[VectorStore] Similarity calculation error:",
+            getErrorMessage(error),
+          );
         }
-      } catch (error) {
-        ztoolkit.log(
-          "[VectorStore] Similarity calculation error:",
-          getErrorMessage(error),
-        );
       }
     }
-
-    // Sort by score descending and take topK
-    results.sort((a, b) => b.score - a.score);
-    return results.slice(0, topK);
+    return results;
   }
 
   /**

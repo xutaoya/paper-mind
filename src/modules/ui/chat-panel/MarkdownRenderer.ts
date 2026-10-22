@@ -3110,9 +3110,19 @@ export function buildDOMFromTokens(
 
       case "math_block": {
         const mathDiv = doc.createElementNS(HTML_NS, "div") as HTMLElement;
+        mathDiv.setAttribute("class", "md-math-scroll");
         mathDiv.style.textAlign = "center";
         mathDiv.style.margin = "12px 0";
         mathDiv.style.overflowX = "auto";
+        mathDiv.style.overflowY = "hidden";
+        mathDiv.style.maxWidth = "100%";
+        // macOS overlay scrollbars must sit below, not over, the MathML glyphs.
+        mathDiv.style.padding = "4px 0 12px";
+        mathDiv.style.scrollbarWidth = "thin";
+        const thumb = isDarkMode()
+          ? "rgba(203, 213, 225, 0.3)"
+          : "rgba(100, 116, 139, 0.3)";
+        mathDiv.style.scrollbarColor = `var(--math-scroll-thumb, ${thumb}) transparent`;
         renderMathToElement(doc, mathDiv, token.content, true);
         parent.appendChild(mathDiv);
         break;

@@ -5,7 +5,9 @@ export const CHAT_UI_FONT_SCALE_MAX = 180;
 export const CHAT_UI_FONT_SCALE_STEP = 10;
 export const DEFAULT_CHAT_UI_FONT_SCALE = 100;
 
-const monitoredRoots = new Set<HTMLElement>();
+// A closed window must not be kept alive just to refresh its font size.
+const monitoredRoots = new Set<WeakRef<HTMLElement>>();
+const rootReferences = new WeakMap<HTMLElement, WeakRef<HTMLElement>>();
 
 export function normalizeChatUIFontScale(value: unknown): number {
   const numeric =
@@ -53,12 +55,21 @@ export function applyChatUIFontScaleToRoot(
 }
 
 export function monitorChatPanelRoot(root: HTMLElement): void {
-  monitoredRoots.add(root);
+  for (const reference of monitoredRoots) {
+    if (!reference.deref()) monitoredRoots.delete(reference);
+  }
+  if (!rootReferences.has(root)) {
+    const reference = new WeakRef(root);
+    rootReferences.set(root, reference);
+    monitoredRoots.add(reference);
+  }
   applyChatUIFontScaleToRoot(root);
 }
 
 export function unmonitorChatPanelRoot(root: HTMLElement): void {
-  monitoredRoots.delete(root);
+  const reference = rootReferences.get(root);
+  if (reference) monitoredRoots.delete(reference);
+  rootReferences.delete(root);
 }
 
 export function refreshAllChatPanelFontScales(): void {
@@ -68,11 +79,13 @@ export function refreshAllChatPanelFontScales(): void {
     }
   }
 
-  for (const root of monitoredRoots) {
-    if (root.isConnected) {
+  for (const reference of monitoredRoots) {
+    const root = reference.deref();
+    if (root?.isConnected && !root.ownerDocument?.defaultView?.closed) {
       applyChatUIFontScaleToRoot(root);
       continue;
     }
-    monitoredRoots.delete(root);
+    monitoredRoots.delete(reference);
+    if (root) rootReferences.delete(root);
   }
 }

@@ -1341,7 +1341,9 @@ export function setupEventHandlers(context: ChatPanelContext): () => void {
     }
   };
 
-  chatManager.setSessionListUpdateCallback(refreshHistoryDropdown);
+  disposers.push(
+    chatManager.setSessionListUpdateCallback(refreshHistoryDropdown),
+  );
 
   // Close dropdown when clicking outside
   if (historyDropdown && historyBtn) {

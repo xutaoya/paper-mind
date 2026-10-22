@@ -1413,6 +1413,41 @@
   font-style: italic;
 }
 
+/* Keep formula scrolling light and stable; only the thumb contrast changes. */
+.md-math-scroll {
+  --math-scroll-thumb: rgba(100, 116, 139, 0.3);
+}
+
+.md-math-scroll:is(:hover, :focus-visible) {
+  --math-scroll-thumb: rgba(100, 116, 139, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+  .md-math-scroll {
+    --math-scroll-thumb: rgba(203, 213, 225, 0.3);
+  }
+
+  .md-math-scroll:is(:hover, :focus-visible) {
+    --math-scroll-thumb: rgba(203, 213, 225, 0.5);
+  }
+}
+
+.chat-container[data-theme="light"] .md-math-scroll {
+  --math-scroll-thumb: rgba(100, 116, 139, 0.3);
+}
+
+.chat-container[data-theme="dark"] .md-math-scroll {
+  --math-scroll-thumb: rgba(203, 213, 225, 0.3);
+}
+
+.chat-container[data-theme="light"] .md-math-scroll:is(:hover, :focus-visible) {
+  --math-scroll-thumb: rgba(100, 116, 139, 0.5);
+}
+
+.chat-container[data-theme="dark"] .md-math-scroll:is(:hover, :focus-visible) {
+  --math-scroll-thumb: rgba(203, 213, 225, 0.5);
+}
+
 /* Table */
 .md-table-scroll {
   display: block;

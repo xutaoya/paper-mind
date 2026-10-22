@@ -9,7 +9,10 @@
  * @param b Second vector
  * @returns Similarity score between 0 and 1
  */
-export function cosineSimilarity(a: number[], b: number[]): number {
+export function cosineSimilarity(
+  a: ArrayLike<number>,
+  b: ArrayLike<number>,
+): number {
   if (a.length !== b.length) {
     throw new Error(`Vector dimension mismatch: ${a.length} vs ${b.length}`);
   }

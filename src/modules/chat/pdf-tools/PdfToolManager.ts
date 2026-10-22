@@ -131,6 +131,7 @@ interface CacheEntry {
   structure: PaperStructureExtended;
   timestamp: number;
   attachmentItemID: number;
+  estimatedBytes: number;
 }
 
 export class PdfToolManager {
@@ -145,6 +146,10 @@ export class PdfToolManager {
   >();
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5分钟缓存过期
   private readonly MAX_CACHE_SIZE = 10; // 最多缓存10个文档
+  // Conservative text/object payload estimate, not a total JS heap limit.
+  private readonly MAX_CACHE_BYTES = 32 * 1024 * 1024;
+  private cachedBytes = 0;
+  private cacheExpiryTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * 设置当前活动的 Item Key (单文档模式)
@@ -257,9 +262,10 @@ export class PdfToolManager {
     const cacheKey = Number.isSafeInteger(libraryID)
       ? `${libraryID}:${itemKey}`
       : itemKey;
+    this.pruneExpiredCache();
     // 检查缓存
     const cached = this.paperCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+    if (cached) {
       ztoolkit.log(`[PdfToolManager] Cache hit for item: ${itemKey}`);
       if (includeNativeOutline) {
         await this.enrichWithNativeOutline(
@@ -267,8 +273,21 @@ export class PdfToolManager {
           cached.attachmentItemID,
           abortSignal,
         );
+        // Native outlines are added lazily; include them in the byte budget.
+        if (this.paperCache.get(cacheKey) === cached) {
+          this.addToCache(
+            cacheKey,
+            cached.attachmentItemID,
+            cached.structure,
+            cached.timestamp,
+          );
+        }
       }
       throwIfAborted(abortSignal);
+      if (this.paperCache.get(cacheKey) === cached) {
+        this.paperCache.delete(cacheKey);
+        this.paperCache.set(cacheKey, cached);
+      }
       return cached.structure;
     }
 
@@ -410,29 +429,85 @@ export class PdfToolManager {
     itemKey: string,
     attachmentItemID: number,
     structure: PaperStructureExtended,
+    timestamp: number = Date.now(),
   ): void {
-    // 如果缓存已满，删除最旧的条目
-    if (this.paperCache.size >= this.MAX_CACHE_SIZE) {
-      let oldestKey: string | null = null;
-      let oldestTime = Infinity;
-      for (const [key, entry] of this.paperCache) {
-        if (entry.timestamp < oldestTime) {
-          oldestTime = entry.timestamp;
-          oldestKey = key;
-        }
-      }
-      if (oldestKey) {
-        this.paperCache.delete(oldestKey);
-        ztoolkit.log(`[PdfToolManager] Cache evicted: ${oldestKey}`);
-      }
+    this.pruneExpiredCache();
+    this.removeCachedPaper(itemKey);
+    const estimatedBytes = this.estimateCacheBytes(structure);
+    // Still return oversized papers to the caller, without retaining a copy.
+    if (
+      estimatedBytes > this.MAX_CACHE_BYTES ||
+      Date.now() - timestamp >= this.CACHE_TTL
+    ) {
+      this.scheduleCacheExpiry();
+      return;
+    }
+    while (
+      this.paperCache.size >= this.MAX_CACHE_SIZE ||
+      this.cachedBytes + estimatedBytes > this.MAX_CACHE_BYTES
+    ) {
+      const oldestKey = this.paperCache.keys().next().value;
+      if (oldestKey === undefined) break;
+      this.removeCachedPaper(oldestKey);
     }
 
     this.paperCache.set(itemKey, {
       structure,
-      timestamp: Date.now(),
+      timestamp,
       attachmentItemID,
+      estimatedBytes,
     });
+    this.cachedBytes += estimatedBytes;
+    this.scheduleCacheExpiry();
     ztoolkit.log(`[PdfToolManager] Cached structure for: ${itemKey}`);
+  }
+
+  private estimateCacheBytes(value: unknown): number {
+    if (typeof value === "string") return value.length * 2;
+    if (!value || typeof value !== "object") return 8;
+    let bytes = 64;
+    for (const key in value) {
+      bytes +=
+        key.length * 2 +
+        this.estimateCacheBytes((value as Record<string, unknown>)[key]);
+      if (bytes > this.MAX_CACHE_BYTES) break;
+    }
+    return bytes;
+  }
+
+  private removeCachedPaper(key: string): void {
+    const entry = this.paperCache.get(key);
+    if (entry) this.cachedBytes -= entry.estimatedBytes;
+    this.paperCache.delete(key);
+  }
+
+  private pruneExpiredCache(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.paperCache) {
+      if (now - entry.timestamp >= this.CACHE_TTL) this.removeCachedPaper(key);
+    }
+  }
+
+  private scheduleCacheExpiry(): void {
+    if (this.cacheExpiryTimer !== null) clearTimeout(this.cacheExpiryTimer);
+    this.cacheExpiryTimer = null;
+    if (this.paperCache.size === 0) return;
+    const expiresAt = Math.min(
+      ...Array.from(
+        this.paperCache.values(),
+        (entry) => entry.timestamp + this.CACHE_TTL,
+      ),
+    );
+    this.cacheExpiryTimer = setTimeout(
+      () => {
+        this.cacheExpiryTimer = null;
+        this.pruneExpiredCache();
+        this.scheduleCacheExpiry();
+      },
+      Math.max(1, expiresAt - Date.now()),
+    );
+    // Node-based tests must not stay alive solely for this idle expiry timer.
+    (this.cacheExpiryTimer as unknown as { unref?: () => void }).unref?.();
   }
 
   /**
@@ -440,6 +515,9 @@ export class PdfToolManager {
    */
   clearCache(): void {
     this.paperCache.clear();
+    this.cachedBytes = 0;
+    if (this.cacheExpiryTimer !== null) clearTimeout(this.cacheExpiryTimer);
+    this.cacheExpiryTimer = null;
     this.nativeOutlineRequests.clear();
     ztoolkit.log("[PdfToolManager] Cache cleared");
   }
@@ -448,7 +526,12 @@ export class PdfToolManager {
    * 从缓存中移除指定条目
    */
   invalidateCache(itemKey: string): void {
-    this.paperCache.delete(itemKey);
+    // Also remove explicitly library-scoped entries for the same item key.
+    for (const key of this.paperCache.keys()) {
+      if (key === itemKey || key.endsWith(`:${itemKey}`))
+        this.removeCachedPaper(key);
+    }
+    this.scheduleCacheExpiry();
   }
 
   /**

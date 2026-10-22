@@ -687,8 +687,14 @@ export class ChatManager {
     this.onRuntimeEvent = callbacks.onRuntimeEvent;
   }
 
-  setSessionListUpdateCallback(callback?: () => void | Promise<void>): void {
+  setSessionListUpdateCallback(
+    callback?: () => void | Promise<void>,
+  ): () => void {
     this.onSessionListUpdate = callback;
+    return () => {
+      if (this.onSessionListUpdate === callback)
+        this.onSessionListUpdate = undefined;
+    };
   }
 
   private notifySessionListUpdated(): void {

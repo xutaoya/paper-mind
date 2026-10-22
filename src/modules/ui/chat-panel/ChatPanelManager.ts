@@ -55,6 +55,9 @@ import {
   setupThemeListener,
 } from "./ChatPanelTheme";
 import { createChatContainer } from "./ChatPanelBuilder";
+import { unmonitorChatPanelRoot } from "./chatUIFontScale";
+import { getStreamingRenderInterval } from "./streamingRenderInterval";
+import { clearContextWindowUsageRefresh } from "./ContextWindowIndicator";
 import { createPanelTabObserver } from "./PanelTabLifecycle";
 import { setupFloatingWindowPin } from "./FloatingWindowPin";
 import { reapplyBookmarkManagerPanelTheme } from "./BookmarkManagerPanel";
@@ -150,7 +153,6 @@ export type ChatPanelOpenSource =
 
 const APPROVAL_RESOLVED_ANIMATION_MS = 260;
 const APPROVAL_ENTER_ANIMATION_MS = 220;
-const STREAMING_TEXT_RENDER_INTERVAL_MS = 240;
 
 type PendingApprovalRequest = ToolApprovalState["pendingRequests"][number];
 
@@ -170,6 +172,7 @@ type StreamingTextRenderState = {
   lastRenderedContent: string;
   lastPresentationArtifactSignature: string;
   lastRenderAt: number;
+  lastRenderDurationMs: number;
   timeoutId: ReturnType<typeof setTimeout> | null;
 };
 
@@ -190,6 +193,8 @@ const streamingTextRenderStates = new WeakMap<
   HTMLElement,
   StreamingTextRenderState
 >();
+const panelInitializations = new WeakMap<HTMLElement, object>();
+let callbackContainer: HTMLElement | null = null;
 const quotedMessageNavigationGenerations = new WeakMap<HTMLElement, number>();
 
 function cancelPendingStreamingTextRender(container: HTMLElement): void {
@@ -218,6 +223,8 @@ function renderStreamingTextNow(
     .getActiveSession()
     ?.messages.find((message) => message.id === messageId);
   if (
+    !container.isConnected ||
+    container.ownerDocument.defaultView?.closed ||
     !activeMessage ||
     activeMessage.role !== "assistant" ||
     activeMessage.streamingState !== "in_progress"
@@ -300,6 +307,7 @@ function scheduleStreamingTextRender(
       lastRenderedContent: "",
       lastPresentationArtifactSignature: "",
       lastRenderAt: 0,
+      lastRenderDurationMs: 0,
       timeoutId: null,
     };
     streamingTextRenderStates.set(container, state);
@@ -327,6 +335,7 @@ function scheduleStreamingTextRender(
     }
     latestState.timeoutId = null;
     const nextContent = latestState.pendingContent;
+    const renderStartedAt = Date.now();
     if (
       !renderStreamingTextNow(
         container,
@@ -341,10 +350,16 @@ function scheduleStreamingTextRender(
       return;
     }
     latestState.lastRenderAt = Date.now();
+    latestState.lastRenderDurationMs =
+      latestState.lastRenderAt - renderStartedAt;
   };
 
   const elapsed = Date.now() - state.lastRenderAt;
-  if (elapsed >= STREAMING_TEXT_RENDER_INTERVAL_MS) {
+  const interval = getStreamingRenderInterval(
+    state.pendingContent.length,
+    state.lastRenderDurationMs,
+  );
+  if (elapsed >= interval) {
     if (state.timeoutId) {
       clearTimeout(state.timeoutId);
       state.timeoutId = null;
@@ -354,10 +369,7 @@ function scheduleStreamingTextRender(
   }
 
   if (!state.timeoutId) {
-    state.timeoutId = setTimeout(
-      render,
-      STREAMING_TEXT_RENDER_INTERVAL_MS - elapsed,
-    );
+    state.timeoutId = setTimeout(render, interval - elapsed);
   }
 }
 
@@ -1631,34 +1643,44 @@ function openFloatingWindow(): boolean {
     return false;
   }
 
-  // Wait for window to load, then initialize content
-  floatingWindow.addEventListener("load", () => {
-    ztoolkit.log("Floating window load event fired");
-    if (floatingWindow) {
-      floatingWindowBoundsCleanup =
-        setupFloatingWindowBoundsPersistence(floatingWindow);
-    }
-    initializeFloatingWindowContent();
-
-    // Handle window close - only after content is loaded
-    const activeFloatingWindow = floatingWindow;
-    activeFloatingWindow?.addEventListener("unload", () => {
-      ztoolkit.log("Floating window unload event");
-      floatingWindowBoundsCleanup?.();
-      floatingWindowBoundsCleanup = null;
-      if (!suppressFloatingUnloadTracking) {
-        trackChatPanelClosed();
-      }
-      suppressFloatingUnloadTracking = false;
-      cleanupPanelIntegrations(floatingContainer);
-      // Immediately reset state
-      floatingWindow = null;
-      floatingContainer = null;
-      floatingContentInitialized = false;
-      pendingPanelReadyAction = null;
-      updateToolbarButtonState(false);
-    });
+  const openedWindow = floatingWindow;
+  // Register unload before load: closing a still-loading window needs cleanup too.
+  openedWindow.addEventListener("unload", (event) => {
+    if (floatingWindow !== openedWindow) return;
+    // Gecko first unloads its initial about:blank document on navigation.
+    // Only the chat document's unload is a panel close.
+    if (
+      (event.target as Document | null)?.documentURI !==
+        `chrome://${config.addonRef}/content/chatWindow.xhtml` &&
+      !openedWindow.closed
+    )
+      return;
+    floatingWindowBoundsCleanup?.();
+    floatingWindowBoundsCleanup = null;
+    if (!suppressFloatingUnloadTracking) trackChatPanelClosed();
+    suppressFloatingUnloadTracking = false;
+    cleanupFloatingPanelIntegrations();
+    floatingWindow = null;
+    floatingContainer = null;
+    floatingContentInitialized = false;
+    pendingPanelReadyAction = null;
+    updateToolbarButtonState(false);
   });
+
+  // Wait for window to load, then initialize content
+  openedWindow.addEventListener(
+    "load",
+    () => {
+      if (floatingWindow !== openedWindow) return;
+      ztoolkit.log("Floating window load event fired");
+      if (floatingWindow) {
+        floatingWindowBoundsCleanup =
+          setupFloatingWindowBoundsPersistence(floatingWindow);
+      }
+      initializeFloatingWindowContent();
+    },
+    { once: true },
+  );
 
   ztoolkit.log("Floating window opened");
   return true;
@@ -1724,6 +1746,12 @@ async function initializeChatContentCommon(
   container: HTMLElement,
 ): Promise<void> {
   readyPanelContainers.delete(container);
+  const initialization = {};
+  panelInitializations.set(container, initialization);
+  const isCurrent = () =>
+    container.isConnected &&
+    !container.ownerDocument.defaultView?.closed &&
+    panelInitializations.get(container) === initialization;
   const authManager = getAuthManager();
   const context = createContext(container);
   const requestedItem = pendingPanelItem;
@@ -1731,6 +1759,7 @@ async function initializeChatContentCommon(
 
   // Initialize auth
   await authManager.initialize();
+  if (!isCurrent()) return;
   context.updateUserBar();
 
   // Set auth callbacks
@@ -1745,17 +1774,6 @@ async function initializeChatContentCommon(
     },
   });
 
-  // Set provider change callback
-  const providerManager = getProviderManager();
-  providerManager.setOnProviderChange(() => {
-    context.updateUserBar();
-    updateModelSelectorDisplay(container);
-    const activeSession = manager.getActiveSession();
-    if (activeSession) {
-      context.renderMessages(activeSession.messages);
-    }
-  });
-
   // Setup event handlers
   eventHandlerDisposers.get(container)?.();
   eventHandlerDisposers.set(container, setupEventHandlers(context));
@@ -1767,10 +1785,12 @@ async function initializeChatContentCommon(
 
   // Initialize ChatManager (handles migration and session loading)
   await manager.init();
+  if (!isCurrent()) return;
 
   // Bind the panel to the active reader item and its conversation.
   const activeItem = requestedItem || getActiveReaderItem();
   const session = await syncChatSessionForActiveItem(container, activeItem);
+  if (!isCurrent()) return;
 
   if (session) {
     context.renderMessages(session.messages);
@@ -1791,7 +1811,23 @@ function cleanupPanelIntegrations(
   if (!container) {
     return;
   }
+  cancelPendingStreamingTextRender(container);
+  clearContextWindowUsageRefresh(container);
+  clearApprovalTransition(getApprovalPanel(container));
+  const tabTimer = tabChatRefreshTimers.get(container);
+  if (tabTimer !== undefined) {
+    container.ownerDocument.defaultView?.clearTimeout(tabTimer);
+    tabChatRefreshTimers.delete(container);
+  }
+  if (callbackContainer === container) {
+    chatManager?.setCallbacks({});
+    getProviderManager().setOnProviderChange();
+    callbackContainer = null;
+  }
   if (disposeEventHandlers) {
+    panelInitializations.delete(container);
+    const root = container.querySelector<HTMLElement>(".chat-panel-root");
+    if (root) unmonitorChatPanelRoot(root);
     readyPanelContainers.delete(container);
     eventHandlerDisposers.get(container)?.();
     eventHandlerDisposers.delete(container);
@@ -1930,6 +1966,8 @@ async function refreshChatForContainer(container: HTMLElement): Promise<void> {
     const activeItem = pendingPanelItem || getActiveReaderItem();
     pendingPanelItem = null;
     const session = await syncChatSessionForActiveItem(container, activeItem);
+    if (!container.isConnected || container.ownerDocument.defaultView?.closed)
+      return;
     if (shouldSkipTabChatRefresh(container, session, activeItem)) {
       return;
     }
@@ -1972,17 +2010,18 @@ async function initializeFloatingChatContent(): Promise<void> {
 /**
  * Close floating window
  */
-function closeFloatingWindow(): void {
+function cleanupFloatingPanelIntegrations(): void {
   // Unregister tab notifier
   if (floatingTabNotifierID) {
     Zotero.Notifier.unregisterObserver(floatingTabNotifierID);
     floatingTabNotifierID = null;
   }
 
-  if (floatingContainer) {
-    cancelPendingStreamingTextRender(floatingContainer);
-    cleanupPanelIntegrations(floatingContainer);
-  }
+  cleanupPanelIntegrations(floatingContainer);
+}
+
+function closeFloatingWindow(): void {
+  cleanupFloatingPanelIntegrations();
 
   const win = floatingWindow;
   if (win && !win.closed) {
@@ -2011,6 +2050,7 @@ function showSidebarPanel(): boolean {
   // Create container if not exists
   if (!chatContainer || !chatContainer.isConnected) {
     if (chatContainer) {
+      cleanupPanelIntegrations(chatContainer);
       chatContainer = null;
     }
     chatContainer = createChatContainer(doc, getCurrentTheme());
@@ -2157,6 +2197,13 @@ function setupChatManagerCallbacks(
   context: ChatPanelContext,
   container: HTMLElement,
 ): void {
+  callbackContainer = container;
+  getProviderManager().setOnProviderChange(() => {
+    context.updateUserBar();
+    updateModelSelectorDisplay(container);
+    const activeSession = manager.getActiveSession();
+    if (activeSession) context.renderMessages(activeSession.messages);
+  });
   manager.setCallbacks({
     onMessageUpdate: (messages) => {
       ztoolkit.log(

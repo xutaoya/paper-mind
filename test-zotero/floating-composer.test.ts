@@ -12,6 +12,7 @@ import {
   setupFloatingWindowPin,
   setFloatingWindowPinned,
 } from "../src/modules/ui/chat-panel/FloatingWindowPin";
+import { renderMarkdownToElement } from "../src/modules/ui/chat-panel/MarkdownRenderer";
 
 describe("floating composer styles in Zotero", function () {
   this.timeout(10000);
@@ -72,6 +73,171 @@ describe("floating composer styles in Zotero", function () {
     assert.equal(win.getComputedStyle(sparks).position, "absolute");
     assert.equal(win.getComputedStyle(spark).opacity, "0");
     assert.equal(win.getComputedStyle(glint).opacity, "0");
+  });
+
+  it("keeps long MathML above a thin scrollbar in floating and sidebar modes", function () {
+    const main = Zotero.getMainWindow();
+    const sidebar = createChatContainer(main.document, lightTheme);
+    Object.assign(sidebar.style, { display: "block", width: "320px" });
+    const formula = String.raw`$$q(x_t\mid x_{t-1}),\quad q(x_t\mid x_{t-1})=\mathcal{N}\left(x_t;\sqrt{1-\beta_t}\,x_{t-1},\beta_t\mathbf{I}\right)\tag{3}$$`;
+    try {
+      for (const panel of [container, sidebar]) {
+        panel.classList.add("chat-container");
+        const doc = panel.ownerDocument;
+        const view = doc.defaultView!;
+        const host = doc.createElementNS(
+          "http://www.w3.org/1999/xhtml",
+          "div",
+        ) as HTMLElement;
+        host.className = "chat-content";
+        host.style.width = "240px";
+        panel.querySelector("#chat-history")!.appendChild(host);
+        renderMarkdownToElement(host, formula);
+        const scroll = host.querySelector<HTMLElement>(".md-math-scroll")!;
+        const math = scroll.querySelector("math")!;
+        assert.isNotNull(math, "real MathML, not a raw LaTeX fallback");
+        for (const theme of ["light", "dark"]) {
+          panel.dataset.theme = theme;
+          const style = view.getComputedStyle(scroll);
+          assert.equal(style.scrollbarWidth, "thin");
+          assert.equal(style.paddingBottom, "12px");
+          assert.include(
+            style.scrollbarColor,
+            theme === "dark" ? "203, 213, 225" : "100, 116, 139",
+          );
+          assert.isAbove(
+            scroll.scrollWidth,
+            scroll.clientWidth,
+            "long formula can scroll",
+          );
+          for (const left of [0, scroll.scrollWidth]) {
+            scroll.scrollLeft = left;
+            const rect = scroll.getBoundingClientRect();
+            const mathRect = math.getBoundingClientRect();
+            assert.isAtLeast(
+              rect.bottom - mathRect.bottom,
+              11,
+              "reserved gap below every glyph",
+            );
+            assert.isAtLeast(
+              mathRect.top - rect.top,
+              3,
+              "top of tall formulas is not clipped",
+            );
+          }
+          assert.isAbove(scroll.scrollLeft, 0);
+          const glyphs = math.querySelectorAll("mo, mi, mn, mtext");
+          const lastGlyph = glyphs[glyphs.length - 1];
+          assert.isAtMost(
+            lastGlyph.getBoundingClientRect().right,
+            scroll.getBoundingClientRect().right + 1,
+            "equation number remains reachable",
+          );
+        }
+      }
+    } catch (error) {
+      const failure = new Error(String(error));
+      Object.defineProperty(failure, "message", {
+        value: String(error),
+        enumerable: true,
+      });
+      throw failure;
+    } finally {
+      unmonitorChatPanelRoot(
+        sidebar.querySelector(".chat-panel-root") as HTMLElement,
+      );
+      sidebar.remove();
+    }
+  });
+
+  it("uses identical heading sizes and spacing in floating and sidebar documents", function () {
+    const main = Zotero.getMainWindow();
+    const sidebar = createChatContainer(main.document, lightTheme);
+    sidebar.style.display = "block";
+    const markdown =
+      "# 一级标题\n\n正文保持原样。\n\n## 二级标题\n\n### 三级标题\n\n#### 四级标题\n\n##### 五级标题\n\n###### 六级标题";
+    const addContent = (panel: HTMLElement) => {
+      const host = panel.ownerDocument.createElementNS(
+        "http://www.w3.org/1999/xhtml",
+        "div",
+      ) as HTMLElement;
+      host.setAttribute("class", "chat-content");
+      host.style.lineHeight = "1.6";
+      panel.querySelector("#chat-history")!.appendChild(host);
+      renderMarkdownToElement(host, markdown);
+      return host;
+    };
+    try {
+      const floatingContent = addContent(container);
+      const sidebarContent = addContent(sidebar);
+      // Reasoning uses Markdown outside the main answer's .chat-content.
+      const floatingReasoning = win.document.createElementNS(
+        "http://www.w3.org/1999/xhtml",
+        "div",
+      ) as HTMLElement;
+      container.querySelector("#chat-history")!.appendChild(floatingReasoning);
+      renderMarkdownToElement(floatingReasoning, "# 思考中的标题");
+      for (const theme of [lightTheme, darkTheme]) {
+        applyComposerChromeTheme(container, theme);
+        applyComposerChromeTheme(sidebar, theme);
+        for (let level = 1; level <= 6; level++) {
+          const floatingHeading = floatingContent.querySelector(`h${level}`)!;
+          const sidebarHeading = sidebarContent.querySelector(`h${level}`)!;
+          const baselineHeading = sidebarHeading.cloneNode(true) as HTMLElement;
+          baselineHeading.removeAttribute("class");
+          sidebarContent.appendChild(baselineHeading);
+          const floatingStyle = win.getComputedStyle(floatingHeading);
+          const sidebarStyle = main.getComputedStyle(sidebarHeading);
+          const baselineStyle = main.getComputedStyle(baselineHeading);
+          const properties = [
+            "font-size",
+            "font-weight",
+            "line-height",
+            "margin-top",
+            "margin-bottom",
+          ];
+          const snapshot = (style: CSSStyleDeclaration) =>
+            Object.fromEntries(
+              properties.map((name) => [name, style.getPropertyValue(name)]),
+            );
+          assert.deepEqual(
+            snapshot(floatingStyle),
+            snapshot(baselineStyle),
+            `h${level} must follow the original sidebar: ${JSON.stringify(snapshot(baselineStyle))}`,
+          );
+          assert.deepEqual(
+            snapshot(sidebarStyle),
+            snapshot(baselineStyle),
+            `h${level} sidebar must not be redesigned`,
+          );
+          baselineHeading.remove();
+        }
+        assert.equal(
+          win.getComputedStyle(floatingContent.querySelector("p")!).fontSize,
+          "13px",
+        );
+        assert.equal(
+          main.getComputedStyle(sidebarContent.querySelector("p")!).fontSize,
+          "13px",
+        );
+        assert.equal(
+          win.getComputedStyle(floatingReasoning.querySelector("h1")!).fontSize,
+          main.getComputedStyle(sidebarContent.querySelector("h1")!).fontSize,
+        );
+      }
+    } catch (error) {
+      const failure = new Error(String(error));
+      Object.defineProperty(failure, "message", {
+        value: String(error),
+        enumerable: true,
+      });
+      throw failure;
+    } finally {
+      unmonitorChatPanelRoot(
+        sidebar.querySelector(".chat-panel-root") as HTMLElement,
+      );
+      sidebar.remove();
+    }
   });
 
   it("pins the existing native window and unpins without losing a draft or conversation", async function () {

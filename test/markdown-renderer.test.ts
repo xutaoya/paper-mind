@@ -180,6 +180,28 @@ describe("Markdown rendering", function () {
     };
   });
 
+  it("keeps semantic headings free of fixed sizes and preserves paragraph text", function () {
+    const doc = new FakeDocument();
+    const host = new FakeElement(doc, "div");
+    renderMarkdownToElement(
+      host as unknown as HTMLElement,
+      "# **一级标题**\n\n正文保持原样。\n\n## 二级标题\n\n### 三级标题\n\n#### 四级标题\n\n##### 五级标题\n\n###### 六级标题",
+    );
+    for (let level = 1; level <= 6; level++) {
+      const heading = findElementByTagName(host, `h${level}`)!;
+      assert.isNotNull(heading);
+      assert.isNull(heading.getAttribute("class"));
+      assert.isUndefined(heading.style.fontSize);
+      assert.isUndefined(heading.style.lineHeight);
+    }
+    assert.isNotNull(
+      findElementByTagName(findElementByTagName(host, "h1")!, "strong"),
+    );
+    const paragraph = findElementByTagName(host, "p")!;
+    assert.equal(collectRenderedText(paragraph), "正文保持原样。");
+    assert.isUndefined(paragraph.style.fontSize);
+  });
+
   afterEach(function () {
     (globalThis as any).addon = originalAddon;
   });
@@ -2427,6 +2449,33 @@ describe("markdown renderer math", function () {
     walk(root);
     return matches;
   };
+
+  it("uses a thin scrollbar with room below display math and leaves inline math unchanged", function () {
+    const originalZotero = (globalThis as any).Zotero;
+    (globalThis as any).Zotero = { getMainWindow: () => null };
+    try {
+      const doc = new FakeDocument();
+      const root = new FakeElement(doc, "div");
+      renderMarkdownToElement(
+        root as unknown as HTMLElement,
+        "$$\\sqrt{1-\\beta_t}x_{t-1}$$\n\n行内 $x_t$ 保持原样",
+      );
+      const display = root.children.find(
+        (child) => child.getAttribute("class") === "md-math-scroll",
+      )!;
+      assert.isDefined(display);
+      assert.equal(display.style.scrollbarWidth, "thin");
+      assert.equal(display.style.overflowX, "auto");
+      assert.equal(display.style.overflowY, "hidden");
+      assert.equal(display.style.padding, "4px 0 12px");
+      assert.include(display.style.scrollbarColor, "transparent");
+      const paragraph = findElementByTagName(root, "p")!;
+      assert.isUndefined(paragraph.style.padding);
+      assert.isUndefined(paragraph.style.scrollbarWidth);
+    } finally {
+      (globalThis as any).Zotero = originalZotero;
+    }
+  });
 
   it("renders inline math in deeply indented blockquote algorithm steps", function () {
     const originalZotero = (globalThis as { Zotero?: unknown }).Zotero;
