@@ -21,6 +21,7 @@ export interface AgentPromptContext {
   executionPlan?: ExecutionPlan;
   scopedPapers?: readonly ScopedPaper[];
   scopeLabel?: string;
+  libraryScope?: boolean;
   recentToolResults?: ToolExecutionResult[];
   searchScope?: SelectedSearchScope;
   searchToolMode?: SearchToolPromptMode;
@@ -292,6 +293,16 @@ function formatAgentPromptContext(agentContext?: AgentPromptContext): string {
   if (!agentContext) return "";
 
   let section = "";
+
+  if (agentContext.libraryScope) {
+    section +=
+      "\n=== LIBRARY CONTEXT ===\n" +
+      "This conversation covers the entire Zotero personal library, including papers in all collections. " +
+      "A selected library row or an open but inactive PDF is not an implicit single-paper context. " +
+      "Use library search/listing tools to find relevant papers, then read their metadata or PDF content by itemKey as needed. " +
+      "The library is not restricted to the first 50 papers, and full texts have not been preloaded. " +
+      "Base claims on retrieved evidence and do not imply that you have already read every paper.\n";
+  }
 
   if (agentContext.scopedPapers?.length) {
     section += formatScopedPapersPrompt(

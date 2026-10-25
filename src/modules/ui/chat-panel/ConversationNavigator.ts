@@ -10,9 +10,9 @@ import type { ChatMessage } from "../../../types/chat";
 import { selectChatMessagePresentations } from "../../chat/message-presentation";
 import {
   ensureRenderedMessage,
-  findRenderedMessageElement,
   scrollMessageToViewportStart,
 } from "./MessageRenderer";
+import { scheduleChatFrame } from "./scheduleChatFrame";
 import { sanitizeMessagePreview } from "./HistoryDropdown";
 import { createElement } from "./ChatPanelBuilder";
 import { getString } from "../../../utils/locale";
@@ -242,8 +242,15 @@ export function resolveActiveRailItemId(
 ): string {
   if (items.length === 0) return "";
 
+  // One pass over the mounted DOM, not a full child scan for every rail item.
+  const rendered = new Map<string, HTMLElement>();
+  for (const child of Array.from(chatHistory.children)) {
+    const id = child.getAttribute("data-message-id");
+    if (id) rendered.set(id, child as HTMLElement);
+  }
+
   if (chatHistory.scrollTop <= followThreshold) {
-    return items[0].id;
+    return items.find((item) => rendered.has(item.id))?.id ?? items[0].id;
   }
 
   const distanceFromEnd =
@@ -258,7 +265,7 @@ export function resolveActiveRailItemId(
   let nearestDistance = Number.POSITIVE_INFINITY;
 
   for (const item of items) {
-    const element = findRenderedMessageElement(chatHistory, item.id);
+    const element = rendered.get(item.id);
     if (!element) continue;
     const rect = element.getBoundingClientRect();
     const messageCenter = rect.top + rect.height / 2;
@@ -558,6 +565,7 @@ export function attachConversationNavigator(
   let isRailEngaged = false;
   let isPointerOverRail = false;
   let mounted = false;
+  let cancelScrollFrame: (() => void) | null = null;
 
   chatViewport.querySelector(`#${NAV_ROOT_ID}`)?.remove();
   chatViewport.querySelector(`#${NAV_PREVIEW_ID}`)?.remove();
@@ -744,9 +752,15 @@ export function attachConversationNavigator(
   };
 
   const onScroll = () => {
+    // Keep immediate hover/click feedback; defer only the layout-heavy tracking.
     engageRail();
     scheduleRailIdle();
-    updateActiveItem();
+    if (cancelScrollFrame) return;
+    cancelScrollFrame = scheduleChatFrame(doc.defaultView, () => {
+      cancelScrollFrame = null;
+      if (!mounted) return;
+      updateActiveItem();
+    });
   };
 
   const onRootEnter = () => {
@@ -840,6 +854,8 @@ export function attachConversationNavigator(
       onScroll();
     },
     dispose() {
+      cancelScrollFrame?.();
+      cancelScrollFrame = null;
       clearHidePreviewTimer();
       clearEngageHideTimer();
       ticks.removeEventListener("mouseover", onTicksPointerOver);

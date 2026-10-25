@@ -2199,7 +2199,10 @@ export function updateUserBarDisplay(container: HTMLElement): void {
 export async function updatePdfCheckboxVisibilityForItem(
   container: HTMLElement,
   item: Zotero.Item | null,
-  chatManager: { hasPdfAttachment(item: Zotero.Item): Promise<boolean> },
+  chatManager: {
+    hasPdfAttachment(item: Zotero.Item): Promise<boolean>;
+    getActiveSession?(): import("../../../types/chat").ChatSession | null;
+  },
 ): Promise<void> {
   await updateContextItemBannerForItem(container, item, chatManager);
 }

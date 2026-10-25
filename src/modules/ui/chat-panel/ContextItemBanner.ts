@@ -2,6 +2,8 @@ import { getItemTitleSmart } from "../../../utils/common";
 import { getString } from "../../../utils/locale";
 import { createElement } from "./ChatPanelBuilder";
 import type { ThemeColors } from "./types";
+import type { ChatSession } from "../../../types/chat";
+import { isLibraryWideSession } from "../../chat/session-scope";
 
 const BANNER_ID = "chat-context-item-banner";
 const BADGE_ID = "chat-context-item-badge";
@@ -151,6 +153,7 @@ export function createContextItemBanner(
 
   banner.appendChild(badge);
   banner.appendChild(title);
+  banner.dataset.dark = String(theme.containerBg === "#1e1e1e");
 
   banner.addEventListener("mouseenter", () => {
     title.style.color = theme.textSecondary;
@@ -185,15 +188,30 @@ export function applyContextItemBannerTheme(
   const badge = container.querySelector(`#${BADGE_ID}`) as HTMLElement | null;
   if (badge) {
     const dark = theme.containerBg === "#1e1e1e";
-    badge.style.background = dark ? PDF_BADGE_BG_DARK : PDF_BADGE_BG_LIGHT;
-    badge.style.color = dark ? PDF_BADGE_TEXT_DARK : PDF_BADGE_TEXT_LIGHT;
+    banner.dataset.dark = String(dark);
+    const library = banner.dataset.contextKind === "library";
+    badge.style.background = library
+      ? "rgba(59, 130, 246, 0.12)"
+      : dark
+        ? PDF_BADGE_BG_DARK
+        : PDF_BADGE_BG_LIGHT;
+    badge.style.color = library
+      ? dark
+        ? "#93c5fd"
+        : "#2563eb"
+      : dark
+        ? PDF_BADGE_TEXT_DARK
+        : PDF_BADGE_TEXT_LIGHT;
   }
 }
 
 export async function updateContextItemBannerForItem(
   container: HTMLElement,
   item: Zotero.Item | null,
-  chatManager: { hasPdfAttachment(item: Zotero.Item): Promise<boolean> },
+  chatManager: {
+    hasPdfAttachment(item: Zotero.Item): Promise<boolean>;
+    getActiveSession?(): ChatSession | null;
+  },
 ): Promise<void> {
   const banner = container.querySelector(`#${BANNER_ID}`) as HTMLElement | null;
   const titleEl = container.querySelector(`#${TITLE_ID}`) as HTMLElement | null;
@@ -201,18 +219,45 @@ export async function updateContextItemBannerForItem(
   if (!banner || !titleEl || !badgeEl) {
     return;
   }
+  banner.dataset.itemRequest = String(item?.id || "");
+  const input = container.querySelector<HTMLTextAreaElement>(
+    "#chat-message-input",
+  );
 
   if (!item?.id) {
-    banner.style.display = "none";
+    const library = isLibraryWideSession(
+      chatManager.getActiveSession?.() ?? null,
+    );
+    banner.dataset.contextKind = library ? "library" : "";
+    banner.style.display = library ? "flex" : "none";
     banner.removeAttribute("data-item-id");
     banner.onclick = null;
-    syncComposerInputPadding(container, false);
+    banner.style.cursor = "default";
+    banner.setAttribute("role", "note");
+    banner.removeAttribute("tabindex");
+    if (library) {
+      const label = getString("chat-context-library-label");
+      titleEl.textContent = label;
+      titleEl.title = getString("chat-context-library-tooltip");
+      banner.setAttribute("aria-label", label);
+      badgeEl.textContent = getString("chat-context-library-badge");
+      badgeEl.style.opacity = "1";
+      badgeEl.style.background = "rgba(59, 130, 246, 0.12)";
+      badgeEl.style.color =
+        banner.dataset.dark === "true" ? "#93c5fd" : "#2563eb";
+    }
+    if (input)
+      input.placeholder = getString(
+        library ? "chat-library-input-placeholder" : "chat-input-placeholder",
+      );
+    syncComposerInputPadding(container, library);
     syncComposerHintOffset(container);
     return;
   }
 
   const contextItem = resolveContextItem(item);
   const hasPdf = await chatManager.hasPdfAttachment(contextItem);
+  if (banner.dataset.itemRequest !== String(item.id)) return;
   const title = getItemTitleSmart(contextItem);
   const creatorMeta = getItemCreatorMeta(contextItem);
   const line = buildCompactLine(title, creatorMeta, hasPdf);
@@ -222,6 +267,14 @@ export async function updateContextItemBannerForItem(
   titleEl.title = tooltip;
   badgeEl.textContent = hasPdf ? "PDF" : "—";
   badgeEl.style.opacity = hasPdf ? "1" : "0.45";
+  const dark = banner.dataset.dark === "true";
+  badgeEl.style.background = dark ? PDF_BADGE_BG_DARK : PDF_BADGE_BG_LIGHT;
+  badgeEl.style.color = dark ? PDF_BADGE_TEXT_DARK : PDF_BADGE_TEXT_LIGHT;
+  banner.dataset.contextKind = "item";
+  banner.style.cursor = "pointer";
+  banner.setAttribute("role", "button");
+  banner.setAttribute("tabindex", "0");
+  if (input) input.placeholder = getString("chat-input-placeholder");
 
   banner.style.display = "flex";
   syncComposerInputPadding(container, true);

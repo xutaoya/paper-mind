@@ -78,6 +78,10 @@ paperchat-chat-debug-context-export = 导出调试上下文
 paperchat-chat-debug-context-exported = 已导出调试上下文，路径已复制
 
 paperchat-chat-input-placeholder = 询问关于论文的问题...
+paperchat-chat-library-input-placeholder = 询问整个文库的问题...
+paperchat-chat-context-library-label = 整个文库
+paperchat-chat-context-library-badge = 文库
+paperchat-chat-context-library-tooltip = 可检索文库中的全部文献，并按需读取论文内容
 
 paperchat-chat-context-item-no-pdf = 该条目暂无 PDF
 
@@ -302,6 +306,7 @@ paperchat-chat-tool-result-output-label = 结果
 paperchat-chat-history-title = 对话 { $time }
 
 paperchat-chat-history-load-older = 加载更早的消息
+paperchat-chat-history-load-gap = 加载中间的消息
 
 paperchat-guide-toolbar-title = 开始与 AI 对话
 
@@ -514,6 +519,7 @@ paperchat-chat-stats-streak-days = 连续 { $count } 天
 paperchat-chat-stats-last-reading-day = 最近在 { $date } 阅读 { $duration }
 paperchat-chat-stats-tracking-active = 正在记录阅读时间
 paperchat-chat-stats-tracking-idle = 未在记录（请聚焦 Zotero 并打开 PDF 阅读器）
+paperchat-chat-stats-tracking-paused = 阅读计时已暂停
 paperchat-chat-stats-header-subtitle-tokens = 模型接口返回的输入与输出 Token
 
 paperchat-chat-stats-view-reading = 阅读
@@ -585,6 +591,8 @@ paperchat-chat-stats-heatmap-day-tooltip = { $date } · 阅读 { $duration }
 paperchat-chat-stats-heatmap-day-none = 这一天没有阅读记录
 
 paperchat-chat-stats-heatmap-day-no-items = 当天总时长已记录，单篇明细从现在起开始统计
+paperchat-chat-stats-day-reading-total = 当天阅读
+paperchat-chat-stats-day-literature-count = 阅读文献 · { $count } 篇
 
 paperchat-chat-stats-top-reading-title = 阅读最多
 

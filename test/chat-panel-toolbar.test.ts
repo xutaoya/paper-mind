@@ -9,6 +9,8 @@ import {
   applyModelSelectionHelpTheme,
 } from "../src/modules/ui/chat-panel/ModelSelectionHelp.ts";
 import { setupFloatingWindowPin } from "../src/modules/ui/chat-panel/FloatingWindowPin.ts";
+import { updateContextItemBannerForItem } from "../src/modules/ui/chat-panel/ContextItemBanner.ts";
+import type { ChatSession } from "../src/types/chat";
 
 class FakeElement {
   readonly style = {
@@ -157,6 +159,66 @@ describe("chat panel toolbar", function () {
     const presentation = container.querySelector("#chat-generate-presentation");
 
     assert.isNull(presentation);
+  });
+
+  it("shows the entire-library context without loading a selected paper PDF", async function () {
+    const container = createChatContainer(
+      new FakeDocument() as unknown as Document,
+      lightTheme,
+    ) as unknown as FakeElement;
+    await updateContextItemBannerForItem(
+      container as unknown as HTMLElement,
+      null,
+      {
+        getActiveSession: () => ({ lastActiveItemKey: null }) as ChatSession,
+        hasPdfAttachment: async () => {
+          throw new Error("A library context must not load a PDF");
+        },
+      },
+    );
+    const banner = container.querySelector("#chat-context-item-banner")!;
+    assert.equal(banner.style.display, "flex");
+    assert.equal(banner.dataset.contextKind, "library");
+    assert.equal(banner.getAttribute("role"), "note");
+    assert.include(
+      container.querySelector("#chat-context-item-title")!.textContent,
+      "chat-context-library-label",
+    );
+    assert.include(
+      (container.querySelector("#chat-message-input") as any).placeholder,
+      "chat-library-input-placeholder",
+    );
+  });
+
+  it("ignores a stale PDF lookup after switching to the library context", async function () {
+    const container = createChatContainer(
+      new FakeDocument() as unknown as Document,
+      lightTheme,
+    ) as unknown as FakeElement;
+    let finish!: (hasPdf: boolean) => void;
+    const manager = {
+      getActiveSession: () => ({ lastActiveItemKey: null }) as ChatSession,
+      hasPdfAttachment: () =>
+        new Promise<boolean>((resolve) => {
+          finish = resolve;
+        }),
+    };
+    const pending = updateContextItemBannerForItem(
+      container as unknown as HTMLElement,
+      { id: 12 } as Zotero.Item,
+      manager,
+    );
+    await updateContextItemBannerForItem(
+      container as unknown as HTMLElement,
+      null,
+      manager,
+    );
+    finish(true);
+    await pending;
+    assert.equal(
+      container.querySelector("#chat-context-item-banner")!.dataset.contextKind,
+      "library",
+    );
   });
 
   it("places the sidebar/floating toggle at the far left of the toolbar", function () {

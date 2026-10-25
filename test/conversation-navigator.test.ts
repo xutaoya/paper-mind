@@ -196,4 +196,37 @@ describe("conversation navigator", function () {
     assert.equal(resolveActiveRailItemId(items, history), "user-2");
     assert.equal(resolveActiveTurnIndex(turns, history), 1);
   });
+
+  it("scans mounted children once even with hundreds of navigation items", function () {
+    const items = Array.from({ length: 500 }, (_, index) => ({
+      id: `user-${index}`,
+      label: String(index),
+    }));
+    let attributeReads = 0;
+    const children = [200, 201, 498, 499].map((index) => ({
+      getAttribute: () => {
+        attributeReads++;
+        return `user-${index}`;
+      },
+      getBoundingClientRect: () => ({
+        top: index === 201 ? 180 : 400,
+        height: 40,
+      }),
+    }));
+    const history = {
+      children,
+      scrollTop: 100,
+      scrollHeight: 2000,
+      clientHeight: 300,
+      getBoundingClientRect: () => ({ top: 0, height: 300 }),
+    } as unknown as HTMLElement;
+    assert.equal(resolveActiveRailItemId(items, history), "user-201");
+    assert.equal(attributeReads, children.length);
+    history.scrollTop = 0;
+    assert.equal(
+      resolveActiveRailItemId(items, history),
+      "user-200",
+      "a hidden prefix must not activate an unmounted message",
+    );
+  });
 });

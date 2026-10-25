@@ -388,6 +388,9 @@ export function fillReadingTrackerStatus(
   const text = createElement(doc, "span", {});
   text.textContent = active
     ? getString("chat-stats-tracking-active")
+    : getString("chat-stats-tracking-paused");
+  host.title = active
+    ? getString("chat-stats-tracking-active")
     : getString("chat-stats-tracking-idle");
   host.appendChild(text);
 }
@@ -404,6 +407,7 @@ export function updateStatsPanelSubtitle(
   subtitle.className = "paperchat-stats-panel-subtitle";
   if (view === "tokens") {
     subtitle.textContent = getString("chat-stats-header-subtitle-tokens");
+    subtitle.removeAttribute("title");
     subtitle.style.color = theme.textMuted;
     subtitle.style.display = "block";
     return;

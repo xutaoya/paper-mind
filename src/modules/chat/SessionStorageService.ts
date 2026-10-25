@@ -1515,6 +1515,21 @@ export class SessionStorageService {
     }
   }
 
+  async findLatestLibrarySessionId(): Promise<string | null> {
+    await this.init();
+    const db = await getStorageDatabase().ensureInit();
+    const rows = await db.queryAsync(
+      `SELECT s.id FROM sessions s
+       INNER JOIN session_meta m ON m.id = s.id
+       WHERE s.last_active_item_key IS NULL
+         AND (s.scope_item_keys IS NULL OR s.scope_item_keys = '[]')
+         AND m.message_count > 0
+       ORDER BY m.updated_at DESC
+       LIMIT 1`,
+    );
+    return rows?.[0]?.id || null;
+  }
+
   /**
    * 列出所有 session (返回元数据列表)
    */

@@ -4,6 +4,8 @@ import { providerSupportsToolCalling } from "../src/modules/providers/provider-c
 import { darkTheme } from "../src/modules/ui/chat-panel/ChatPanelTheme.ts";
 import {
   createMessageElement,
+  cancelPendingHistoryRender,
+  ensureRenderedMessage,
   findRenderedMessageElement,
   renderMessages,
   scrollToAndHighlightMessage,
@@ -125,6 +127,7 @@ class FakeElement {
       child.children.length = 0;
       return child;
     }
+    child.remove();
     child.parentElement = this;
     this.children.push(child);
     if (
@@ -134,6 +137,24 @@ class FakeElement {
     ) {
       this.value = child.value;
     }
+    return child;
+  }
+
+  get firstChild(): FakeElement | null {
+    return this.children[0] || null;
+  }
+
+  insertBefore(child: FakeElement, reference: FakeElement | null): FakeElement {
+    if (child.tagName === "#fragment") {
+      for (const item of [...child.children])
+        this.insertBefore(item, reference);
+      return child;
+    }
+    child.remove();
+    const index = reference ? this.children.indexOf(reference) : -1;
+    child.parentElement = this;
+    if (index < 0) this.children.push(child);
+    else this.children.splice(index, 0, child);
     return child;
   }
 
@@ -179,6 +200,14 @@ class FakeElement {
     const listeners = this.listeners.get(type) || [];
     listeners.push(listener);
     this.listeners.set(type, listeners);
+  }
+
+  removeEventListener(type: string, listener: (event: any) => void): void {
+    const listeners = this.listeners.get(type) || [];
+    this.listeners.set(
+      type,
+      listeners.filter((entry) => entry !== listener),
+    );
   }
 
   querySelector(selector: string): FakeElement | null {
@@ -274,6 +303,33 @@ class AttachmentPreviewContainer extends FakeElement {
   }
 }
 
+class FrameDocument extends FakeDocument {
+  readonly frames = new Map<number, () => void>();
+  private frameId = 0;
+  readonly defaultView = {
+    requestAnimationFrame: (callback: () => void) => {
+      const id = ++this.frameId;
+      this.frames.set(id, callback);
+      return id;
+    },
+    cancelAnimationFrame: (id: number) => {
+      this.frames.delete(id);
+    },
+  };
+
+  flushFrame(): void {
+    const frames = [...this.frames];
+    this.frames.clear();
+    for (const [, callback] of frames) callback();
+  }
+
+  flushFrames(): void {
+    for (let count = 0; this.frames.size > 0 && count < 20; count++)
+      this.flushFrame();
+    assert.equal(this.frames.size, 0, "frame work must remain bounded");
+  }
+}
+
 function asElement(element: FakeElement): HTMLElement {
   return element as unknown as HTMLElement;
 }
@@ -315,6 +371,172 @@ describe("chat message exact navigation", function () {
   afterEach(function () {
     (globalThis as { Zotero?: unknown }).Zotero = originalZotero;
     (globalThis as { addon?: unknown }).addon = originalAddon;
+  });
+
+  describe("target-first lazy history", function () {
+    let doc: FrameDocument;
+    let history: FakeElement;
+    let messages: ChatMessage[];
+    const ids = () =>
+      history
+        .querySelectorAll("[data-message-id]")
+        .map((element) => element.getAttribute("data-message-id"));
+
+    beforeEach(function () {
+      doc = new FrameDocument();
+      history = new FakeElement(doc, "div");
+      history.scrollHeight = 1000;
+      history.clientHeight = 300;
+      history.setRect({ top: 0, height: 300 });
+      messages = Array.from({ length: 200 }, (_, index) =>
+        message(`message-${index}`),
+      );
+      renderMessages(asElement(history), null, messages, darkTheme);
+    });
+
+    afterEach(function () {
+      cancelPendingHistoryRender(asElement(history));
+    });
+
+    it("paints a distant target before its neighbours without rendering intervening messages", function () {
+      assert.deepEqual(ids(), ["message-198", "message-199"]);
+      const tail = findRenderedMessageElement(
+        asElement(history),
+        "message-199",
+      );
+      let ready = false;
+      ensureRenderedMessage(asElement(history), "message-20", (element) => {
+        ready = !!element;
+        assert.deepEqual(ids(), ["message-20", "message-198", "message-199"]);
+      });
+      assert.isFalse(ready);
+      doc.flushFrame();
+      assert.isTrue(ready);
+      doc.flushFrames();
+      assert.deepEqual(ids(), [
+        "message-19",
+        "message-20",
+        "message-21",
+        "message-198",
+        "message-199",
+      ]);
+      assert.strictEqual(
+        findRenderedMessageElement(asElement(history), "message-199"),
+        tail,
+      );
+      assert.lengthOf(history.querySelectorAll(".paperchat-history-gap"), 2);
+    });
+
+    it("keeps only the last jump, including a jump to an already-rendered message", function () {
+      const results: unknown[] = [];
+      for (const id of ["message-20", "message-50", "message-199"]) {
+        ensureRenderedMessage(asElement(history), id, (element, cancelled) => {
+          results.push([
+            id,
+            element?.getAttribute("data-message-id") ?? null,
+            !!cancelled,
+          ]);
+        });
+      }
+      doc.flushFrames();
+      assert.deepEqual(results, [
+        ["message-20", null, true],
+        ["message-50", null, true],
+        ["message-199", "message-199", false],
+      ]);
+      assert.deepEqual(ids(), ["message-198", "message-199"]);
+    });
+
+    it("cancels stale neighbour preloads after the target has painted", function () {
+      let calls = 0;
+      ensureRenderedMessage(asElement(history), "message-20", () => {
+        calls++;
+      });
+      doc.flushFrame();
+      ensureRenderedMessage(asElement(history), "message-50", () => {
+        calls++;
+      });
+      doc.flushFrames();
+      assert.equal(calls, 2);
+      assert.deepEqual(ids(), [
+        "message-20",
+        "message-49",
+        "message-50",
+        "message-51",
+        "message-198",
+        "message-199",
+      ]);
+    });
+
+    it("fills gaps in chronological order without duplicates and removes completed loaders", function () {
+      messages = messages.slice(0, 12);
+      renderMessages(asElement(history), null, messages, darkTheme);
+      ensureRenderedMessage(asElement(history), "message-3", () => {});
+      doc.flushFrames();
+      for (let count = 0; count < messages.length; count++) {
+        const control = history.querySelector(".paperchat-history-gap");
+        if (!control) break;
+        control.listeners.get("click")![0]({
+          preventDefault() {},
+          stopPropagation() {},
+        });
+        doc.flushFrames();
+      }
+      assert.deepEqual(
+        ids(),
+        messages.map((entry) => entry.id),
+      );
+      assert.isNull(history.querySelector(".paperchat-history-gap"));
+      assert.lengthOf(history.listeners.get("scroll") || [], 0);
+    });
+
+    it("does not walk history for a missing ID", function () {
+      let result: unknown = "pending";
+      ensureRenderedMessage(asElement(history), "missing", (element) => {
+        result = element;
+      });
+      assert.isNull(result);
+      assert.equal(doc.frames.size, 0);
+      assert.lengthOf(ids(), 2);
+    });
+
+    it("settles cancelled requests and releases frame work on rerender or panel close", function () {
+      let cancelled = 0;
+      const onReady = (
+        _element: HTMLElement | null,
+        wasCancelled?: boolean,
+      ) => {
+        if (wasCancelled) cancelled++;
+      };
+      ensureRenderedMessage(asElement(history), "message-20", onReady);
+      renderMessages(
+        asElement(history),
+        null,
+        [message("new-session")],
+        darkTheme,
+      );
+      doc.flushFrames();
+      assert.equal(cancelled, 1);
+      assert.deepEqual(ids(), ["new-session"]);
+      renderMessages(asElement(history), null, messages, darkTheme);
+      ensureRenderedMessage(asElement(history), "message-10", onReady);
+      cancelPendingHistoryRender(asElement(history));
+      doc.flushFrames();
+      assert.equal(cancelled, 2);
+      assert.lengthOf(ids(), 2);
+      assert.lengthOf(history.listeners.get("scroll") || [], 0);
+    });
+
+    it("loads one visible gap per frame when scrolling, not the entire history", function () {
+      const scroll = history.listeners.get("scroll")![0];
+      history.scrollTop = 10;
+      for (let index = 0; index < 20; index++) scroll({});
+      assert.equal(doc.frames.size, 1);
+      assert.lengthOf(ids(), 2);
+      doc.flushFrame();
+      assert.deepEqual(ids(), ["message-197", "message-198", "message-199"]);
+      assert.equal(doc.frames.size, 0);
+    });
   });
 
   it("clears only session-bound quotes and refreshes the target send state", function () {

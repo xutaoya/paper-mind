@@ -58,19 +58,19 @@ function getReadingAccent(theme: ThemeColors): string {
 }
 
 const HEATMAP_LEVEL_COLORS_LIGHT = [
-  "#ebedf0",
-  "#c6e48b",
-  "#7bc96f",
-  "#239a3b",
-  "#196127",
+  "#eef1f3",
+  "#cce9df",
+  "#87cbb6",
+  "#409e83",
+  "#19755f",
 ] as const;
 
 const HEATMAP_LEVEL_COLORS_DARK = [
-  "#2d333b",
-  "#0e4429",
-  "#006d32",
-  "#26a641",
-  "#39d353",
+  "#2b3237",
+  "#234b42",
+  "#326e5d",
+  "#4da88a",
+  "#88d6b9",
 ] as const;
 
 /** Token heatmap uses indigo/violet, separate from reading green. */
@@ -149,41 +149,50 @@ function renderMonthAxis(
   );
 
   const track = createElement(doc, "div", {
-    position: "relative",
+    display: "grid",
+    gridTemplateColumns: `repeat(${weekCount}, minmax(0, 1fr))`,
+    columnGap: "2px",
     flex: "1",
     minWidth: "0",
     height: "14px",
   });
 
-  let lastMonth = -1;
+  const months: { week: number; date: Date }[] = [];
   for (let week = 0; week < weekCount; week += 1) {
     const cell = cells[week * 7];
     if (!cell) {
       continue;
     }
-    const month = cell.date.getMonth();
-    if (month === lastMonth) {
+    const previous = months[months.length - 1]?.date;
+    if (
+      previous?.getMonth() === cell.date.getMonth() &&
+      previous?.getFullYear() === cell.date.getFullYear()
+    ) {
       continue;
     }
-    lastMonth = month;
+    months.push({ week, date: cell.date });
+  }
+  months.forEach(({ week, date }, index) => {
+    const span = (months[index + 1]?.week ?? weekCount) - week;
     const label = createElement(doc, "div", {
-      position: "absolute",
-      top: "0",
-      left: `${(week / weekCount) * 100}%`,
-      transform: "translateX(-1px)",
+      gridColumn: `${week + 1} / span ${span}`,
+      minWidth: "0",
+      overflow: "hidden",
+      // Partial months at either edge may have only one or two columns.
+      visibility: span < 3 ? "hidden" : "visible",
       fontSize: "10px",
       lineHeight: "14px",
       color: theme.textMuted,
       whiteSpace: "nowrap",
       pointerEvents: "none",
     });
-    const fullLabel = formatHeatmapMonthLabel(cell.date);
+    const fullLabel = formatHeatmapMonthLabel(date);
     label.className = "paperchat-stats-month-label";
     label.dataset.fullLabel = fullLabel;
-    label.dataset.compactLabel = String(cell.date.getMonth() + 1);
+    label.dataset.compactLabel = String(date.getMonth() + 1);
     label.textContent = fullLabel;
     track.appendChild(label);
-  }
+  });
 
   row.appendChild(track);
   return row;
@@ -667,8 +676,8 @@ function createEmptyHint(
 
 function readingBarColor(rank: number): string {
   const palette = isDarkMode()
-    ? ["#39d353", "#26a641", "#006d32", "#0e4429"]
-    : ["#196127", "#239a3b", "#7bc96f", "#9be9a8"];
+    ? ["#88d6b9", "#65baa0", "#4da88a", "#326e5d"]
+    : ["#19755f", "#409e83", "#68b39c", "#87cbb6"];
   return (
     palette[Math.min(rank - 1, palette.length - 1)] ??
     palette[palette.length - 1]
@@ -700,7 +709,9 @@ function createReadingRankRow(
     gap: "6px",
     padding: "10px 0 8px",
   });
-  row.className = "paperchat-stats-bar-row paperchat-stats-list-row";
+  row.className =
+    "paperchat-stats-bar-row paperchat-stats-list-row paperchat-stats-rank-row";
+  row.dataset.rank = String(rank);
 
   const head = createElement(doc, "div", {
     display: "grid",
@@ -779,59 +790,10 @@ function createReadingRankRow(
 
 function formatItemTypeLabel(typeName: string): string {
   try {
-    const typeID = Zotero.ItemTypes.getID(typeName);
-    const name = typeID ? Zotero.ItemTypes.getName(typeID) : typeName;
-    return name || typeName;
+    return Zotero.ItemTypes.getLocalizedString(typeName) || typeName;
   } catch {
     return typeName;
   }
-}
-
-function createDateStamp(
-  doc: Document,
-  theme: ThemeColors,
-  timestamp: number,
-): HTMLElement {
-  const date = new Date(timestamp);
-  const stamp = createElement(doc, "div", {
-    width: "40px",
-    minHeight: "44px",
-    borderRadius: "10px",
-    border: `1px solid ${theme.borderColor}`,
-    background: theme.inputBg,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "center",
-    flexShrink: "0",
-    position: "relative",
-    zIndex: "1",
-  });
-  stamp.className = "paperchat-stats-date-stamp";
-  const month = createElement(doc, "div", {
-    fontSize: "9px",
-    fontWeight: "600",
-    color: theme.textMuted,
-    lineHeight: "1.1",
-    letterSpacing: "0.02em",
-  });
-  try {
-    month.textContent = date.toLocaleDateString(undefined, { month: "short" });
-  } catch {
-    month.textContent = `${date.getMonth() + 1}`;
-  }
-  const day = createElement(doc, "div", {
-    fontSize: "16px",
-    fontWeight: "700",
-    color: theme.textPrimary,
-    lineHeight: "1.1",
-    fontVariantNumeric: "tabular-nums",
-  });
-  day.textContent = String(date.getDate());
-  stamp.appendChild(month);
-  stamp.appendChild(day);
-  stamp.title = formatReadingDate(timestamp);
-  return stamp;
 }
 
 function createRecentItemRow(
@@ -840,26 +802,19 @@ function createRecentItemRow(
   item: RecentlyAddedEntry,
 ): HTMLElement {
   const row = createElement(doc, "div", {
-    display: "grid",
-    gridTemplateColumns: "40px minmax(0, 1fr)",
-    columnGap: "12px",
-    alignItems: "start",
-    paddingBottom: "14px",
-    position: "relative",
+    padding: "8px 0",
   });
-  row.className = "paperchat-stats-timeline-item paperchat-stats-list-row";
-  row.appendChild(createDateStamp(doc, theme, item.dateAdded));
+  row.className = "paperchat-stats-recent-row paperchat-stats-list-row";
 
   const main = createElement(doc, "div", {
     minWidth: "0",
     display: "flex",
     flexDirection: "column",
-    gap: "3px",
-    paddingTop: "4px",
+    gap: "4px",
   });
   const titleEl = createElement(doc, "div", {
     fontSize: "13px",
-    fontWeight: "550",
+    fontWeight: "500",
     color: theme.textPrimary,
     lineHeight: "1.4",
     overflow: "hidden",
@@ -869,12 +824,14 @@ function createRecentItemRow(
   });
   titleEl.textContent = item.title;
   titleEl.title = item.title;
+  titleEl.className = "paperchat-stats-recent-title";
   const metaEl = createElement(doc, "div", {
     fontSize: "11px",
     color: theme.textMuted,
     lineHeight: "1.3",
   });
   metaEl.textContent = formatItemTypeLabel(item.itemType);
+  metaEl.className = "paperchat-stats-item-type";
   main.appendChild(titleEl);
   main.appendChild(metaEl);
   row.appendChild(main);
@@ -918,12 +875,28 @@ function renderRecentlyAddedList(
     );
     return wrap;
   }
-  const list = createElement(doc, "div", {
-    paddingTop: "12px",
-  });
-  list.className = "paperchat-stats-timeline";
+  const list = createElement(doc, "div", {});
+  list.className = "paperchat-stats-recent-list";
+  const groups = new Map<string, HTMLElement>();
   for (const item of items) {
-    list.appendChild(createRecentItemRow(doc, theme, item));
+    const dateLabel = formatReadingDate(item.dateAdded);
+    let group = groups.get(dateLabel);
+    if (!group) {
+      group = createElement(doc, "section", {}, { "aria-label": dateLabel });
+      group.className = "paperchat-stats-date-group";
+      const heading = createElement(
+        doc,
+        "div",
+        {},
+        { role: "heading", "aria-level": "3" },
+      );
+      heading.className = "paperchat-stats-date-heading";
+      heading.textContent = dateLabel;
+      group.appendChild(heading);
+      groups.set(dateLabel, group);
+      list.appendChild(group);
+    }
+    group.appendChild(createRecentItemRow(doc, theme, item));
   }
   wrap.appendChild(list);
   return wrap;
@@ -1216,42 +1189,67 @@ function openHeatmapDayPopover(
     boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)",
   });
   popover.id = DAY_POPOVER_ID;
-  popover.className = "paperchat-stats-day-popover";
-  popover.addEventListener("mousedown", (event) => {
-    const target = event.target as HTMLElement | null;
-    if (target?.closest("button")) {
-      return;
-    }
-    event.preventDefault();
-    closeHeatmapDayPopover(panel);
-  });
+  popover.className =
+    "paperchat-stats-day-popover paperchat-stats-day-popover--reading";
+  popover.setAttribute("role", "dialog");
+  popover.setAttribute("aria-label", formatTooltipDate(cellData.date));
 
+  const header = createElement(doc, "div", {});
+  header.className = "paperchat-stats-day-header";
   const dateEl = createElement(doc, "div", {
     fontSize: "12px",
     fontWeight: "650",
     color: theme.textPrimary,
     lineHeight: "1.35",
   });
+  dateEl.className = "paperchat-stats-day-date";
   dateEl.textContent = formatTooltipDate(cellData.date);
-  popover.appendChild(dateEl);
+  header.appendChild(dateEl);
+  const close = createStatsToolbarIconButton(
+    doc,
+    theme,
+    "close.svg",
+    getString("chat-bookmark-close"),
+    () => {
+      closeHeatmapDayPopover(panel);
+      cell.focus({ preventScroll: true });
+    },
+  );
+  close.className = "paperchat-stats-day-close";
+  header.appendChild(close);
+  popover.appendChild(header);
 
-  const summary = createElement(doc, "div", {
-    marginTop: "4px",
-    fontSize: "12px",
-    color: theme.textSecondary,
-  });
-  summary.textContent =
-    cellData.seconds > 0
-      ? formatReadingDuration(cellData.seconds)
-      : getString("chat-stats-heatmap-day-none");
+  const summary = createElement(doc, "div", {});
+  summary.className = "paperchat-stats-day-summary";
+  const summaryLabel = createElement(doc, "div", {});
+  summaryLabel.className = "paperchat-stats-day-label";
+  summaryLabel.textContent = getString("chat-stats-day-reading-total");
+  const total = createElement(doc, "div", {});
+  total.className = "paperchat-stats-day-total";
+  if (cellData.seconds > 0) {
+    renderReadingTimeValue(total, cellData.seconds);
+    total.title = formatReadingDuration(cellData.seconds);
+  } else {
+    total.classList.add("paperchat-stats-day-total--empty");
+    total.textContent = getString("chat-stats-heatmap-day-none");
+  }
+  summary.appendChild(summaryLabel);
+  summary.appendChild(total);
   popover.appendChild(summary);
 
   if (items.length) {
+    const listHeading = createElement(doc, "div", {});
+    listHeading.className = "paperchat-stats-day-list-heading";
+    listHeading.textContent = getString("chat-stats-day-literature-count", {
+      args: { count: String(items.length) },
+    });
+    popover.appendChild(listHeading);
     const list = createElement(doc, "div", {
       display: "flex",
       flexDirection: "column",
       marginTop: "8px",
     });
+    list.className = "paperchat-stats-day-reading-list";
     for (const item of items) {
       const row = createElement(
         doc,
@@ -1271,6 +1269,7 @@ function openHeatmapDayPopover(
         },
         { type: "button" },
       ) as HTMLButtonElement;
+      row.className = "paperchat-stats-day-reading-row";
       const titleEl = createElement(doc, "span", {
         fontSize: "12px",
         overflow: "hidden",
@@ -1279,13 +1278,16 @@ function openHeatmapDayPopover(
       });
       titleEl.textContent = item.title;
       titleEl.title = item.title;
+      titleEl.className = "paperchat-stats-day-item-title";
       const durationEl = createElement(doc, "span", {
         fontSize: "11px",
         color: theme.textMuted,
         fontVariantNumeric: "tabular-nums",
         whiteSpace: "nowrap",
       });
-      durationEl.textContent = formatReadingDuration(item.seconds);
+      durationEl.className = "paperchat-stats-day-item-duration";
+      durationEl.textContent = formatReadingDurationCompact(item.seconds);
+      durationEl.title = formatReadingDuration(item.seconds);
       row.appendChild(titleEl);
       row.appendChild(durationEl);
       row.addEventListener("click", (event) => {
@@ -1303,6 +1305,7 @@ function openHeatmapDayPopover(
       lineHeight: "1.4",
     });
     hint.textContent = getString("chat-stats-heatmap-day-no-items");
+    hint.className = "paperchat-stats-day-note";
     popover.appendChild(hint);
   }
 
@@ -1315,6 +1318,18 @@ function bindHeatmapDayPopoverDismiss(panel: HTMLElement): void {
     return;
   }
   panel.dataset.dayPopoverBound = "1";
+  panel.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape" || !panel.querySelector(`#${DAY_POPOVER_ID}`)) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const anchor = panel.querySelector<HTMLElement>(
+      ".paperchat-reading-heatmap-cell--selected, .paperchat-stats-token-bar-column--selected",
+    );
+    closeHeatmapDayPopover(panel);
+    anchor?.focus({ preventScroll: true });
+  });
   const doc = panel.ownerDocument;
   doc.addEventListener(
     "mousedown",

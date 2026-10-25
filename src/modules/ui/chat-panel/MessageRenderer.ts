@@ -53,6 +53,7 @@ import {
   shouldShowMessageTimeSeparator,
 } from "./MessageTimeSeparator";
 import { canQuoteAssistantReply } from "../../chat/quoted-messages";
+import { scheduleChatFrame } from "./scheduleChatFrame";
 
 export function getStreamingContentSelector(messageId: string): string {
   return `[data-streaming-content-for="${messageId}"]`;
@@ -103,23 +104,41 @@ const messageHighlightLeases = new WeakMap<
   MessageHighlightLease
 >();
 
+interface HistoryGap {
+  start: number;
+  end: number;
+  control: HTMLElement;
+}
+
 interface PendingHistoryRender {
   cancelled: boolean;
-  timerId: number | null;
+  cancelLoadFrame: (() => void) | null;
   scrollHandler: (() => void) | null;
   presentations: ChatMessagePresentation[];
-  renderedStart: number;
+  gaps: HistoryGap[];
+  lastScrollTop: number;
   lastAssistantIndex: number;
   theme: ThemeColors;
   retryableErrorMessageId?: string;
   onReroll?: () => void | Promise<void>;
   onRerollError?: (error: Error) => void;
   renderOptions: MessageRenderOptions;
-  tailMarker: Comment | null;
-  loading: boolean;
 }
 
 const pendingHistoryRenders = new WeakMap<HTMLElement, PendingHistoryRender>();
+type MessageReadyCallback = (
+  element: HTMLElement | null,
+  cancelled?: boolean,
+) => void;
+interface PendingMessageNavigation {
+  cancelFrame: (() => void) | null;
+  onReady: MessageReadyCallback;
+  ready: boolean;
+}
+const pendingMessageNavigations = new WeakMap<
+  HTMLElement,
+  PendingMessageNavigation
+>();
 const historyClickActions = new WeakMap<HTMLElement, MessageRenderOptions>();
 const delegatedHistoryRoots = new WeakSet<HTMLElement>();
 
@@ -164,15 +183,13 @@ function bindHistoryClickDelegation(chatHistory: HTMLElement): void {
 }
 
 export function cancelPendingHistoryRender(chatHistory: HTMLElement): void {
+  cancelPendingMessageNavigation(chatHistory);
   const pending = pendingHistoryRenders.get(chatHistory);
   if (!pending) {
     return;
   }
   pending.cancelled = true;
-  if (pending.timerId !== null) {
-    const win = chatHistory.ownerDocument?.defaultView;
-    win?.clearTimeout(pending.timerId);
-  }
+  pending.cancelLoadFrame?.();
   if (pending.scrollHandler) {
     chatHistory.removeEventListener("scroll", pending.scrollHandler);
   }
@@ -210,6 +227,7 @@ export function updateChatHistoryAutoScrollState(
 }
 
 export function scrollChatHistoryToBottom(chatHistory: HTMLElement): void {
+  cancelPendingMessageNavigation(chatHistory);
   chatHistory.scrollTop = chatHistory.scrollHeight;
   chatHistory.setAttribute(CHAT_HISTORY_AUTO_SCROLL_ATTR, "true");
   updateChatHistoryScrollBottomButton(chatHistory);
@@ -1976,164 +1994,217 @@ function createLoadOlderControl(
       justifyContent: "center",
     },
     {
-      id: HISTORY_LOAD_OLDER_ID,
+      class: "paperchat-history-gap",
       type: "button",
     },
   );
 }
 
-function syncLoadOlderControl(
+function createHistoryGap(
   chatHistory: HTMLElement,
   pending: PendingHistoryRender,
-): void {
-  const doc = chatHistory.ownerDocument;
-  if (!doc) {
-    return;
-  }
-  const existing = chatHistory.querySelector(
-    `#${HISTORY_LOAD_OLDER_ID}`,
-  ) as HTMLButtonElement | null;
-  if (pending.renderedStart <= 0) {
-    existing?.remove();
-    return;
-  }
-  const control = existing || createLoadOlderControl(doc, pending.theme);
-  control.textContent = pending.loading
-    ? `${getString("chat-history-load-older")}…`
-    : getString("chat-history-load-older");
-  (control as HTMLButtonElement).disabled = pending.loading;
-  if (!existing) {
-    chatHistory.insertBefore(control, chatHistory.firstChild);
-    control.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      loadOlderHistoryMessages(chatHistory, 1);
-    });
-  }
+  start: number,
+  end: number,
+): HistoryGap {
+  const control = createLoadOlderControl(
+    chatHistory.ownerDocument,
+    pending.theme,
+  );
+  if (start === 0) control.setAttribute("id", HISTORY_LOAD_OLDER_ID);
+  control.textContent = getString(
+    start === 0 ? "chat-history-load-older" : "chat-history-load-gap",
+  );
+  const gap = { start, end, control };
+  control.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    // Do not retain a cancelled session's presentation array through its button.
+    const current = pendingHistoryRenders.get(chatHistory);
+    if (current?.gaps.some((entry) => entry.control === control)) {
+      scheduleGapLoad(chatHistory, current, start === 0 ? end - 1 : start);
+    }
+  });
+  return gap;
 }
 
-function loadOlderHistoryMessages(
+/** Insert just one missing message, leaving unrelated history as small gaps. */
+function renderHistoryMessage(
   chatHistory: HTMLElement,
-  count = 1,
+  pending: PendingHistoryRender,
+  index: number,
+  preserveScroll = true,
 ): boolean {
-  const pending = pendingHistoryRenders.get(chatHistory);
-  if (
-    !pending ||
-    pending.cancelled ||
-    pending.loading ||
-    pending.renderedStart <= 0
-  ) {
+  if (pending.cancelled || pendingHistoryRenders.get(chatHistory) !== pending)
     return false;
-  }
-
+  const gapIndex = pending.gaps.findIndex(
+    (gap) => index >= gap.start && index < gap.end,
+  );
+  if (gapIndex < 0) return false;
+  const gap = pending.gaps[gapIndex];
   const doc = chatHistory.ownerDocument;
-  if (!doc) {
-    return false;
-  }
-
-  pending.loading = true;
-  syncLoadOlderControl(chatHistory, pending);
-
-  const batchEnd = pending.renderedStart;
-  const batchStart = Math.max(0, batchEnd - Math.max(1, count));
   const fragment = doc.createDocumentFragment();
+  const replacements: HistoryGap[] = [];
+  if (gap.start < index) {
+    const before = createHistoryGap(chatHistory, pending, gap.start, index);
+    replacements.push(before);
+    fragment.appendChild(before.control);
+  }
   appendPresentationRange(
     doc,
     fragment,
     pending.presentations,
-    batchStart,
-    batchEnd,
+    index,
+    index + 1,
     pending.lastAssistantIndex,
-    batchStart > 0
-      ? pending.presentations[batchStart - 1]?.message.timestamp
-      : undefined,
+    index > 0 ? pending.presentations[index - 1]?.message.timestamp : undefined,
     pending.theme,
     pending.retryableErrorMessageId,
     pending.onReroll,
     pending.onRerollError,
     pending.renderOptions,
   );
-
-  const previousScrollHeight = chatHistory.scrollHeight;
-  const previousScrollTop = chatHistory.scrollTop;
-  const insertBeforeNode =
-    chatHistory.querySelector(`#${HISTORY_LOAD_OLDER_ID}`)?.nextSibling ||
-    pending.tailMarker ||
-    chatHistory.firstChild;
-  chatHistory.insertBefore(fragment, insertBeforeNode);
-  chatHistory.scrollTop =
-    previousScrollTop + (chatHistory.scrollHeight - previousScrollHeight);
-
-  pending.renderedStart = batchStart;
-  pending.loading = false;
-  if (pending.renderedStart <= 0) {
-    pending.tailMarker?.remove();
-    pending.tailMarker = null;
+  if (index + 1 < gap.end) {
+    const after = createHistoryGap(chatHistory, pending, index + 1, gap.end);
+    replacements.push(after);
+    fragment.appendChild(after.control);
+  }
+  const viewportTop = preserveScroll
+    ? chatHistory.getBoundingClientRect().top
+    : 0;
+  const anchor = preserveScroll
+    ? Array.from(chatHistory.children).find(
+        (child) =>
+          child.hasAttribute("data-message-id") &&
+          child.getBoundingClientRect().bottom > viewportTop,
+      )
+    : undefined;
+  const anchorTop = anchor?.getBoundingClientRect().top ?? 0;
+  chatHistory.insertBefore(fragment, gap.control);
+  gap.control.remove();
+  pending.gaps.splice(gapIndex, 1, ...replacements);
+  // Account for native scroll anchoring too. Loading below a short target must
+  // not push it offscreen, and loading above it must keep the same visible text.
+  if (anchor)
+    chatHistory.scrollTop += anchor.getBoundingClientRect().top - anchorTop;
+  pending.lastScrollTop = chatHistory.scrollTop;
+  if (pending.gaps.length === 0) {
+    pending.cancelLoadFrame?.();
+    pending.cancelLoadFrame = null;
     if (pending.scrollHandler) {
       chatHistory.removeEventListener("scroll", pending.scrollHandler);
       pending.scrollHandler = null;
     }
     pendingHistoryRenders.delete(chatHistory);
-    const leftover = chatHistory.querySelector(`#${HISTORY_LOAD_OLDER_ID}`);
-    leftover?.remove();
-  } else {
-    syncLoadOlderControl(chatHistory, pending);
   }
   return true;
+}
+
+function scheduleGapLoad(
+  chatHistory: HTMLElement,
+  pending: PendingHistoryRender,
+  index: number,
+): void {
+  pending.cancelLoadFrame?.();
+  pending.cancelLoadFrame = scheduleChatFrame(
+    chatHistory.ownerDocument.defaultView,
+    () => {
+      pending.cancelLoadFrame = null;
+      renderHistoryMessage(chatHistory, pending, index);
+    },
+  );
 }
 
 function attachLazyHistoryLoader(
   chatHistory: HTMLElement,
   pending: PendingHistoryRender,
 ): void {
-  syncLoadOlderControl(chatHistory, pending);
   const scrollHandler = () => {
-    if (chatHistory.scrollTop <= 72) {
-      loadOlderHistoryMessages(chatHistory, 1);
-    }
+    const movingDown = chatHistory.scrollTop > pending.lastScrollTop;
+    if (chatHistory.scrollTop === pending.lastScrollTop) return;
+    pending.lastScrollTop = chatHistory.scrollTop;
+    const viewport = chatHistory.getBoundingClientRect();
+    const visible = pending.gaps.filter(({ control }) => {
+      const rect = control.getBoundingClientRect();
+      return rect.bottom >= viewport.top && rect.top <= viewport.bottom;
+    });
+    const gap = movingDown ? visible[0] : visible.at(-1);
+    if (gap)
+      scheduleGapLoad(
+        chatHistory,
+        pending,
+        movingDown ? gap.start : gap.end - 1,
+      );
   };
   pending.scrollHandler = scrollHandler;
   chatHistory.addEventListener("scroll", scrollHandler, { passive: true });
 }
 
-function scheduleEnsureHistoryMessage(
-  chatHistory: HTMLElement,
-  messageId: string,
-  onReady: (element: HTMLElement | null) => void,
-): void {
-  const existing = findRenderedMessageElement(chatHistory, messageId);
-  if (existing || !pendingHistoryRenders.get(chatHistory)) {
-    onReady(existing);
-    return;
-  }
-
-  const win = chatHistory.ownerDocument?.defaultView ?? Zotero.getMainWindow();
-  const step = () => {
-    const state = pendingHistoryRenders.get(chatHistory);
-    if (!state || state.cancelled) {
-      onReady(findRenderedMessageElement(chatHistory, messageId));
-      return;
-    }
-    const found = findRenderedMessageElement(chatHistory, messageId);
-    if (found) {
-      onReady(found);
-      return;
-    }
-    if (!loadOlderHistoryMessages(chatHistory, 1)) {
-      onReady(findRenderedMessageElement(chatHistory, messageId));
-      return;
-    }
-    state.timerId = win.setTimeout(step, 16);
-  };
-  step();
+function cancelPendingMessageNavigation(chatHistory: HTMLElement): void {
+  const navigation = pendingMessageNavigations.get(chatHistory);
+  if (!navigation) return;
+  pendingMessageNavigations.delete(chatHistory);
+  navigation.cancelFrame?.();
+  if (!navigation.ready) navigation.onReady(null, true);
 }
 
 export function ensureRenderedMessage(
   chatHistory: HTMLElement,
   messageId: string,
-  onReady: (element: HTMLElement | null) => void,
+  onReady: MessageReadyCallback,
 ): void {
-  scheduleEnsureHistoryMessage(chatHistory, messageId, onReady);
+  cancelPendingMessageNavigation(chatHistory);
+  const existing = findRenderedMessageElement(chatHistory, messageId);
+  const pending = pendingHistoryRenders.get(chatHistory);
+  pending?.cancelLoadFrame?.();
+  if (pending) pending.cancelLoadFrame = null;
+  if (existing || !pending) {
+    onReady(existing);
+    return;
+  }
+  const index = pending.presentations.findIndex(
+    ({ message }) => message.id === messageId,
+  );
+  if (index < 0) {
+    onReady(null);
+    return;
+  }
+  chatHistory.setAttribute(CHAT_HISTORY_AUTO_SCROLL_ATTR, "false");
+  const navigation: PendingMessageNavigation = {
+    cancelFrame: null,
+    onReady,
+    ready: false,
+  };
+  pendingMessageNavigations.set(chatHistory, navigation);
+  // The target paints first. At most its two neighbours follow, one per frame.
+  const indices = [index, index - 1, index + 1];
+  const step = () => {
+    navigation.cancelFrame = null;
+    if (pendingMessageNavigations.get(chatHistory) !== navigation) return;
+    const next = indices.shift();
+    if (next !== undefined)
+      renderHistoryMessage(chatHistory, pending, next, navigation.ready);
+    if (!navigation.ready) {
+      navigation.ready = true;
+      onReady(findRenderedMessageElement(chatHistory, messageId));
+      pending.lastScrollTop = chatHistory.scrollTop;
+    }
+    if (pendingMessageNavigations.get(chatHistory) !== navigation) return;
+    if (
+      indices.length > 0 &&
+      pendingHistoryRenders.get(chatHistory) === pending
+    ) {
+      navigation.cancelFrame = scheduleChatFrame(
+        chatHistory.ownerDocument.defaultView,
+        step,
+      );
+    } else {
+      pendingMessageNavigations.delete(chatHistory);
+    }
+  };
+  navigation.cancelFrame = scheduleChatFrame(
+    chatHistory.ownerDocument.defaultView,
+    step,
+  );
 }
 
 /**
@@ -2199,10 +2270,6 @@ export function renderMessages(
     onRerollError,
     renderOptions,
   );
-  const tailMarker = doc.createComment("paperchat-history-tail");
-  if (syncStart > 0) {
-    chatHistory.appendChild(tailMarker);
-  }
   chatHistory.appendChild(tailFragment);
 
   if (syncStart === 0) {
@@ -2216,26 +2283,29 @@ export function renderMessages(
 
   const pending: PendingHistoryRender = {
     cancelled: false,
-    timerId: null,
+    cancelLoadFrame: null,
     scrollHandler: null,
     presentations,
-    renderedStart: syncStart,
+    gaps: [],
+    lastScrollTop: chatHistory.scrollTop,
     lastAssistantIndex,
     theme,
     retryableErrorMessageId,
     onReroll,
     onRerollError,
     renderOptions,
-    tailMarker,
-    loading: false,
   };
   pendingHistoryRenders.set(chatHistory, pending);
+  const gap = createHistoryGap(chatHistory, pending, 0, syncStart);
+  pending.gaps.push(gap);
+  chatHistory.insertBefore(gap.control, chatHistory.firstChild);
   attachLazyHistoryLoader(chatHistory, pending);
   finishHistoryRender(
     chatHistory,
     shouldScrollToBottom,
     renderOptions.onRenderComplete,
   );
+  pending.lastScrollTop = chatHistory.scrollTop;
 }
 
 export function isDockedExecutionPlanVisible(container: HTMLElement): boolean {

@@ -78,6 +78,10 @@ paperchat-chat-debug-context-export = Export Debug Context
 paperchat-chat-debug-context-exported = Debug context exported; path copied
 
 paperchat-chat-input-placeholder = Ask a question about the PDF...
+paperchat-chat-library-input-placeholder = Ask about your entire library...
+paperchat-chat-context-library-label = Entire library
+paperchat-chat-context-library-badge = Library
+paperchat-chat-context-library-tooltip = Search all papers in your library and read their content as needed
 
 paperchat-chat-context-item-no-pdf = No PDF attached to this item
 
@@ -302,6 +306,7 @@ paperchat-chat-tool-result-output-label = Result
 paperchat-chat-history-title = Chat { $time }
 
 paperchat-chat-history-load-older = Load earlier messages
+paperchat-chat-history-load-gap = Load messages in between
 
 paperchat-guide-toolbar-title = Start Chatting with AI
 
@@ -513,6 +518,7 @@ paperchat-chat-stats-week-same-as-last = Same as last week
 paperchat-chat-stats-streak-days = { $count }-day streak
 paperchat-chat-stats-last-reading-day = Last read { $duration } on { $date }
 paperchat-chat-stats-tracking-active = Recording reading time
+paperchat-chat-stats-tracking-paused = Reading timer paused
 paperchat-chat-stats-tracking-idle = Not recording (focus Zotero with PDF reader open)
 paperchat-chat-stats-header-subtitle-tokens = Input and output tokens from the model API
 
@@ -585,6 +591,8 @@ paperchat-chat-stats-heatmap-day-tooltip = { $date } · { $duration } read
 paperchat-chat-stats-heatmap-day-none = No reading on this day
 
 paperchat-chat-stats-heatmap-day-no-items = Only the daily total is stored. Per-paper time is tracked from now on.
+paperchat-chat-stats-day-reading-total = Reading time
+paperchat-chat-stats-day-literature-count = Papers read · { $count }
 
 paperchat-chat-stats-top-reading-title = Most read
 

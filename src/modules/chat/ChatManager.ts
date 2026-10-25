@@ -145,6 +145,7 @@ import {
 } from "./prompt-cache-messages";
 import {
   MAX_SCOPE_ITEMS,
+  isLibraryWideSession,
   resolveScopedPapers,
   type SessionScope,
 } from "./session-scope";
@@ -489,6 +490,7 @@ export class ChatManager {
       executionPlan: sendingSession.executionPlan,
       scopedPapers: resolveScopedPapers(sendingSession.scopeItemKeys),
       scopeLabel: sendingSession.scopeLabel,
+      libraryScope: isLibraryWideSession(sendingSession),
       recentToolResults,
       selectedSkills,
       searchScope,
@@ -958,6 +960,29 @@ export class ChatManager {
     );
   }
 
+  /** Keep library-wide conversations separate from paper/collection chats. */
+  async activateLibrarySession(): Promise<ChatSession> {
+    await this.init();
+    return this.enqueueSessionNavigation(async () => {
+      let session = this.currentSession;
+      if (!session || !isLibraryWideSession(session)) {
+        const sessionId =
+          await this.sessionStorage.findLatestLibrarySessionId();
+        session = sessionId ? await this.switchSessionLocked(sessionId) : null;
+        if (!session || !isLibraryWideSession(session)) {
+          session = await this.createNewSessionLocked(false);
+        }
+      }
+      const label = getString("chat-context-library-label");
+      if (session.scopeLabel !== label) {
+        session.scopeLabel = label;
+        await this.sessionStorage.updateSessionMeta(session);
+      }
+      this.applySessionItemContext(session);
+      return session;
+    });
+  }
+
   private async createItemSessionLocked(
     itemKey: string,
     title: string,
@@ -1047,9 +1072,11 @@ export class ChatManager {
     );
   }
 
-  private async createNewSessionLocked(): Promise<ChatSession> {
+  private async createNewSessionLocked(
+    reuseDraft = true,
+  ): Promise<ChatSession> {
     const previousSession = this.currentSession;
-    if (previousSession && this.isDraftSession(previousSession)) {
+    if (reuseDraft && previousSession && this.isDraftSession(previousSession)) {
       await this.sessionStorage.cleanupAbandonedDraftSessions();
       return previousSession;
     }

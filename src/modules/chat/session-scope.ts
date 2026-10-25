@@ -8,6 +8,15 @@
  */
 
 import { getItemTitleSmart } from "../../utils/common";
+import type { ChatSession } from "../../types/chat";
+
+export function isLibraryWideSession(
+  session: Pick<ChatSession, "lastActiveItemKey" | "scopeItemKeys"> | null,
+): boolean {
+  return (
+    !!session && !session.lastActiveItemKey && !session.scopeItemKeys?.length
+  );
+}
 
 /** Cap so a huge collection cannot blow up the system prompt. */
 export const MAX_SCOPE_ITEMS = 50;

@@ -1311,6 +1311,7 @@ let floatingContentInitialized = false;
 let floatingTabNotifierID: string | null = null;
 let panelVisibleSince: number | null = null;
 let panelOpenSource: ChatPanelOpenSource = "unknown";
+let pendingLibraryContext = false;
 let suppressFloatingUnloadTracking = false;
 const eventHandlerDisposers = new WeakMap<HTMLElement, () => void>();
 const readyPanelContainers = new WeakSet<HTMLElement>();
@@ -1619,6 +1620,7 @@ function openFloatingWindow(): boolean {
   // Close existing floating window if any
   if (floatingWindow && !floatingWindow.closed) {
     floatingWindow.focus();
+    if (floatingContainer) void refreshChatForContainer(floatingContainer);
     return true;
   }
 
@@ -1842,6 +1844,8 @@ async function syncChatSessionForActiveItem(
   container: HTMLElement,
   item: Zotero.Item | null,
 ): Promise<ChatSession | null> {
+  const useLibraryContext = pendingLibraryContext;
+  pendingLibraryContext = false;
   const manager = getChatManager();
   await manager.init();
 
@@ -1853,9 +1857,12 @@ async function syncChatSessionForActiveItem(
   }
 
   moduleCurrentItem = null;
+  const session = useLibraryContext
+    ? await manager.activateLibrarySession()
+    : manager.getActiveSession();
   manager.setCurrentItemKey(null);
   await updatePdfCheckboxVisibilityForItem(container, null, manager);
-  return manager.getActiveSession();
+  return session;
 }
 
 function renderActiveSessionInContainer(
@@ -2361,6 +2368,9 @@ function trackChatPanelClosed(): void {
  * Show the chat panel
  */
 export function showPanel(source: ChatPanelOpenSource = "unknown"): void {
+  pendingLibraryContext =
+    (source === "toolbar" || source === "menu") && !getActiveReaderItem();
+  if (pendingLibraryContext) pendingPanelItem = null;
   // Initialize events module
   initializeEventsModule();
 
@@ -2886,7 +2896,7 @@ function attemptScrollToQuotedMessage(
   context: ChatPanelContext,
   messageId: string,
   options: NavigateToQuotedMessageOptions = {},
-): Promise<boolean> {
+): Promise<boolean | null> {
   const scrollOptions = {
     align: options.align,
     topPadding: options.align === "start" ? 16 : undefined,
@@ -2897,11 +2907,12 @@ function attemptScrollToQuotedMessage(
   if (!chatHistory) {
     return Promise.resolve(false);
   }
-  if (scrollToAndHighlightMessage(chatHistory, messageId, scrollOptions)) {
-    return Promise.resolve(true);
-  }
   return new Promise((resolve) => {
-    ensureRenderedMessage(chatHistory, messageId, (element) => {
+    ensureRenderedMessage(chatHistory, messageId, (element, cancelled) => {
+      if (cancelled) {
+        resolve(null);
+        return;
+      }
       if (!element) {
         resolve(false);
         return;
@@ -2958,12 +2969,12 @@ async function renderSessionAndScrollToMessage(
   messageId: string,
   isLatestNavigation: () => boolean,
   options: NavigateToQuotedMessageOptions = {},
-): Promise<boolean> {
+): Promise<boolean | null> {
   const manager = context.chatManager;
   if (!isLatestNavigation() || manager.getActiveSession()?.id !== session.id) {
     return false;
   }
-  return new Promise<boolean>((resolve) => {
+  return new Promise<boolean | null>((resolve) => {
     context.renderMessages(session.messages, () => {
       void attemptScrollToQuotedMessage(context, messageId, options).then(
         (scrolled) => {
@@ -3057,7 +3068,7 @@ export async function navigateToQuotedMessage(
 
   const scrollToTargetInSession = async (
     session: ChatSession,
-  ): Promise<boolean> => {
+  ): Promise<boolean | null> => {
     if (!session.messages.some((message) => message.id === quote.messageId)) {
       return false;
     }
@@ -3069,9 +3080,7 @@ export async function navigateToQuotedMessage(
       quote.messageId,
       options,
     );
-    if (!isLatestNavigation()) {
-      return false;
-    }
+    if (scrolled === null || !isLatestNavigation()) return null;
     if (!scrolled) {
       scrolled = await renderSessionAndScrollToMessage(
         context,
@@ -3081,13 +3090,14 @@ export async function navigateToQuotedMessage(
         options,
       );
     }
-    return isLatestNavigation() && scrolled;
+    return isLatestNavigation() ? scrolled : null;
   };
 
   if (currentSession?.id === quote.sessionId) {
     const session =
       (await manager.getSessionById(quote.sessionId)) ?? currentSession;
     const scrolled = await scrollToTargetInSession(session);
+    if (scrolled === null) return false;
     if (!isLatestNavigation()) {
       return false;
     }
@@ -3136,6 +3146,7 @@ export async function navigateToQuotedMessage(
   }
 
   const scrolled = await scrollToTargetInSession(sourceSession);
+  if (scrolled === null) return false;
   if (!isLatestNavigation()) {
     if (!scrolled) {
       await restoreSessionNavigation(
