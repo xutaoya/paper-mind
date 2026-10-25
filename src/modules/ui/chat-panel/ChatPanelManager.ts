@@ -58,7 +58,10 @@ import { createChatContainer } from "./ChatPanelBuilder";
 import { unmonitorChatPanelRoot } from "./chatUIFontScale";
 import { getStreamingRenderInterval } from "./streamingRenderInterval";
 import { clearContextWindowUsageRefresh } from "./ContextWindowIndicator";
-import { createPanelTabObserver } from "./PanelTabLifecycle";
+import {
+  activatePanelTabSession,
+  createPanelTabObserver,
+} from "./PanelTabLifecycle";
 import { setupFloatingWindowPin } from "./FloatingWindowPin";
 import { reapplyBookmarkManagerPanelTheme } from "./BookmarkManagerPanel";
 import { reapplyReadingStatsPanelTheme } from "./ReadingStatsPanel";
@@ -1312,12 +1315,15 @@ let floatingTabNotifierID: string | null = null;
 let panelVisibleSince: number | null = null;
 let panelOpenSource: ChatPanelOpenSource = "unknown";
 let pendingLibraryContext = false;
+let pendingScopedContext = false;
 let suppressFloatingUnloadTracking = false;
 const eventHandlerDisposers = new WeakMap<HTMLElement, () => void>();
 const readyPanelContainers = new WeakSet<HTMLElement>();
 const TAB_CHAT_REFRESH_DEBOUNCE_MS = 300;
 const tabChatRefreshTimers = new WeakMap<HTMLElement, number>();
 const tabChatRefreshInFlight = new WeakMap<HTMLElement, Promise<void>>();
+const tabChatRefreshRequested = new WeakSet<HTMLElement>();
+const lastContextTabID = new WeakMap<HTMLElement, string>();
 const lastTabChatRenderKey = new WeakMap<HTMLElement, string>();
 
 function buildTabChatRenderKey(
@@ -1359,6 +1365,7 @@ function shouldSkipTabChatRefresh(
 }
 
 function scheduleTabChatRefresh(container: HTMLElement): void {
+  tabChatRefreshRequested.add(container);
   const win = container.ownerDocument?.defaultView ?? Zotero.getMainWindow();
   if (!win) {
     void refreshChatForContainer(container);
@@ -1835,6 +1842,8 @@ function cleanupPanelIntegrations(
     eventHandlerDisposers.delete(container);
   }
   NextQuestionHintController.detach(container);
+  tabChatRefreshRequested.delete(container);
+  lastContextTabID.delete(container);
 }
 
 /**
@@ -1846,22 +1855,24 @@ async function syncChatSessionForActiveItem(
 ): Promise<ChatSession | null> {
   const useLibraryContext = pendingLibraryContext;
   pendingLibraryContext = false;
+  const preserveScopedContext = pendingScopedContext;
+  pendingScopedContext = false;
+  const tabID = Zotero.getMainWindow().Zotero_Tabs?.selectedID;
   const manager = getChatManager();
   await manager.init();
 
-  if (item) {
-    moduleCurrentItem = item;
-    manager.setCurrentItemKey(item.key, item.libraryID);
-    await updatePdfCheckboxVisibilityForItem(container, item, manager);
-    return manager.activateSessionForItem(item);
-  }
-
-  moduleCurrentItem = null;
-  const session = useLibraryContext
-    ? await manager.activateLibrarySession()
-    : manager.getActiveSession();
-  manager.setCurrentItemKey(null);
-  await updatePdfCheckboxVisibilityForItem(container, null, manager);
+  const session = await activatePanelTabSession(
+    manager,
+    item,
+    tabID,
+    lastContextTabID.get(container),
+    useLibraryContext,
+    preserveScopedContext,
+  );
+  if (tabID) lastContextTabID.set(container, tabID);
+  moduleCurrentItem = item;
+  manager.setCurrentItemKey(item?.key ?? null, item?.libraryID);
+  await updatePdfCheckboxVisibilityForItem(container, item, manager);
   return session;
 }
 
@@ -1963,6 +1974,7 @@ function renderActiveSessionInContainer(
  * Switches to the active reader item's conversation when available.
  */
 async function refreshChatForContainer(container: HTMLElement): Promise<void> {
+  tabChatRefreshRequested.add(container);
   const inFlight = tabChatRefreshInFlight.get(container);
   if (inFlight) {
     await inFlight;
@@ -1970,21 +1982,36 @@ async function refreshChatForContainer(container: HTMLElement): Promise<void> {
   }
 
   const run = async () => {
-    const activeItem = pendingPanelItem || getActiveReaderItem();
-    pendingPanelItem = null;
-    const session = await syncChatSessionForActiveItem(container, activeItem);
-    if (!container.isConnected || container.ownerDocument.defaultView?.closed)
-      return;
-    if (shouldSkipTabChatRefresh(container, session, activeItem)) {
-      return;
-    }
-    rememberTabChatRenderKey(container, session, activeItem);
-    renderActiveSessionInContainer(container, session);
-    focusInput(container);
+    do {
+      tabChatRefreshRequested.delete(container);
+      const tabID = Zotero.getMainWindow().Zotero_Tabs?.selectedID;
+      const activeItem = pendingPanelItem || getActiveReaderItem();
+      pendingPanelItem = null;
+      const session = await syncChatSessionForActiveItem(container, activeItem);
+      if (!container.isConnected || container.ownerDocument.defaultView?.closed)
+        return;
+      if (tabID !== Zotero.getMainWindow().Zotero_Tabs?.selectedID) {
+        tabChatRefreshRequested.add(container);
+      }
+      if (tabChatRefreshRequested.has(container)) continue;
+      if (shouldSkipTabChatRefresh(container, session, activeItem)) return;
+      rememberTabChatRenderKey(container, session, activeItem);
+      renderActiveSessionInContainer(container, session);
+      focusInput(container);
+    } while (tabChatRefreshRequested.has(container));
   };
 
   const promise = run().finally(() => {
     tabChatRefreshInFlight.delete(container);
+    // A notification can arrive after the loop ends but before this cleanup.
+    if (
+      tabChatRefreshRequested.has(container) &&
+      container.isConnected &&
+      !container.ownerDocument.defaultView?.closed
+    ) {
+      return refreshChatForContainer(container);
+    }
+    return undefined;
   });
   tabChatRefreshInFlight.set(container, promise);
   await promise;
@@ -2368,6 +2395,7 @@ function trackChatPanelClosed(): void {
  * Show the chat panel
  */
 export function showPanel(source: ChatPanelOpenSource = "unknown"): void {
+  pendingScopedContext = source === "library_scope";
   pendingLibraryContext =
     (source === "toolbar" || source === "menu") && !getActiveReaderItem();
   if (pendingLibraryContext) pendingPanelItem = null;

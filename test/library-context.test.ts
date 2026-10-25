@@ -7,6 +7,7 @@ import { isLibraryWideSession } from "../src/modules/chat/session-scope.ts";
 import { generateAgentRuntimeContextPrompt } from "../src/modules/chat/pdf-tools/promptGenerator.ts";
 import type { ChatSession } from "../src/types/chat";
 import { getActiveReaderItem } from "../src/modules/ui/chat-panel/ChatPanelManager.ts";
+import { activatePanelTabSession } from "../src/modules/ui/chat-panel/PanelTabLifecycle.ts";
 
 function session(
   id: string,
@@ -24,16 +25,24 @@ function session(
 
 function managerFor(current: ChatSession, saved?: ChatSession) {
   const manager = Object.create(ChatManager.prototype) as any;
+  const stored = new Map(
+    [current, ...(saved ? [saved] : [])].map((s) => [s.id, s]),
+  );
   let created = 0;
   manager.init = async () => undefined;
   manager.currentSession = current;
   manager.streamingSessions = new Map();
   manager.sessionStorage = {
-    findLatestLibrarySessionId: async () => saved?.id ?? null,
-    loadSession: async () => saved ?? null,
+    findLatestLibrarySessionId: async () =>
+      [...stored.values()].find(isLibraryWideSession)?.id ?? null,
+    findLatestSessionIdForItem: async (key: string) =>
+      [...stored.values()].find((s) => s.lastActiveItemKey === key)?.id ?? null,
+    loadSession: async (id: string) => stored.get(id) ?? null,
     createSession: async () => {
       created++;
-      return session(`library-${created}`);
+      const value = session(`library-${created}`);
+      stored.set(value.id, value);
+      return value;
     },
     setActiveSession: async () => undefined,
     cleanupAbandonedDraftSessions: async () => 0,
@@ -51,9 +60,12 @@ function managerFor(current: ChatSession, saved?: ChatSession) {
 
 describe("library-wide chat context", function () {
   let previousAddon: unknown;
+  let previousZotero: unknown;
 
   beforeEach(function () {
     previousAddon = (globalThis as any).addon;
+    previousZotero = (globalThis as any).Zotero;
+    (globalThis as any).Zotero = { Libraries: { userLibraryID: 1 } };
     (globalThis as any).addon = {
       data: {
         locale: {
@@ -68,6 +80,7 @@ describe("library-wide chat context", function () {
 
   afterEach(function () {
     (globalThis as any).addon = previousAddon;
+    (globalThis as any).Zotero = previousZotero;
   });
 
   it("does not reuse an empty paper draft as the library conversation", async function () {
@@ -112,6 +125,67 @@ describe("library-wide chat context", function () {
     const library = await manager.activateLibrarySession();
     assert.isTrue(isLibraryWideSession(library));
     assert.deepEqual(scoped.scopeItemKeys, ["PAPER001"]);
+  });
+
+  it("switches PDF → library → PDF → library without reopening the panel", async function () {
+    const paper = session("paper-history", { lastActiveItemKey: "PAPER001" });
+    const library = session("library-history");
+    const { manager, created } = managerFor(paper, library);
+    const item = { key: "PAPER001", libraryID: 1 } as Zotero.Item;
+    for (let i = 0; i < 3; i++) {
+      assert.strictEqual(
+        await activatePanelTabSession(
+          manager,
+          null,
+          "zotero-pane",
+          "reader-1",
+          false,
+        ),
+        library,
+      );
+      assert.isNull(manager.getCurrentItemKey());
+      assert.strictEqual(
+        await activatePanelTabSession(
+          manager,
+          item,
+          "reader-1",
+          "zotero-pane",
+          false,
+        ),
+        paper,
+      );
+      assert.equal(manager.getCurrentItemKey(), "PAPER001");
+    }
+    assert.equal(created(), 0);
+  });
+
+  it("keeps an explicitly selected collection chat when the library tab has not changed", async function () {
+    const scoped = session("selection", { scopeItemKeys: ["PAPER001"] });
+    const { manager, created } = managerFor(scoped);
+    for (const previous of [undefined, "zotero-pane"]) {
+      assert.strictEqual(
+        await activatePanelTabSession(
+          manager,
+          null,
+          "zotero-pane",
+          previous,
+          false,
+        ),
+        scoped,
+      );
+    }
+    assert.strictEqual(
+      await activatePanelTabSession(
+        manager,
+        null,
+        "zotero-pane",
+        "reader-1",
+        false,
+        true,
+      ),
+      scoped,
+    );
+    assert.equal(created(), 0);
   });
 
   it("does not use an inactive PDF when the library tab is selected", function () {

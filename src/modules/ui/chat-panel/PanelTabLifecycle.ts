@@ -1,4 +1,30 @@
+import type { ChatSession } from "../../../types/chat";
+
 type PanelTabs = Pick<_ZoteroTypes.Zotero_Tabs, "selectedID" | "getState">;
+
+/** Select the conversation before publishing its composer context. */
+export async function activatePanelTabSession(
+  manager: {
+    activateSessionForItem(item: Zotero.Item): Promise<ChatSession>;
+    activateLibrarySession(): Promise<ChatSession>;
+    getActiveSession(): ChatSession | null;
+  },
+  item: Zotero.Item | null,
+  tabID: string | undefined,
+  previousTabID: string | undefined,
+  forceLibrary: boolean,
+  preserveSession = false,
+): Promise<ChatSession | null> {
+  if (item) return manager.activateSessionForItem(item);
+  if (preserveSession) return manager.getActiveSession();
+  const switchedToLibrary =
+    tabID === "zotero-pane" &&
+    previousTabID !== undefined &&
+    previousTabID !== tabID;
+  if (forceLibrary || switchedToLibrary)
+    return manager.activateLibrarySession();
+  return manager.getActiveSession();
+}
 
 export function createPanelTabObserver(
   getTabs: () => PanelTabs | undefined,
