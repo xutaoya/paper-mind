@@ -266,7 +266,7 @@ function renderStreamingTextNow(
   state.lastPresentationArtifactSignature = presentationArtifactSignature;
 
   if (assistantContentHasVisibleAnswer(content)) {
-    collapseDockedExecutionPlan(container);
+    collapseDockedExecutionPlan(container, messageId);
   }
   updateAgentActivityPanel(
     container,
@@ -2293,7 +2293,7 @@ function setupChatManagerCallbacks(
           return;
         }
         if (assistantContentHasVisibleAnswer(activeMessage.content)) {
-          collapseDockedExecutionPlan(container);
+          collapseDockedExecutionPlan(container, messageId);
         }
         updateAgentActivityPanel(
           container,

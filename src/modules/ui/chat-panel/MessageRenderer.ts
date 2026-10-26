@@ -2319,16 +2319,21 @@ export function isDockedExecutionPlanVisible(container: HTMLElement): boolean {
   return height > 0;
 }
 
-export function collapseDockedExecutionPlan(container: HTMLElement): void {
+export function collapseDockedExecutionPlan(
+  container: HTMLElement,
+  messageId: string,
+): void {
   const panel = container.querySelector(
     "#chat-execution-plan-panel",
   ) as HTMLElement | null;
   const todoRoot = panel?.querySelector(
     ".paperchat-todo-list-root",
   ) as HTMLElement | null;
-  if (!todoRoot) {
+  if (!todoRoot || todoRoot.dataset.collapsedForMessageId === messageId) {
     return;
   }
+  // Later answer/reasoning chunks must preserve the user's disclosure choice.
+  todoRoot.dataset.collapsedForMessageId = messageId;
   collapseTodoListElement(todoRoot);
   if (panel) {
     syncExecutionInsetHeight(panel, todoRoot);

@@ -4,12 +4,14 @@ import { providerSupportsToolCalling } from "../src/modules/providers/provider-c
 import { darkTheme } from "../src/modules/ui/chat-panel/ChatPanelTheme.ts";
 import {
   createMessageElement,
+  collapseDockedExecutionPlan,
   cancelPendingHistoryRender,
   ensureRenderedMessage,
   findRenderedMessageElement,
   renderMessages,
   scrollToAndHighlightMessage,
   updateUserInputRequestView,
+  updateExecutionPlanView,
 } from "../src/modules/ui/chat-panel/MessageRenderer.ts";
 import {
   buildNoteSummaryDestinationRequestArgs,
@@ -64,6 +66,14 @@ class FakeElement {
 
   private classNames(): string[] {
     return (this.getAttribute("class") || "").split(/\s+/).filter(Boolean);
+  }
+
+  get className(): string {
+    return this.getAttribute("class") || "";
+  }
+
+  set className(value: string) {
+    this.setAttribute("class", value);
   }
   scrollTop = 0;
   scrollHeight = 0;
@@ -371,6 +381,73 @@ describe("chat message exact navigation", function () {
   afterEach(function () {
     (globalThis as { Zotero?: unknown }).Zotero = originalZotero;
     (globalThis as { addon?: unknown }).addon = originalAddon;
+  });
+
+  it("lets users reopen the docked checklist while answer updates continue", function () {
+    const doc = new FakeDocument();
+    const container = new FakeElement(doc, "div");
+    const panel = new FakeElement(doc, "div");
+    panel.setAttribute("id", "chat-execution-plan-panel");
+    container.appendChild(panel);
+    const plan = {
+      id: "plan-1",
+      summary: "Read the paper and answer",
+      status: "in_progress" as const,
+      steps: [
+        { id: "read", title: "Read paper", status: "completed" as const },
+        { id: "answer", title: "Write answer", status: "in_progress" as const },
+      ],
+      createdAt: 1,
+      updatedAt: 2,
+    };
+
+    // An answer callback may arrive before the checklist has mounted.
+    collapseDockedExecutionPlan(asElement(container), "answer-1");
+    updateExecutionPlanView(asElement(panel), darkTheme, plan);
+    const root = panel.querySelector(".paperchat-todo-list-root")!;
+    const trigger = root.querySelector(".paperchat-todo-list-trigger")!;
+    const body = root.querySelector(".paperchat-todo-list-body")!;
+    const click = () => {
+      for (const listener of trigger.listeners.get("click") || []) {
+        listener({ preventDefault() {}, stopPropagation() {} });
+      }
+    };
+
+    collapseDockedExecutionPlan(asElement(container), "answer-1");
+    assert.equal(trigger.getAttribute("aria-expanded"), "false");
+    assert.equal(body.style.maxHeight, "0px");
+
+    click();
+    for (let i = 0; i < 5; i++) {
+      collapseDockedExecutionPlan(asElement(container), "answer-1");
+      updateExecutionPlanView(asElement(panel), darkTheme, {
+        ...plan,
+        updatedAt: 3 + i,
+      });
+      assert.equal(trigger.getAttribute("aria-expanded"), "true");
+      assert.equal(body.style.maxHeight, "248px");
+    }
+
+    click();
+    collapseDockedExecutionPlan(asElement(container), "answer-1");
+    assert.equal(trigger.getAttribute("aria-expanded"), "false");
+    click();
+
+    collapseDockedExecutionPlan(asElement(container), "answer-2");
+    assert.equal(trigger.getAttribute("aria-expanded"), "false");
+    click();
+    collapseDockedExecutionPlan(asElement(container), "answer-2");
+    assert.equal(trigger.getAttribute("aria-expanded"), "true");
+
+    updateExecutionPlanView(asElement(panel), darkTheme);
+    updateExecutionPlanView(asElement(panel), darkTheme, plan);
+    collapseDockedExecutionPlan(asElement(container), "answer-2");
+    assert.equal(
+      panel
+        .querySelector(".paperchat-todo-list-trigger")!
+        .getAttribute("aria-expanded"),
+      "false",
+    );
   });
 
   describe("target-first lazy history", function () {

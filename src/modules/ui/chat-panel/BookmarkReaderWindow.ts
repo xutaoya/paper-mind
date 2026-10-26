@@ -255,8 +255,8 @@ function injectReaderStyles(doc: Document): void {
     .paperchat-reader-markdown table,
     .paperchat-reader-markdown .md-table {
       width: 100%;
-      max-width: 100%;
-      table-layout: fixed;
+      max-width: none;
+      table-layout: auto;
       border-collapse: collapse;
       margin: 0;
       font-size: 13px;
@@ -270,20 +270,6 @@ function injectReaderStyles(doc: Document): void {
       word-break: break-word;
       overflow-wrap: anywhere;
       white-space: normal;
-    }
-    .paperchat-reader-markdown th:first-child,
-    .paperchat-reader-markdown td:first-child {
-      width: 2.6em;
-      max-width: 3.2em;
-      text-align: center;
-      white-space: nowrap;
-    }
-    .paperchat-reader-markdown th:nth-child(2),
-    .paperchat-reader-markdown td:nth-child(2) {
-      width: 4.8em;
-      max-width: 6.5em;
-      text-align: center;
-      white-space: nowrap;
     }
     .paperchat-reader-markdown blockquote {
       margin-left: 0;

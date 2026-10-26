@@ -3008,6 +3008,9 @@ export function buildDOMFromTokens(
           display: "block",
           width: "100%",
           maxWidth: "100%",
+          minWidth: "0",
+          boxSizing: "border-box",
+          overflowX: "auto",
           margin: "10px 0",
         });
 
@@ -3015,8 +3018,9 @@ export function buildDOMFromTokens(
         table.setAttribute("class", "md-table");
         table.style.borderCollapse = "collapse";
         table.style.width = "100%";
-        table.style.maxWidth = "100%";
-        table.style.tableLayout = "fixed";
+        // MathML cannot wrap: let intrinsic cell widths expand inside the scroller.
+        table.style.maxWidth = "none";
+        table.style.tableLayout = "auto";
         table.style.fontSize = "12px";
         wrapper.appendChild(table);
         parent.appendChild(wrapper);
@@ -3262,6 +3266,15 @@ export function renderInlineTokens(
 
       case "math_inline": {
         const mathSpan = doc.createElementNS(HTML_NS, "span") as HTMLElement;
+        if (["td", "th"].includes(parent.tagName.toLowerCase())) {
+          // Keep cell wrapping rules from shrinking MathML's intrinsic width.
+          Object.assign(mathSpan.style, {
+            display: "inline-block",
+            whiteSpace: "nowrap",
+            overflowWrap: "normal",
+            wordBreak: "normal",
+          });
+        }
         // Always use displayMode: false for inline math to avoid
         // <math display="block"> which breaks paragraph flow in Firefox.
         // Block-level display math is handled by math_block tokens.

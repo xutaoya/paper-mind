@@ -1690,6 +1690,8 @@
   display: block;
   width: 100%;
   max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   overflow-x: auto;
   overflow-y: visible;
   margin: 10px 0;
@@ -1717,8 +1719,8 @@
 
 .md-table {
   width: 100%;
-  max-width: 100%;
-  table-layout: fixed;
+  max-width: none;
+  table-layout: auto;
   border-collapse: collapse;
   margin: 0;
   font-size: 12px;
@@ -1735,27 +1737,6 @@
   overflow-wrap: anywhere;
   white-space: normal;
   hyphens: auto;
-}
-
-.md-table th:first-child,
-.md-table td:first-child {
-  width: 2.6em;
-  max-width: 3.2em;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.md-table th:nth-child(2),
-.md-table td:nth-child(2) {
-  width: 4.8em;
-  max-width: 6.5em;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.md-table th:last-child,
-.md-table td:last-child {
-  width: auto;
 }
 
 .md-table th {
