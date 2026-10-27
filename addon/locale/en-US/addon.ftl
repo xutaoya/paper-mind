@@ -46,6 +46,8 @@ paperchat-chat-reader-ask = Ask AI
 
 paperchat-chat-reader-ask-tooltip = Send the selected text to AI chat
 
+paperchat-chat-math-preview = Formula preview
+
 paperchat-chat-reader-figure-screenshot = Select figure screenshot
 paperchat-chat-image-screenshot = Page { $page } screenshot
 paperchat-chat-image-attachment = Image

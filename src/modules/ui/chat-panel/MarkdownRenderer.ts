@@ -20,6 +20,10 @@ import { getString } from "../../../utils/locale";
 import { HTML_NS } from "./types";
 import { createUiChevron, setUiChevronExpanded } from "./UiChevron";
 import { isDarkMode, getCurrentTheme } from "./ChatPanelTheme";
+import {
+  bindMathEquationReferences,
+  getMathEquationNumber,
+} from "./MathFormulaPreview";
 import type { EvidenceRecord } from "../../../types/evidence";
 import type { PresentationToolCardArtifact } from "../../../types/chat";
 import type { PresentationCardProgress } from "../../presentation/contracts";
@@ -2469,6 +2473,12 @@ function renderMathToElement(
     });
     const mathMarkup = extractMathMLMarkup(mathml);
     if (mathMarkup && importMathMLIntoDocument(doc, parent, mathMarkup)) {
+      const equationNumber = displayMode
+        ? getMathEquationNumber(normalized)
+        : null;
+      if (equationNumber) {
+        parent.setAttribute("data-equation-number", equationNumber);
+      }
       return;
     }
   } catch {
@@ -2556,15 +2566,13 @@ export function renderMarkdownToElement(
     renderedPresentationArtifactKeys,
   );
 
-  if (!remainingContent) {
-    return;
+  if (
+    remainingContent &&
+    !renderSourceGroupBlocks(doc, element, remainingContent, options)
+  ) {
+    renderMarkdownFragment(doc, element, remainingContent, options);
   }
-
-  if (renderSourceGroupBlocks(doc, element, remainingContent, options)) {
-    return;
-  }
-
-  renderMarkdownFragment(doc, element, remainingContent, options);
+  bindMathEquationReferences(element);
 }
 
 function appendBlockquoteAction(

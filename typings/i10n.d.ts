@@ -186,6 +186,7 @@ export type FluentMessageId =
   | 'paperchat-chat-jump-to-quote'
   | 'paperchat-chat-jump-to-quote-title'
   | 'paperchat-chat-library-input-placeholder'
+  | 'paperchat-chat-math-preview'
   | 'paperchat-chat-menu-open'
   | 'paperchat-chat-message-count'
   | 'paperchat-chat-message-edited'

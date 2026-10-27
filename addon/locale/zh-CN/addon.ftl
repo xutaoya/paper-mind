@@ -46,6 +46,8 @@ paperchat-chat-reader-ask = 向 AI 提问
 
 paperchat-chat-reader-ask-tooltip = 将选中文本发送到 AI 对话并提问
 
+paperchat-chat-math-preview = 公式预览
+
 paperchat-chat-reader-figure-screenshot = 框选图片截图
 paperchat-chat-image-screenshot = 第 { $page } 页截图
 paperchat-chat-image-attachment = 图片
