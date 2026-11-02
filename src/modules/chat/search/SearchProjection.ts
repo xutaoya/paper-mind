@@ -1,4 +1,5 @@
 import MarkdownIt from "markdown-it";
+import { findDisplayMathClosingDelimiter } from "../../../utils/chatMathMarkdown";
 import { graphemeSegments } from "unicode-segmenter/grapheme";
 import type { ChatMessage } from "../../../types/chat";
 import { normalizeQuotedMessageRefs } from "../quoted-messages";
@@ -8,7 +9,7 @@ import type { SearchHighlightRange } from "./SearchTypes";
  * Increment this whenever visible extraction or normalization semantics change.
  * Rows processed by an older projector remain in the backfill work set.
  */
-export const CURRENT_SEARCH_VERSION = 3;
+export const CURRENT_SEARCH_VERSION = 4;
 
 /** Reserved inside stored documents so a phrase cannot cross field boundaries. */
 export const FIELD_BOUNDARY_TOKEN = "\u001f";
@@ -195,38 +196,41 @@ function installMathPlugin(md: MarkdownIt): void {
         return false;
       }
 
-      const afterOpening = state.src.slice(start + 2, lineEnd).trim();
-      if (afterOpening.endsWith("$$") && afterOpening.length > 2) {
-        if (silent) return true;
-        const token = state.push("math_block", "math", 0);
-        token.content = afterOpening.slice(0, -2).trim();
-        token.markup = "$$";
-        token.map = [startLine, startLine + 1];
-        state.line = startLine + 1;
-        return true;
+      const lines: string[] = [];
+      let closingLine = startLine;
+      let trailing = "";
+      let found = false;
+      for (; closingLine < endLine; closingLine++) {
+        const lineStart =
+          closingLine === startLine
+            ? start + 2
+            : state.bMarks[closingLine] + state.tShift[closingLine];
+        const line = state.src.slice(lineStart, state.eMarks[closingLine]);
+        const closingOffset = findDisplayMathClosingDelimiter(line);
+        if (closingOffset >= 0) {
+          lines.push(line.slice(0, closingOffset));
+          trailing = line.slice(closingOffset + 2).trim();
+          found = true;
+          break;
+        }
+        lines.push(line);
       }
-
-      let closingLine = startLine + 1;
-      while (closingLine < endLine) {
-        const nextStart = state.bMarks[closingLine] + state.tShift[closingLine];
-        const nextEnd = state.eMarks[closingLine];
-        if (state.src.slice(nextStart, nextEnd).trim() === "$$") break;
-        closingLine += 1;
-      }
-      if (closingLine >= endLine) return false;
+      const content = lines.join("\n").trim();
+      if (!found || !content) return false;
       if (silent) return true;
 
-      const lines: string[] = [];
-      if (afterOpening) lines.push(afterOpening);
-      for (let line = startLine + 1; line < closingLine; line += 1) {
-        const nextStart = state.bMarks[line] + state.tShift[line];
-        lines.push(state.src.slice(nextStart, state.eMarks[line]));
-      }
-
       const token = state.push("math_block", "math", 0);
-      token.content = lines.join("\n").trim();
+      token.content = content;
       token.markup = "$$";
       token.map = [startLine, closingLine + 1];
+      if (trailing) {
+        const paragraph = state.push("paragraph_open", "p", 1);
+        paragraph.map = [closingLine, closingLine + 1];
+        const inline = state.push("inline", "", 0);
+        inline.content = trailing;
+        inline.children = [];
+        state.push("paragraph_close", "p", -1);
+      }
       state.line = closingLine + 1;
       return true;
     },

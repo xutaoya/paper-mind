@@ -67,6 +67,23 @@ function assertMessageFastPathParity(label: string, value: ChatMessage): void {
 }
 
 describe("chat search visible projection", function () {
+  it("keeps prose and citation markup out of display-math search segments", function () {
+    const value = message(
+      "assistant",
+      '$$[2,\\ 2,\\ 4,\\ 4].\n$$<evidence-ref ids="ev-1234567890abcdef"/>\n\n空间细节与整体结构。\n\n**Prior-guided Fusion Module**\n\n$$\nF_f^k = \\mathcal{M}_f(F_{ir}^k).\n$$。其余正文。',
+    );
+    const segments = buildVisibleSearchSegments(value);
+    const math = segments.filter((segment) => segment.kind === "math");
+    assert.lengthOf(math, 2);
+    assert.equal(math[0].text, "[2,\\ 2,\\ 4,\\ 4].");
+    assert.notInclude(math[0].text, "空间细节");
+    const document = projectMessage(value);
+    assert.include(document.displayText, "空间细节与整体结构。");
+    assert.include(document.displayText, "其余正文。");
+    assert.notInclude(document.displayText, "<evidence-ref");
+    assertMessageFastPathParity("math followed by citations", value);
+  });
+
   it("keeps subfigure labels searchable as rendered rather than as copyright marks", function () {
     const value = message(
       "assistant",

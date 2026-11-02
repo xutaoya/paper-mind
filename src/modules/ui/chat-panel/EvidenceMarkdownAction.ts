@@ -3,6 +3,10 @@ import { getString } from "../../../utils/locale";
 import type { MarkdownRenderOptions } from "./MarkdownRenderer";
 import { navigateToPdfQuote } from "./PdfQuoteNavigator";
 import { openSourceTarget, type SourceTarget } from "./SourceNavigator";
+import {
+  loadPdfEvidencePreview,
+  PdfEvidencePreviewError,
+} from "./PdfEvidencePreview";
 
 function getItemByLibraryKey(
   itemKey: string,
@@ -25,6 +29,16 @@ export function createEvidenceMarkdownAction(
   return {
     citationTitle: getString("chat-evidence-citation-title"),
     viewSourceLabel: getString("chat-evidence-view-source"),
+    loadPagePreview: async (record, signal) => {
+      const sourceItem = getItemByLibraryKey(record.itemKey, record.libraryID);
+      if (!sourceItem) throw new PdfEvidencePreviewError("attachment");
+      try {
+        return await loadPdfEvidencePreview(record, sourceItem, signal);
+      } catch (error) {
+        ztoolkit.log("[Evidence] PDF page preview failed:", error);
+        throw error;
+      }
+    },
     onClick: async (record: EvidenceRecord) => {
       const target: SourceTarget = {
         type: "item",

@@ -3,6 +3,7 @@ import {
   containsInlineMathDelimiters,
   deltaContainsMathMarkup,
   extractMathMLMarkup,
+  findDisplayMathClosingDelimiter,
   normalizeBlockquoteListIndentation,
   normalizeMathContent,
   preserveStrongEmphasisAsHtml,
@@ -11,6 +12,21 @@ import {
 import katex from "katex";
 
 describe("chat math markdown helpers", function () {
+  it("finds display-math endings before citations and respects escaped dollars", function () {
+    assert.equal(
+      findDisplayMathClosingDelimiter('x$$<evidence-ref ids="ev-test"/>'),
+      1,
+    );
+    assert.equal(findDisplayMathClosingDelimiter("x$$。其余正文"), 1);
+    const escaped = String.raw`x\$$ + y$$`;
+    assert.equal(
+      findDisplayMathClosingDelimiter(escaped),
+      escaped.lastIndexOf("$$"),
+    );
+    assert.equal(findDisplayMathClosingDelimiter(String.raw`x\\$$`), 3);
+    assert.equal(findDisplayMathClosingDelimiter(String.raw`x\$$`), -1);
+  });
+
   it("normalizes escaped underscores inside math content", function () {
     assert.equal(normalizeMathContent("D(\\Phi\\_F)"), "D(\\Phi_F)");
   });

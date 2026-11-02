@@ -1,6 +1,7 @@
 import { recordReadingSeconds } from "./ReadingStatsService";
 import type { ItemReadingRef } from "./ReadingStatsStore";
 import { ensureZoteroStyleReadingImport } from "./ZoteroStyleReadingImport";
+import { config } from "../../../package.json";
 
 const TICK_MS = 15_000;
 const MAX_DELTA_MS = 60_000;
@@ -8,26 +9,48 @@ const MAX_DELTA_MS = 60_000;
 let timerId: ReturnType<typeof setInterval> | null = null;
 let lastTickAt = 0;
 
+function hasWindowFocus(win: Window | undefined | null): boolean {
+  return !!win && !win.closed && !!win.document?.hasFocus?.();
+}
+
+function isPaperMindWindowFocused(): boolean {
+  if (typeof Services === "undefined") return false;
+  const windows = Services.wm.getEnumerator("");
+  while (windows.hasMoreElements()) {
+    const win = windows.getNext() as Window;
+    if (
+      win.document?.documentURI ===
+        `chrome://${config.addonRef}/content/chatWindow.xhtml` &&
+      hasWindowFocus(win)
+    )
+      return true;
+  }
+  return false;
+}
+
 function getActiveReaderLiteratureItem(): Zotero.Item | null {
-  const mainWindow = Zotero.getMainWindow() as Window & {
-    Zotero_Tabs?: { selectedID?: string; selectedType?: string };
-    document?: Document;
-  };
-  if (!mainWindow?.document?.hasFocus?.()) {
-    return null;
-  }
-  const tabs = mainWindow.Zotero_Tabs;
-  if (!tabs?.selectedID) {
-    return null;
-  }
-  if (tabs.selectedType && tabs.selectedType !== "reader") {
-    return null;
-  }
-  const reader = Zotero.Reader?.getByTabID?.(tabs.selectedID);
-  if (!reader?.itemID) {
-    return null;
-  }
   try {
+    const readers = Object.values(Zotero.Reader?._readers || {});
+    let reader = readers.find(
+      (candidate) => !candidate.tabID && hasWindowFocus(candidate._window),
+    );
+    if (!reader) {
+      const mainWindow = Zotero.getMainWindow() as Window & {
+        Zotero_Tabs?: { selectedID?: string; selectedType?: string };
+      };
+      // The paper stays active while its PaperMind companion has focus.
+      // Preferences, library tabs and other applications must not accrue time.
+      if (!hasWindowFocus(mainWindow) && !isPaperMindWindowFocused())
+        return null;
+      const tabs = mainWindow?.Zotero_Tabs;
+      if (
+        !tabs?.selectedID ||
+        (tabs.selectedType && tabs.selectedType !== "reader")
+      )
+        return null;
+      reader = Zotero.Reader?.getByTabID?.(tabs.selectedID);
+    }
+    if (!reader?.itemID) return null;
     const item = Zotero.Items.get(reader.itemID);
     if (!item || item.deleted) {
       return null;

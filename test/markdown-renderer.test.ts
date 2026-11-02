@@ -16,6 +16,8 @@ import { getMessageMarkdownRenderOptions } from "../src/modules/ui/chat-panel/Me
 import { createPdfPassageEvidenceRecord } from "../src/modules/chat/evidence/index.ts";
 import { MAX_ITERATIONS_MESSAGE } from "../src/modules/chat/agent-runtime/messages.ts";
 import { renderAgentActivityReasoning } from "../src/modules/ui/chat-panel/AgentActivityPanel.ts";
+import { renderEvidenceExcerpt } from "../src/modules/ui/chat-panel/EvidenceExcerpt.ts";
+import { PdfEvidencePreviewError } from "../src/modules/ui/chat-panel/PdfEvidencePreview.ts";
 
 class FakeElement {
   readonly ELEMENT_NODE = 1;
@@ -80,6 +82,17 @@ class FakeElement {
     return child;
   }
 
+  removeChild(child: FakeElement): FakeElement {
+    const index = this.children.indexOf(child);
+    if (index >= 0) this.children.splice(index, 1);
+    child.parentNode = null;
+    return child;
+  }
+
+  focus(): void {
+    this.ownerDocument.activeElement = this;
+  }
+
   setAttribute(name: string, value: string): void {
     this.attributes.set(name, value);
   }
@@ -111,6 +124,10 @@ class FakeElement {
 
   addEventListener(type: string, listener: (event: any) => void): void {
     this.listeners.set(type, listener);
+  }
+
+  removeEventListener(type: string, listener: (event: any) => void): void {
+    if (this.listeners.get(type) === listener) this.listeners.delete(type);
   }
 
   dispatch(type: string, details: Record<string, unknown> = {}): void {
@@ -151,6 +168,20 @@ function findElementByTagName(
 class FakeDocument {
   readonly body = new FakeElement(this, "body");
   readonly documentElement = this.body;
+  activeElement: FakeElement | null = null;
+  readonly listeners = new Map<string, (event: any) => void>();
+
+  addEventListener(type: string, listener: (event: any) => void): void {
+    this.listeners.set(type, listener);
+  }
+
+  dispatch(type: string, details: Record<string, unknown>): void {
+    this.listeners.get(type)?.({
+      preventDefault() {},
+      stopPropagation() {},
+      ...details,
+    });
+  }
 
   createElementNS(_namespace: string, tagName: string): FakeElement {
     return new FakeElement(this, tagName);
@@ -1994,9 +2025,31 @@ Missing label should not be parsed.
             "data-evidence-card",
             record.id,
           );
-          assert.equal(firstCard?.style.display, "block");
+          assert.equal(firstCard?.style.display, "flex");
           assert.equal(firstCard?.style.position, "fixed");
+          assert.equal(firstCard?.getAttribute("role"), "dialog");
           assert.strictEqual(firstCard?.parentNode, doc.body);
+          const body = findByAttribute(
+            firstCard!,
+            "data-evidence-body",
+            record.id,
+          )!;
+          assert.equal(body.style.overflowY, "auto");
+          assert.equal(
+            collectRenderedText(
+              findByAttribute(firstCard!, "data-evidence-quote", record.id)!,
+            ),
+            record.quote,
+          );
+          assert.equal(
+            findByAttribute(firstCard!, "data-evidence-location", record.id)
+              ?.textContent,
+            "Page 7 · Section: Results",
+          );
+          assert.notInclude(
+            collectRenderedText(firstCard!),
+            "paperchat-chat-evidence",
+          );
 
           secondCitation?.dispatch("click");
           const secondCard = findByAttribute(
@@ -2004,21 +2057,389 @@ Missing label should not be parsed.
             "data-evidence-card",
             secondRecord.id,
           );
+          assert.equal(firstCard?.style.display, "none");
+          assert.equal(citation?.getAttribute("aria-expanded"), "false");
+          assert.equal(secondCard?.style.display, "flex");
+          assert.strictEqual(secondCard?.parentNode, doc.body);
+          doc.dispatch("keydown", { key: "Escape" });
+          assert.equal(secondCitation?.getAttribute("aria-expanded"), "false");
+          assert.strictEqual(doc.activeElement, secondCitation);
+          assert.isUndefined(
+            findByAttribute(doc.body, "data-evidence-card", secondRecord.id),
+          );
+
+          secondCitation?.dispatch("click");
+          findByAttribute(
+            doc.body,
+            "data-evidence-close",
+            secondRecord.id,
+          )?.dispatch("click");
+          assert.strictEqual(doc.activeElement, secondCitation);
+          assert.isUndefined(
+            findByAttribute(doc.body, "data-evidence-card", secondRecord.id),
+          );
+
+          secondCitation?.dispatch("click");
           const sourceAction = findByAttribute(
             doc.body,
             "data-evidence-source-action",
             secondRecord.id,
           );
-          assert.equal(firstCard?.style.display, "none");
-          assert.equal(citation?.getAttribute("aria-expanded"), "false");
-          assert.equal(secondCard?.style.display, "block");
-          assert.strictEqual(secondCard?.parentNode, doc.body);
           sourceAction?.dispatch("click");
           await Promise.resolve();
           await Promise.resolve();
           assert.deepEqual(opened, [secondRecord.id]);
         } finally {
           (globalThis as { Zotero?: unknown }).Zotero = originalZotero;
+        }
+      });
+
+      it("lays out evidence text without interpreting its markup or changing the quote", function () {
+        const doc = new FakeDocument();
+        const host = new FakeElement(doc, "blockquote");
+        const quote =
+          "6336 IEEE TRANSACTIONS ON IMAGE PROCESSING, VOL. 35, 2026\nC. Stage II: Semantic Prior Diffusion Model\nFirst paragraph.\n\n<script>alert(1)</script> $F_i$\n";
+        renderEvidenceExcerpt(host as unknown as HTMLElement, quote, "#777");
+        assert.equal(collectRenderedText(host), quote);
+        assert.deepEqual(
+          host.children.map((child) =>
+            child.getAttribute("data-evidence-text-block"),
+          ),
+          ["page-header", "heading", "paragraph", "paragraph"],
+        );
+        assert.equal(host.children[0].style.color, "#777");
+        assert.equal(host.children[1].style.fontWeight, "650");
+        assert.isNull(findElementByTagName(host, "script"));
+      });
+
+      it("loads an original page only on expansion and supports keyboard zoom", async function () {
+        const originalZotero = (globalThis as any).Zotero;
+        (globalThis as any).Zotero = { getMainWindow: () => null };
+        try {
+          const doc = new FakeDocument();
+          const root = new FakeElement(doc, "div");
+          const requested: string[] = [];
+          renderMarkdownToElement(
+            root as unknown as HTMLElement,
+            `Claim.<evidence-ref ids="${record.id}"/>`,
+            "page-preview",
+            {
+              evidenceRecords: [record],
+              evidenceAction: {
+                citationTitle: "Evidence",
+                viewSourceLabel: "View source",
+                onClick: () => {},
+                loadPagePreview: async (selected) => {
+                  requested.push(selected.id);
+                  return "data:image/png;base64,cGFnZQ==";
+                },
+              },
+            },
+          );
+          findByAttribute(root, "data-evidence-ref", record.id)!.dispatch(
+            "click",
+          );
+          const preview = findByAttribute(
+            doc.body,
+            "data-evidence-page-preview",
+            record.id,
+          )! as FakeElement & { open: boolean };
+          assert.isEmpty(requested);
+          preview.open = true;
+          preview.dispatch("toggle");
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          assert.deepEqual(requested, [record.id]);
+          const image = findElementByTagName(preview, "img")!;
+          assert.isDefined(image);
+          assert.equal(image.style.display, "none");
+          image.dispatch("load");
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          assert.equal(image.style.display, "block");
+          image.dispatch("keydown", { key: "Enter" });
+          assert.equal(image.style.width, "250%");
+          assert.equal(image.getAttribute("aria-pressed"), "true");
+          image.dispatch("click");
+          assert.equal(image.style.width, "100%");
+          preview.dispatch("toggle");
+          assert.lengthOf(requested, 1);
+        } finally {
+          (globalThis as any).Zotero = originalZotero;
+        }
+      });
+
+      it("loads evidence previews without a global AbortController in the Zotero sandbox", async function () {
+        const originalZotero = (globalThis as any).Zotero;
+        const nativeController = globalThis.AbortController;
+        (globalThis as any).AbortController = undefined;
+        (globalThis as any).Zotero = {
+          getMainWindow: () => ({ AbortController: nativeController }),
+        };
+        try {
+          const doc = new FakeDocument();
+          const root = new FakeElement(doc, "div");
+          let requested = false;
+          renderMarkdownToElement(
+            root as unknown as HTMLElement,
+            `Claim.<evidence-ref ids="${record.id}"/>`,
+            "sandbox-page-preview",
+            {
+              evidenceRecords: [record],
+              evidenceAction: {
+                citationTitle: "Evidence",
+                viewSourceLabel: "View source",
+                onClick: () => {},
+                loadPagePreview: async (_record, signal) => {
+                  requested = true;
+                  assert.isDefined(signal);
+                  return null;
+                },
+              },
+            },
+          );
+          findByAttribute(root, "data-evidence-ref", record.id)!.dispatch(
+            "click",
+          );
+          const preview = findByAttribute(
+            doc.body,
+            "data-evidence-page-preview",
+            record.id,
+          )! as FakeElement & { open: boolean };
+          preview.open = true;
+          preview.dispatch("toggle");
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          assert.isTrue(requested);
+          assert.include(
+            collectRenderedText(preview),
+            "Page preview unavailable",
+          );
+        } finally {
+          (globalThis as any).Zotero = originalZotero;
+          globalThis.AbortController = nativeController;
+        }
+      });
+
+      it("times out visibly even when no DOM cancellation controller is available", async function () {
+        const originalZotero = (globalThis as any).Zotero;
+        const originalServices = (globalThis as any).Services;
+        const nativeController = globalThis.AbortController;
+        const nativeTimeout = globalThis.setTimeout;
+        (globalThis as any).AbortController = undefined;
+        (globalThis as any).Services = undefined;
+        (globalThis as any).Zotero = { getMainWindow: () => null };
+        (globalThis as any).setTimeout = (
+          callback: () => void,
+          delay: number,
+        ) => nativeTimeout(callback, delay === 6000 ? 0 : delay);
+        try {
+          const doc = new FakeDocument();
+          const root = new FakeElement(doc, "div");
+          renderMarkdownToElement(
+            root as unknown as HTMLElement,
+            `Claim.<evidence-ref ids="${record.id}"/>`,
+            "preview-timeout",
+            {
+              evidenceRecords: [record],
+              evidenceAction: {
+                citationTitle: "Evidence",
+                viewSourceLabel: "View source",
+                onClick: () => {},
+                loadPagePreview: () => new Promise(() => {}),
+              },
+            },
+          );
+          findByAttribute(root, "data-evidence-ref", record.id)!.dispatch(
+            "click",
+          );
+          const preview = findByAttribute(
+            doc.body,
+            "data-evidence-page-preview",
+            record.id,
+          )! as FakeElement & { open: boolean };
+          preview.open = true;
+          preview.dispatch("toggle");
+          await new Promise((resolve) => nativeTimeout(resolve, 10));
+          assert.include(
+            collectRenderedText(preview),
+            "Loading the original page timed out",
+          );
+          assert.isDefined(
+            findByAttribute(preview, "data-evidence-preview-retry", record.id),
+          );
+        } finally {
+          (globalThis as any).Zotero = originalZotero;
+          (globalThis as any).Services = originalServices;
+          globalThis.AbortController = nativeController;
+          globalThis.setTimeout = nativeTimeout;
+        }
+      });
+
+      it("shows actionable PDF errors instead of treating every failure as a closed PDF", async function () {
+        const originalZotero = (globalThis as any).Zotero;
+        (globalThis as any).Zotero = { getMainWindow: () => null };
+        try {
+          const cases = [
+            ["reader", "Open this PDF in the reader"],
+            ["initializing", "PDF reader is still loading"],
+            ["render", "PDF page could not be rendered"],
+          ] as const;
+          for (const [code, expected] of cases) {
+            const doc = new FakeDocument();
+            const root = new FakeElement(doc, "div");
+            renderMarkdownToElement(
+              root as unknown as HTMLElement,
+              `Claim.<evidence-ref ids="${record.id}"/>`,
+              "preview-diagnostic",
+              {
+                evidenceRecords: [record],
+                evidenceAction: {
+                  citationTitle: "Evidence",
+                  viewSourceLabel: "View source",
+                  onClick: () => {},
+                  loadPagePreview: async () => {
+                    throw new PdfEvidencePreviewError(code);
+                  },
+                },
+              },
+            );
+            findByAttribute(root, "data-evidence-ref", record.id)!.dispatch(
+              "click",
+            );
+            const preview = findByAttribute(
+              doc.body,
+              "data-evidence-page-preview",
+              record.id,
+            )! as FakeElement & { open: boolean };
+            preview.open = true;
+            preview.dispatch("toggle");
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            assert.include(collectRenderedText(preview), expected);
+          }
+        } finally {
+          (globalThis as any).Zotero = originalZotero;
+        }
+      });
+
+      it("shows an image loading failure and lets the user retry successfully", async function () {
+        const originalZotero = (globalThis as any).Zotero;
+        (globalThis as any).Zotero = { getMainWindow: () => null };
+        try {
+          const doc = new FakeDocument();
+          const root = new FakeElement(doc, "div");
+          let requests = 0;
+          renderMarkdownToElement(
+            root as unknown as HTMLElement,
+            `Claim.<evidence-ref ids="${record.id}"/>`,
+            "failed-page-image",
+            {
+              evidenceRecords: [record],
+              evidenceAction: {
+                citationTitle: "Evidence",
+                viewSourceLabel: "View source",
+                onClick: () => {},
+                loadPagePreview: async () => {
+                  requests++;
+                  return "data:image/png;base64,cGFnZQ==";
+                },
+              },
+            },
+          );
+          findByAttribute(root, "data-evidence-ref", record.id)!.dispatch(
+            "click",
+          );
+          const preview = findByAttribute(
+            doc.body,
+            "data-evidence-page-preview",
+            record.id,
+          )! as FakeElement & { open: boolean };
+          preview.open = true;
+          preview.dispatch("toggle");
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          findElementByTagName(preview, "img")!.dispatch("error");
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          assert.include(
+            collectRenderedText(preview),
+            "Page preview unavailable",
+          );
+          assert.isNull(findElementByTagName(preview, "img"));
+          findByAttribute(
+            preview,
+            "data-evidence-preview-retry",
+            record.id,
+          )!.dispatch("click");
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          const retriedImage = findElementByTagName(preview, "img")!;
+          retriedImage.dispatch("load");
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          assert.equal(requests, 2);
+          assert.equal(retriedImage.style.display, "block");
+          assert.notInclude(
+            collectRenderedText(preview),
+            "Page preview unavailable",
+          );
+        } finally {
+          (globalThis as any).Zotero = originalZotero;
+        }
+      });
+
+      it("preserves damaged math and cancels original page loading on close", async function () {
+        const originalZotero = (globalThis as any).Zotero;
+        (globalThis as any).Zotero = { getMainWindow: () => null };
+        try {
+          const doc = new FakeDocument();
+          const root = new FakeElement(doc, "div");
+          const damaged = createPdfPassageEvidenceRecord({
+            ...record,
+            quote: "Broken formula: $$\\frac{x}{ $$",
+          })!;
+          let signal: AbortSignal | undefined;
+          let complete!: (src: string) => void;
+          renderMarkdownToElement(
+            root as unknown as HTMLElement,
+            `Claim.<evidence-ref ids="${damaged.id}"/>`,
+            "page-cancel",
+            {
+              evidenceRecords: [damaged],
+              evidenceAction: {
+                citationTitle: "Evidence",
+                viewSourceLabel: "View source",
+                onClick: () => {},
+                loadPagePreview: (_record, selectedSignal) => {
+                  signal = selectedSignal;
+                  return new Promise((resolve) => {
+                    complete = resolve;
+                  });
+                },
+              },
+            },
+          );
+          findByAttribute(root, "data-evidence-ref", damaged.id)!.dispatch(
+            "click",
+          );
+          const card = findByAttribute(
+            doc.body,
+            "data-evidence-card",
+            damaged.id,
+          )!;
+          const preview = findByAttribute(
+            card,
+            "data-evidence-page-preview",
+            damaged.id,
+          )! as FakeElement & { open: boolean };
+          assert.isTrue(preview.open);
+          assert.equal(
+            collectRenderedText(
+              findByAttribute(card, "data-evidence-quote", damaged.id)!,
+            ),
+            damaged.quote,
+          );
+          preview.dispatch("toggle");
+          doc.dispatch("keydown", { key: "Escape" });
+          assert.isTrue(signal?.aborted);
+          complete("data:image/png;base64,cGFnZQ==");
+          await new Promise((resolve) => setTimeout(resolve, 0));
+          assert.isNull(findElementByTagName(preview, "img"));
+        } finally {
+          (globalThis as any).Zotero = originalZotero;
         }
       });
 
@@ -2472,6 +2893,56 @@ describe("markdown renderer math", function () {
     walk(root);
     return matches;
   };
+
+  it("keeps citations and following prose outside display math closing delimiters", function () {
+    const originalZotero = (globalThis as any).Zotero;
+    (globalThis as any).Zotero = { getMainWindow: () => null };
+    const evidence = createPdfPassageEvidenceRecord({
+      itemKey: "ITEM0001",
+      page: 5,
+      quote: "The Transformer block counts are 2, 2, 4, and 4.",
+      toolCallId: "tool-read",
+      resultIndex: 1,
+    })!;
+    try {
+      for (const first of [
+        "$$[2,\\ 2,\\ 4,\\ 4].\n$$",
+        "$$\n[2,\\ 2,\\ 4,\\ 4].\n$$",
+        "$$[2,\\ 2,\\ 4,\\ 4].$$",
+        "$$[2,\\ 2,\\ 4,\\ 4].$$。",
+        "$$\n[2,\\ 2,\\ 4,\\ 4].$$ **补充说明**",
+        "\\[[2,\\ 2,\\ 4,\\ 4].\\]",
+      ]) {
+        const doc = new FakeDocument();
+        const root = new FakeElement(doc, "div");
+        renderMarkdownToElement(
+          root as unknown as HTMLElement,
+          `${first}<evidence-ref ids="${evidence.id}"/>\n\n从一般多尺度网络的作用理解，较浅层保留空间信息。\n\n**4. Prior-guided Fusion Module**\n\n图中模块不是只在底层出现：\n\n$$\nF_f^k = \\mathcal{M}_f(F_{ir}^k, F_{vi}^k, p_s).\n$$`,
+          "math-citation-boundary",
+          { evidenceRecords: [evidence] },
+        );
+        const displays = root.children.filter(
+          (child) => child.getAttribute("class") === "md-math-scroll",
+        );
+        assert.lengthOf(displays, 2, first);
+        assert.notInclude(collectRenderedText(displays[0]), "<evidence-ref");
+        assert.notInclude(collectRenderedText(displays[0]), "从一般");
+        assert.isTrue(
+          collectByTag(root, "span").some(
+            (span) => span.getAttribute("data-evidence-ref") === evidence.id,
+          ),
+        );
+        assert.isTrue(
+          collectByTag(root, "strong").some(
+            (node) =>
+              collectRenderedText(node) === "4. Prior-guided Fusion Module",
+          ),
+        );
+      }
+    } finally {
+      (globalThis as any).Zotero = originalZotero;
+    }
+  });
 
   it("uses a thin scrollbar with room below display math and leaves inline math unchanged", function () {
     const originalZotero = (globalThis as any).Zotero;

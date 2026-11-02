@@ -5,6 +5,23 @@ export function normalizeMathContent(content: string): string {
   return content.replace(/\\_/g, "_");
 }
 
+/** A closing $$ can be followed by punctuation, citations or other prose. */
+export function findDisplayMathClosingDelimiter(line: string): number {
+  for (let index = 0; index < line.length - 1; index++) {
+    if (line[index] !== "$" || line[index + 1] !== "$") continue;
+    let backslashes = 0;
+    for (
+      let before = index - 1;
+      before >= 0 && line[before] === "\\";
+      before--
+    ) {
+      backslashes++;
+    }
+    if (backslashes % 2 === 0) return index;
+  }
+  return -1;
+}
+
 export function containsInlineMathDelimiters(content: string): boolean {
   return /(^|[^\\])\$(?!\$)[^$\n]+?\$(?!\$)/m.test(content);
 }

@@ -254,6 +254,21 @@ paperchat-chat-open-source-failed = 无法打开这个来源
 paperchat-chat-evidence-citation-title = 查看支持这条陈述的证据
 
 paperchat-chat-evidence-view-source = 查看原文
+paperchat-chat-evidence-preview-title = 证据 [{ $number }]
+paperchat-chat-evidence-page = 第 { $page } 页
+paperchat-chat-evidence-section = { $section }
+paperchat-chat-evidence-pdf-source = PDF 原文摘录
+paperchat-chat-evidence-page-preview = 原页预览（含公式）
+paperchat-chat-evidence-preview-loading = 正在加载 PDF 原页…
+paperchat-chat-evidence-preview-retry = 重试
+paperchat-chat-evidence-preview-error-attachment = 未找到此证据对应的 PDF 附件，请确认附件仍在文库中。
+paperchat-chat-evidence-preview-error-reader = 此 PDF 尚未在阅读器中打开，请先点击“查看原文”，再重试预览。
+paperchat-chat-evidence-preview-error-initializing = PDF 阅读器仍在加载，请稍后重试。
+paperchat-chat-evidence-preview-error-page = 此证据的页码超出了对应 PDF 的页数，请通过“查看原文”核对。
+paperchat-chat-evidence-preview-error-render = PDF 原页渲染失败，请重试或点击“查看原文”查看该页。
+paperchat-chat-evidence-preview-error-timeout = 原页加载超时，请重试。
+paperchat-chat-evidence-preview-zoom = 双指捏合缩放，双指滑动移动；点击切换大小
+paperchat-chat-evidence-preview-unavailable = 暂时无法预览，请打开对应 PDF 后重试，或点击“查看原文”核对公式。
 
 paperchat-chat-source-group-toggle = 展开或收起引用依据
 paperchat-chat-source-group-caption = 来源
@@ -513,14 +528,14 @@ paperchat-chat-stats-export-ok = 已复制 JSON 到剪贴板
 paperchat-chat-stats-export-fail = 导出失败或暂无数据
 paperchat-chat-stats-help = 说明
 paperchat-chat-stats-updated-at = 更新于 { $time }
-paperchat-chat-stats-help-reading = 近 6 个月累计 { $total }。在 PDF 阅读器中停留且 Zotero 窗口聚焦时累计阅读时间；可点击热力图格子查看当日文献明细。
+paperchat-chat-stats-help-reading = 近 6 个月累计 { $total }。打开 PDF 并聚焦阅读器或 PaperMind 浮窗时累计阅读时间；切到其他应用或文库页时暂停。可点击热力图格子查看当日文献明细。
 paperchat-chat-stats-help-token = 统计模型接口返回的输入与输出 Token。悬停看概览，点击看按模型明细；更早未保存用量的对话不会出现。
 paperchat-chat-stats-week-vs-last = 较上周 { $delta }
 paperchat-chat-stats-week-same-as-last = 与上周持平
 paperchat-chat-stats-streak-days = 连续 { $count } 天
 paperchat-chat-stats-last-reading-day = 最近在 { $date } 阅读 { $duration }
 paperchat-chat-stats-tracking-active = 正在记录阅读时间
-paperchat-chat-stats-tracking-idle = 未在记录（请聚焦 Zotero 并打开 PDF 阅读器）
+paperchat-chat-stats-tracking-idle = 未在记录（请打开 PDF，并聚焦阅读器或 PaperMind 浮窗）
 paperchat-chat-stats-tracking-paused = 阅读计时已暂停
 paperchat-chat-stats-header-subtitle-tokens = 模型接口返回的输入与输出 Token
 
@@ -580,7 +595,7 @@ paperchat-chat-stats-reading-active-days-none = 本周暂无阅读
 
 paperchat-chat-stats-daily-reading-title = 每日阅读时间
 
-paperchat-chat-stats-reading-footnote = 近 6 个月累计 { $total } · 在 PDF 阅读器中停留且窗口聚焦时累计
+paperchat-chat-stats-reading-footnote = 近 6 个月累计 { $total } · 打开 PDF 并聚焦阅读器或 PaperMind 浮窗时累计
 
 paperchat-chat-stats-heatmap-less = 少
 

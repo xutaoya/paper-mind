@@ -6,6 +6,7 @@ import MarkdownIt from "markdown-it";
 import {
   containsInlineMathDelimiters,
   extractMathMLMarkup,
+  findDisplayMathClosingDelimiter,
   importMathMLIntoDocument,
   normalizeBlockquoteListIndentation,
   normalizeEmphasisDelimiters,
@@ -15,11 +16,19 @@ import {
 } from "../../../utils/chatMathMarkdown";
 import hljs from "highlight.js";
 import katex from "katex";
+import {
+  createAbortController,
+  raceWithAbort,
+  type ManagedAbortController,
+} from "../../../utils/abort";
 import { chatColors } from "../../../utils/colors";
 import { getString } from "../../../utils/locale";
 import { HTML_NS } from "./types";
 import { createUiChevron, setUiChevronExpanded } from "./UiChevron";
 import { isDarkMode, getCurrentTheme } from "./ChatPanelTheme";
+import { renderEvidenceExcerpt } from "./EvidenceExcerpt";
+import { PdfEvidencePreviewError } from "./PdfEvidencePreview";
+import { setupEvidencePreviewZoom } from "./EvidencePreviewZoom";
 import {
   bindMathEquationReferences,
   getMathEquationNumber,
@@ -167,48 +176,42 @@ function mathPlugin(mdInstance: MarkdownIt) {
         return false;
       }
 
-      const afterOpening = state.src.slice(startPos + 2, maxPos).trim();
-
-      // Single-line: $$...$$ on same line
-      if (afterOpening.endsWith("$$") && afterOpening.length > 2) {
-        if (silent) return true;
-        const token = state.push("math_block", "math", 0);
-        token.content = afterOpening.slice(0, -2).trim();
-        token.markup = "$$";
-        token.map = [startLine, startLine + 1];
-        state.line = startLine + 1;
-        return true;
-      }
-
-      // Multi-line: find closing $$
-      let nextLine = startLine + 1;
+      const lines: string[] = [];
+      let closingLine = startLine;
+      let trailing = "";
       let found = false;
-      while (nextLine < endLine) {
-        const lineStart = state.bMarks[nextLine] + state.tShift[nextLine];
-        const lineEnd = state.eMarks[nextLine];
-        const line = state.src.slice(lineStart, lineEnd).trim();
-        if (line === "$$") {
+      for (; closingLine < endLine; closingLine++) {
+        const lineStart =
+          closingLine === startLine
+            ? startPos + 2
+            : state.bMarks[closingLine] + state.tShift[closingLine];
+        const line = state.src.slice(lineStart, state.eMarks[closingLine]);
+        const closingOffset = findDisplayMathClosingDelimiter(line);
+        if (closingOffset >= 0) {
+          lines.push(line.slice(0, closingOffset));
+          trailing = line.slice(closingOffset + 2).trim();
           found = true;
           break;
         }
-        nextLine++;
+        lines.push(line);
       }
-
-      if (!found) return false;
+      const content = lines.join("\n").trim();
+      if (!found || !content) return false;
       if (silent) return true;
 
-      let content = afterOpening ? afterOpening + "\n" : "";
-      for (let i = startLine + 1; i < nextLine; i++) {
-        const lineStart = state.bMarks[i] + state.tShift[i];
-        const lineEnd = state.eMarks[i];
-        content += state.src.slice(lineStart, lineEnd) + "\n";
-      }
-
       const token = state.push("math_block", "math", 0);
-      token.content = content.trim();
+      token.content = content;
       token.markup = "$$";
-      token.map = [startLine, nextLine + 1];
-      state.line = nextLine + 1;
+      token.map = [startLine, closingLine + 1];
+      if (trailing) {
+        const paragraph = state.push("paragraph_open", "p", 1);
+        paragraph.map = [closingLine, closingLine + 1];
+        const inline = state.push("inline", "", 0);
+        inline.content = trailing;
+        inline.children = [];
+        state.push("paragraph_close", "p", -1);
+      }
+      state.line = closingLine + 1;
       return true;
     },
   );
@@ -327,16 +330,22 @@ const activeEvidencePopoverByDocument = new WeakMap<
   ActiveEvidencePopover
 >();
 const evidencePopoverListenersInstalled = new WeakSet<Document>();
+const evidencePreviewControllers = new WeakMap<
+  HTMLElement,
+  ManagedAbortController
+>();
 
-function closeActiveEvidencePopover(doc: Document): void {
+function closeActiveEvidencePopover(doc: Document, restoreFocus = false): void {
   const active = activeEvidencePopoverByDocument.get(doc);
   if (!active) return;
+  evidencePreviewControllers.get(active.card)?.abort();
   active.citation.setAttribute("aria-expanded", "false");
   active.card.style.display = "none";
   if (active.card.parentNode?.removeChild) {
     active.card.parentNode.removeChild(active.card);
   }
   activeEvidencePopoverByDocument.delete(doc);
+  if (restoreFocus) active.citation.focus?.({ preventScroll: true });
 }
 
 function isNodeInside(
@@ -366,6 +375,17 @@ function ensureEvidencePopoverDismissListeners(doc: Document): void {
         return;
       }
       closeActiveEvidencePopover(doc);
+    },
+    true,
+  );
+  doc.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.key !== "Escape" || !activeEvidencePopoverByDocument.has(doc))
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      closeActiveEvidencePopover(doc, true);
     },
     true,
   );
@@ -401,12 +421,12 @@ function positionEvidencePopover(
     1,
     view.innerHeight || doc.documentElement.clientHeight,
   );
-  const width = Math.min(360, Math.max(1, viewportWidth - margin * 2));
+  const width = Math.min(400, Math.max(1, viewportWidth - margin * 2));
   card.style.width = `${width}px`;
   card.style.maxWidth = `${width}px`;
-  card.style.maxHeight = `${Math.max(1, viewportHeight - margin * 2)}px`;
+  card.style.maxHeight = `${Math.max(1, Math.min(460, Math.round(viewportHeight * 0.65), viewportHeight - margin * 2))}px`;
   card.style.visibility = "hidden";
-  card.style.display = "block";
+  card.style.display = "flex";
 
   const anchorRect = citation.getBoundingClientRect();
   const cardRect = card.getBoundingClientRect();
@@ -474,6 +494,10 @@ export interface MarkdownRenderOptions {
   evidenceAction?: {
     citationTitle: string;
     viewSourceLabel: string;
+    loadPagePreview?: (
+      record: EvidenceRecord,
+      signal?: AbortSignal,
+    ) => Promise<string | null>;
     onClick: (record: EvidenceRecord) => void | Promise<void>;
     onError?: (error: Error) => void;
   };
@@ -2656,15 +2680,408 @@ function formatEvidenceLocation(record: EvidenceRecord): string {
 }
 
 function getEvidenceLocaleString(
-  key: "chat-evidence-page" | "chat-evidence-section",
+  key: string,
   args: Record<string, unknown>,
   fallback: string,
 ): string {
   try {
-    return getString(key, { args });
+    const value = getString(key, { args });
+    if (value && value !== key && !value.endsWith(`-${key}`)) return value;
   } catch {
-    return fallback;
+    // A missing Fluent message can return its key instead of throwing.
   }
+  return fallback;
+}
+
+function createEvidencePopover(
+  doc: Document,
+  record: EvidenceRecord,
+  index: number,
+  action: NonNullable<MarkdownRenderOptions["evidenceAction"]>,
+): HTMLElement {
+  const dark = isDarkMode();
+  const border = dark ? "#3c4149" : "#e1e5eb";
+  const muted = dark ? "#a4acb8" : "#697586";
+  const card = doc.createElementNS(HTML_NS, "div") as HTMLElement;
+  card.setAttribute("data-evidence-card", record.id);
+  card.setAttribute("role", "dialog");
+  const title = getEvidenceLocaleString(
+    "chat-evidence-preview-title",
+    { number: index + 1 },
+    `Evidence [${index + 1}]`,
+  );
+  card.setAttribute("aria-label", title);
+  card.setAttribute("tabindex", "-1");
+  Object.assign(card.style, {
+    display: "none",
+    position: "fixed",
+    zIndex: "2147483000",
+    flexDirection: "column",
+    width: "400px",
+    maxWidth: "calc(100vw - 24px)",
+    maxHeight: "min(460px, 65vh)",
+    overflow: "hidden",
+    boxSizing: "border-box",
+    border: `1px solid ${border}`,
+    borderRadius: "12px",
+    background: dark ? "#25282e" : "#ffffff",
+    color: dark ? "#e3e7ed" : "#303947",
+    boxShadow: dark
+      ? "0 12px 36px rgba(0,0,0,0.38)"
+      : "0 10px 32px rgba(15,23,42,0.14)",
+    fontFamily: "system-ui, sans-serif",
+    fontSize: "13px",
+    fontWeight: "400",
+    lineHeight: "1.65",
+    textAlign: "left",
+    whiteSpace: "normal",
+    outline: "none",
+  });
+
+  const header = doc.createElementNS(HTML_NS, "div") as HTMLElement;
+  Object.assign(header.style, {
+    flex: "0 0 auto",
+    padding: "12px 14px 10px",
+    borderBottom: `1px solid ${border}`,
+  });
+  const heading = doc.createElementNS(HTML_NS, "div") as HTMLElement;
+  Object.assign(heading.style, {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "12px",
+  });
+  const label = doc.createElementNS(HTML_NS, "span") as HTMLElement;
+  label.textContent = title;
+  Object.assign(label.style, { fontSize: "13px", fontWeight: "650" });
+  heading.appendChild(label);
+
+  const close = doc.createElementNS(HTML_NS, "button") as HTMLElement;
+  close.setAttribute("type", "button");
+  close.setAttribute("data-evidence-close", record.id);
+  close.setAttribute("aria-label", getString("chat-close"));
+  Object.assign(close.style, {
+    appearance: "none",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flex: "0 0 26px",
+    width: "26px",
+    height: "26px",
+    minHeight: "0",
+    maxHeight: "none",
+    margin: "-3px -4px -3px 0",
+    padding: "0",
+    border: "none",
+    borderRadius: "6px",
+    background: "transparent",
+    color: muted,
+    cursor: "pointer",
+  });
+  const closeIcon = doc.createElementNS(SVG_NS, "svg");
+  closeIcon.setAttribute("width", "14");
+  closeIcon.setAttribute("height", "14");
+  closeIcon.setAttribute("viewBox", "0 0 16 16");
+  closeIcon.setAttribute("aria-hidden", "true");
+  const closePath = doc.createElementNS(SVG_NS, "path");
+  closePath.setAttribute("d", "m4 4 8 8M12 4l-8 8");
+  closePath.setAttribute("stroke", "currentColor");
+  closePath.setAttribute("stroke-width", "1.5");
+  closePath.setAttribute("stroke-linecap", "round");
+  closeIcon.appendChild(closePath);
+  close.appendChild(closeIcon);
+  close.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    closeActiveEvidencePopover(doc, true);
+  });
+  heading.appendChild(close);
+  header.appendChild(heading);
+  const location = formatEvidenceLocation(record);
+  if (location) {
+    const locationElement = doc.createElementNS(HTML_NS, "div") as HTMLElement;
+    locationElement.setAttribute("data-evidence-location", record.id);
+    locationElement.setAttribute("title", location);
+    locationElement.textContent = location;
+    Object.assign(locationElement.style, {
+      marginTop: "3px",
+      color: muted,
+      fontSize: "11px",
+      overflow: "hidden",
+      textOverflow: "ellipsis",
+      whiteSpace: "nowrap",
+    });
+    header.appendChild(locationElement);
+  }
+  card.appendChild(header);
+
+  const body = doc.createElementNS(HTML_NS, "div") as HTMLElement;
+  body.setAttribute("data-evidence-body", record.id);
+  Object.assign(body.style, {
+    flex: "1 1 auto",
+    minHeight: "0",
+    overflowY: "auto",
+    overscrollBehavior: "contain",
+    scrollbarWidth: "thin",
+    scrollbarColor: `${dark ? "#555d69" : "#c2c8d1"} transparent`,
+    padding: "14px",
+    background: dark ? "#202329" : "#fafbfc",
+  });
+  const quote = doc.createElementNS(HTML_NS, "blockquote") as HTMLElement;
+  quote.setAttribute("data-evidence-quote", record.id);
+  const { needsSourcePreview } = renderEvidenceExcerpt(
+    quote,
+    record.quote,
+    muted,
+  );
+  Object.assign(quote.style, {
+    margin: "0",
+    padding: "0 0 0 11px",
+    borderLeft: `2px solid ${dark ? "#515b6b" : "#d8dfe9"}`,
+    overflowWrap: "anywhere",
+    whiteSpace: "normal",
+    fontSize: "13px",
+    lineHeight: "1.75",
+  });
+  body.appendChild(quote);
+  if (record.page && action.loadPagePreview) {
+    const preview = doc.createElementNS(
+      HTML_NS,
+      "details",
+    ) as HTMLDetailsElement;
+    preview.setAttribute("data-evidence-page-preview", record.id);
+    Object.assign(preview.style, {
+      marginTop: "14px",
+      borderTop: `1px solid ${border}`,
+      paddingTop: "10px",
+    });
+    const summary = doc.createElementNS(HTML_NS, "summary") as HTMLElement;
+    summary.textContent = getEvidenceLocaleString(
+      "chat-evidence-page-preview",
+      {},
+      "Preview original PDF page",
+    );
+    Object.assign(summary.style, {
+      cursor: "pointer",
+      color: dark ? "#9abffd" : "#315f9b",
+      fontSize: "12px",
+    });
+    preview.appendChild(summary);
+    const content = doc.createElementNS(HTML_NS, "div") as HTMLElement;
+    content.setAttribute("data-evidence-preview-content", record.id);
+    content.setAttribute("aria-live", "polite");
+    Object.assign(content.style, { marginTop: "10px", overflowX: "auto" });
+    preview.appendChild(content);
+    let loaded = false;
+    let pending = false;
+    const load = async (): Promise<void> => {
+      if (!preview.open || loaded || pending || !card.parentNode) return;
+      pending = true;
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      let cleanupImage = (): void => {};
+      let failure: unknown;
+      let timedOut = false;
+      content.textContent = getEvidenceLocaleString(
+        "chat-evidence-preview-loading",
+        {},
+        "Loading original page…",
+      );
+      try {
+        const controller = createAbortController();
+        evidencePreviewControllers.set(card, controller);
+        const deadline = new Promise<never>((_resolve, reject) => {
+          timeout = setTimeout(() => {
+            timedOut = true;
+            reject(new Error("Page preview timed out"));
+            controller.abort();
+          }, 6000);
+        });
+        const withinDeadline = <T>(operation: () => Promise<T>): Promise<T> =>
+          raceWithAbort(
+            () => Promise.race([operation(), deadline]),
+            controller.signal,
+          );
+        const src = await withinDeadline(() =>
+          action.loadPagePreview!(record, controller.signal),
+        );
+        if (controller.aborted || !card.parentNode) return;
+        if (!src?.startsWith("data:image/png;base64,"))
+          throw new Error("PDF page unavailable");
+        const image = doc.createElementNS(HTML_NS, "img") as HTMLImageElement;
+        image.setAttribute(
+          "alt",
+          getEvidenceLocaleString(
+            "chat-evidence-page",
+            { page: record.page! },
+            `Page ${record.page}`,
+          ),
+        );
+        image.setAttribute("tabindex", "0");
+        image.setAttribute("role", "button");
+        const zoomLabel = getEvidenceLocaleString(
+          "chat-evidence-preview-zoom",
+          {},
+          "Pinch to zoom, scroll with two fingers to pan, or click to toggle zoom",
+        );
+        image.setAttribute("aria-label", zoomLabel);
+        image.setAttribute("title", zoomLabel);
+        image.setAttribute("aria-pressed", "false");
+        Object.assign(image.style, {
+          display: "none",
+          width: "100%",
+          height: "auto",
+          maxWidth: "none",
+          background: "#fff",
+          cursor: "zoom-in",
+        });
+        const imageReady = new Promise<void>((resolve, reject) => {
+          const onLoad = (): void => resolve();
+          const onError = (): void =>
+            reject(new Error("PDF page image failed to load"));
+          image.addEventListener("load", onLoad, { once: true });
+          image.addEventListener("error", onError, { once: true });
+          cleanupImage = () => {
+            image.removeEventListener("load", onLoad);
+            image.removeEventListener("error", onError);
+          };
+        });
+        content.appendChild(image);
+        image.setAttribute("src", src);
+        await withinDeadline(() => imageReady);
+        if (controller.aborted || !card.parentNode) return;
+        content.textContent = "";
+        image.style.display = "block";
+        content.appendChild(image);
+        setupEvidencePreviewZoom(content, image);
+        loaded = true;
+      } catch (error) {
+        failure = error;
+        // Keep the quote and its source action usable when a reader is unavailable.
+      } finally {
+        if (timeout !== undefined) clearTimeout(timeout);
+        cleanupImage();
+        pending = false;
+        if (!loaded && card.parentNode) {
+          content.textContent = "";
+          const message = doc.createElementNS(HTML_NS, "span") as HTMLElement;
+          const reason = timedOut
+            ? "timeout"
+            : failure instanceof PdfEvidencePreviewError
+              ? failure.code
+              : undefined;
+          message.textContent = reason
+            ? getEvidenceLocaleString(
+                `chat-evidence-preview-error-${reason}`,
+                {},
+                {
+                  attachment: "The source PDF attachment could not be found.",
+                  reader: "Open this PDF in the reader, then retry.",
+                  initializing:
+                    "The PDF reader is still loading. Please retry shortly.",
+                  page: "The cited page is outside this PDF's page range.",
+                  render:
+                    "The original PDF page could not be rendered. Retry or use View source.",
+                  timeout: "Loading the original page timed out. Please retry.",
+                }[reason],
+              )
+            : getEvidenceLocaleString(
+                "chat-evidence-preview-unavailable",
+                {},
+                "Page preview unavailable. Use View source to inspect the original formula.",
+              );
+          content.appendChild(message);
+          const retry = doc.createElementNS(HTML_NS, "button") as HTMLElement;
+          retry.setAttribute("type", "button");
+          retry.setAttribute("data-evidence-preview-retry", record.id);
+          retry.textContent = getEvidenceLocaleString(
+            "chat-evidence-preview-retry",
+            {},
+            "Retry",
+          );
+          Object.assign(retry.style, {
+            display: "block",
+            margin: "8px 0 0",
+            padding: "4px 9px",
+            maxHeight: "none",
+            border: `1px solid ${border}`,
+            borderRadius: "6px",
+            background: "transparent",
+            color: dark ? "#9abffd" : "#315f9b",
+            cursor: "pointer",
+            fontSize: "12px",
+          });
+          retry.addEventListener("click", () => {
+            void load();
+          });
+          content.appendChild(retry);
+        }
+      }
+    };
+    preview.addEventListener("toggle", () => {
+      void load();
+    });
+    body.appendChild(preview);
+    if (needsSourcePreview) preview.open = true;
+  }
+  card.appendChild(body);
+
+  const footer = doc.createElementNS(HTML_NS, "div") as HTMLElement;
+  Object.assign(footer.style, {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: "10px",
+    flex: "0 0 auto",
+    borderTop: `1px solid ${border}`,
+    padding: "9px 14px",
+  });
+  const sourceKind = doc.createElementNS(HTML_NS, "span") as HTMLElement;
+  sourceKind.textContent = getEvidenceLocaleString(
+    "chat-evidence-pdf-source",
+    {},
+    "PDF passage",
+  );
+  Object.assign(sourceKind.style, { color: muted, fontSize: "11px" });
+  footer.appendChild(sourceKind);
+  const viewSource = doc.createElementNS(HTML_NS, "button") as HTMLElement;
+  viewSource.setAttribute("type", "button");
+  viewSource.setAttribute("data-evidence-source-action", record.id);
+  Object.assign(viewSource.style, {
+    appearance: "none",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "5px",
+    height: "auto",
+    minHeight: "28px",
+    maxHeight: "none",
+    margin: "0",
+    padding: "4px 9px",
+    border: `1px solid ${border}`,
+    borderRadius: "6px",
+    background: "transparent",
+    color: dark ? "#9abffd" : "#315f9b",
+    cursor: "pointer",
+    fontSize: "12px",
+    fontWeight: "550",
+    lineHeight: "1.4",
+  });
+  viewSource.textContent = action.viewSourceLabel;
+  viewSource.appendChild(createUiChevron(doc, { kind: "right", size: 12 }));
+  viewSource.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    closeActiveEvidencePopover(doc);
+    void Promise.resolve()
+      .then(() => action.onClick(record))
+      .catch((error: unknown) => {
+        action.onError?.(
+          error instanceof Error ? error : new Error(String(error)),
+        );
+      });
+  });
+  footer.appendChild(viewSource);
+  card.appendChild(footer);
+  return card;
 }
 
 const EVIDENCE_REF_INLINE_PATTERN = /<evidence-ref\b([^>]*?)\s*\/>/gi;
@@ -2766,97 +3183,28 @@ function appendEvidenceReference(
     if (action) {
       citation.setAttribute("type", "button");
       citation.setAttribute("aria-expanded", "false");
+      citation.setAttribute("aria-haspopup", "dialog");
       citation.style.cursor = "pointer";
-
-      const card = doc.createElementNS(HTML_NS, "span") as HTMLElement;
-      card.setAttribute("data-evidence-card", record.id);
-      card.setAttribute("role", "note");
-      card.style.display = "none";
-      card.style.position = "fixed";
-      card.style.zIndex = "2147483000";
-      card.style.width = "360px";
-      card.style.maxWidth = "calc(100vw - 24px)";
-      card.style.overflowY = "auto";
-      card.style.boxSizing = "border-box";
-      card.style.padding = "10px";
-      card.style.border = `1px solid ${dark ? "#4b5563" : "#d0d7de"}`;
-      card.style.borderRadius = "8px";
-      card.style.background = dark ? "#161b22" : "#ffffff";
-      card.style.color = dark ? "#c9d1d9" : "#334155";
-      card.style.boxShadow = dark
-        ? "0 8px 24px rgba(0, 0, 0, 0.45)"
-        : "0 8px 24px rgba(15, 23, 42, 0.16)";
-      card.style.fontSize = "12px";
-      card.style.fontWeight = "400";
-      card.style.lineHeight = "1.5";
-      card.style.textAlign = "left";
-      card.style.whiteSpace = "normal";
-
-      const location = formatEvidenceLocation(record);
-      if (location) {
-        const locationElement = doc.createElementNS(
-          HTML_NS,
-          "span",
-        ) as HTMLElement;
-        locationElement.style.display = "block";
-        locationElement.style.marginBottom = "5px";
-        locationElement.style.color = dark ? "#8b949e" : "#64748b";
-        locationElement.style.fontSize = "11px";
-        locationElement.style.fontWeight = "600";
-        locationElement.textContent = location;
-        card.appendChild(locationElement);
-      }
-
-      const quote = doc.createElementNS(HTML_NS, "span") as HTMLElement;
-      quote.style.display = "block";
-      quote.style.whiteSpace = "pre-wrap";
-      quote.textContent = record.quote;
-      card.appendChild(quote);
-
-      const viewSource = doc.createElementNS(HTML_NS, "button") as HTMLElement;
-      viewSource.setAttribute("type", "button");
-      viewSource.setAttribute("data-evidence-source-action", record.id);
-      viewSource.style.display = "inline-flex";
-      viewSource.style.marginTop = "8px";
-      viewSource.style.padding = "3px 8px";
-      viewSource.style.border = `1px solid ${dark ? "#4b5563" : "#cbd5e1"}`;
-      viewSource.style.borderRadius = "6px";
-      viewSource.style.background = dark ? "#21262d" : "#f8fafc";
-      viewSource.style.color = dark ? "#79c0ff" : "#2563eb";
-      viewSource.style.cursor = "pointer";
-      viewSource.style.fontSize = "11px";
-      viewSource.textContent = action.viewSourceLabel;
-      viewSource.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        closeActiveEvidencePopover(doc);
-        void Promise.resolve()
-          .then(() => action.onClick(record))
-          .catch((error: unknown) => {
-            action.onError?.(
-              error instanceof Error ? error : new Error(String(error)),
-            );
-          });
-      });
-      card.appendChild(viewSource);
 
       citation.addEventListener("click", (event) => {
         event.preventDefault();
         event.stopPropagation();
         const active = activeEvidencePopoverByDocument.get(doc);
-        if (active?.card === card) {
+        if (active?.citation === citation) {
           closeActiveEvidencePopover(doc);
           return;
         }
 
         closeActiveEvidencePopover(doc);
+        const card = createEvidencePopover(doc, record, index, action);
         const host = doc.body || doc.documentElement || wrapper;
         host.appendChild(card);
-        card.style.display = "block";
+        card.style.display = "flex";
         citation.setAttribute("aria-expanded", "true");
         activeEvidencePopoverByDocument.set(doc, { card, citation });
         ensureEvidencePopoverDismissListeners(doc);
         positionEvidencePopover(doc, citation, card);
+        card.focus?.({ preventScroll: true });
       });
     }
 

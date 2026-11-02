@@ -52,6 +52,43 @@ const STATS_SWITCHER_HOST_ID = "paperchat-stats-view-switcher-host";
 const STATS_CLOSE_BTN_ID = "chat-stats-close-btn";
 const VIEW_HOST_READING = "stats-view-reading";
 const VIEW_HOST_TOKEN = "stats-view-tokens";
+const readingStatusTimers = new WeakMap<HTMLElement, number>();
+
+function stopReadingStatusUpdates(panel: HTMLElement): void {
+  const timer = readingStatusTimers.get(panel);
+  if (timer !== undefined)
+    panel.ownerDocument.defaultView?.clearInterval(timer);
+  readingStatusTimers.delete(panel);
+}
+
+function startReadingStatusUpdates(panel: HTMLElement): void {
+  stopReadingStatusUpdates(panel);
+  const win = panel.ownerDocument.defaultView;
+  if (!win?.setInterval) return;
+  let lastState = "";
+  const update = (): void => {
+    if (!panel.isConnected || panel.style.display !== "flex") {
+      stopReadingStatusUpdates(panel);
+      return;
+    }
+    const active = isReadingTimeAccumulatingNow();
+    const view = readStatsView(panel);
+    const state = `${view}:${active}`;
+    if (state === lastState) return;
+    lastState = state;
+    const subtitle = panel.querySelector<HTMLElement>(`#${STATS_SUBTITLE_ID}`);
+    if (subtitle)
+      updateStatsPanelSubtitle(
+        subtitle,
+        panel.ownerDocument,
+        getCurrentTheme(),
+        view,
+        active,
+      );
+  };
+  update();
+  readingStatusTimers.set(panel, win.setInterval(update, 1000));
+}
 
 function getReadingAccent(theme: ThemeColors): string {
   return theme.sendButtonBg || "#2563eb";
@@ -1818,6 +1855,8 @@ export function setReadingStatsPanelVisible(
     return;
   }
   panel.style.display = visible ? "flex" : "none";
+  if (visible) startReadingStatusUpdates(panel);
+  else stopReadingStatusUpdates(panel);
   const inputArea = container.querySelector(
     "#chat-input-area",
   ) as HTMLElement | null;

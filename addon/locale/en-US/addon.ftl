@@ -254,6 +254,21 @@ paperchat-chat-open-source-failed = Could not open this source
 paperchat-chat-evidence-citation-title = View supporting evidence
 
 paperchat-chat-evidence-view-source = View source
+paperchat-chat-evidence-preview-title = Evidence [{ $number }]
+paperchat-chat-evidence-page = Page { $page }
+paperchat-chat-evidence-section = { $section }
+paperchat-chat-evidence-pdf-source = PDF passage
+paperchat-chat-evidence-page-preview = Original page (including formulas)
+paperchat-chat-evidence-preview-loading = Loading original PDF page…
+paperchat-chat-evidence-preview-retry = Retry
+paperchat-chat-evidence-preview-error-attachment = The source PDF attachment could not be found. Check that it is still in your library.
+paperchat-chat-evidence-preview-error-reader = Open this PDF using View source, then retry the preview.
+paperchat-chat-evidence-preview-error-initializing = The PDF reader is still loading. Please retry shortly.
+paperchat-chat-evidence-preview-error-page = The cited page is outside this PDF's page range. Use View source to check it.
+paperchat-chat-evidence-preview-error-render = The original PDF page could not be rendered. Retry or use View source.
+paperchat-chat-evidence-preview-error-timeout = Loading the original page timed out. Please retry.
+paperchat-chat-evidence-preview-zoom = Pinch to zoom, scroll with two fingers to pan, or click to toggle zoom
+paperchat-chat-evidence-preview-unavailable = Preview unavailable. Open the matching PDF and retry, or use View source to inspect the formula.
 
 paperchat-chat-source-group-toggle = Expand or collapse cited passages
 paperchat-chat-source-group-caption = Source
@@ -513,7 +528,7 @@ paperchat-chat-stats-export-ok = JSON copied to clipboard
 paperchat-chat-stats-export-fail = Export failed or no data yet
 paperchat-chat-stats-help = Help
 paperchat-chat-stats-updated-at = Updated { $time }
-paperchat-chat-stats-help-reading = { $total } read in the last 6 months. Time accrues in the PDF reader while Zotero is focused. Click a heatmap cell for papers that day.
+paperchat-chat-stats-help-reading = { $total } read in the last 6 months. Time accrues with a PDF open while its reader or PaperMind window is focused, and pauses in other apps or library tabs. Click a heatmap cell for papers that day.
 paperchat-chat-stats-help-token = Input/output tokens from the model API. Hover for a quick total; click for per-model breakdown. Older chats without saved usage are omitted.
 paperchat-chat-stats-week-vs-last = { $delta } vs last week
 paperchat-chat-stats-week-same-as-last = Same as last week
@@ -521,7 +536,7 @@ paperchat-chat-stats-streak-days = { $count }-day streak
 paperchat-chat-stats-last-reading-day = Last read { $duration } on { $date }
 paperchat-chat-stats-tracking-active = Recording reading time
 paperchat-chat-stats-tracking-paused = Reading timer paused
-paperchat-chat-stats-tracking-idle = Not recording (focus Zotero with PDF reader open)
+paperchat-chat-stats-tracking-idle = Not recording (open a PDF and focus its reader or PaperMind window)
 paperchat-chat-stats-header-subtitle-tokens = Input and output tokens from the model API
 
 paperchat-chat-stats-view-reading = Reading
@@ -580,7 +595,7 @@ paperchat-chat-stats-reading-active-days-none = No reading this week yet
 
 paperchat-chat-stats-daily-reading-title = Daily reading time
 
-paperchat-chat-stats-reading-footnote = { $total } in the past 6 months · counted while a PDF reader tab is focused
+paperchat-chat-stats-reading-footnote = { $total } in the past 6 months · counted with a PDF open while its reader or PaperMind window is focused
 
 paperchat-chat-stats-heatmap-less = Less
 
