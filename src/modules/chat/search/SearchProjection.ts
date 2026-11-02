@@ -8,7 +8,7 @@ import type { SearchHighlightRange } from "./SearchTypes";
  * Increment this whenever visible extraction or normalization semantics change.
  * Rows processed by an older projector remain in the backfill work set.
  */
-export const CURRENT_SEARCH_VERSION = 2;
+export const CURRENT_SEARCH_VERSION = 3;
 
 /** Reserved inside stored documents so a phrase cannot cross field boundaries. */
 export const FIELD_BOUNDARY_TOKEN = "\u001f";
@@ -80,7 +80,7 @@ const markdown = new MarkdownIt({
   xhtmlOut: true,
   typographer: true,
   linkify: true,
-});
+}).disable("replacements");
 
 const unicodeWhitespace = /^[\p{White_Space}\uFEFF]$/u;
 const unicodeWhitespaceRun = /[\p{White_Space}\uFEFF]+/gu;

@@ -16,7 +16,7 @@ const noteMarkdown = new MarkdownIt({
   xhtmlOut: true,
   linkify: true,
   typographer: true,
-});
+}).disable("replacements");
 
 function pad2(value: number): string {
   return String(value).padStart(2, "0");

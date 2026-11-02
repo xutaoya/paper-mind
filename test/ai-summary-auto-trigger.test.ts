@@ -43,6 +43,17 @@ describe("AI summary automatic trigger", function () {
       await import("../src/modules/ai-summary/AISummaryProcessor.ts");
   });
 
+  it("preserves figure labels when formatting summary notes", function () {
+    const processor = new processorModule.AISummaryProcessor();
+    const html = (processor as any).formatContentAsHtml(
+      "Summary",
+      "图中的 **(a) → (b) → (c) → (d) → (e)**，以及 (C)、(r)、(tm)。原有 © ® ™",
+    );
+    assert.include(html, "<strong>(a) → (b) → (c) → (d) → (e)</strong>");
+    assert.include(html, "(C)、(r)、(tm)");
+    assert.include(html, "原有 © ® ™");
+  });
+
   beforeEach(function () {
     hadZotero = Object.prototype.hasOwnProperty.call(globalThis, "Zotero");
     hadZtoolkit = Object.prototype.hasOwnProperty.call(globalThis, "ztoolkit");

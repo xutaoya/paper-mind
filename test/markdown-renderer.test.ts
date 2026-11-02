@@ -206,6 +206,29 @@ describe("Markdown rendering", function () {
     (globalThis as any).addon = originalAddon;
   });
 
+  it("preserves parenthesized figure labels in prose, bold, headings and tables", function () {
+    const doc = new FakeDocument();
+    const root = new FakeElement(doc, "div");
+    const originalZotero = (globalThis as any).Zotero;
+    (globalThis as any).Zotero = { getMainWindow: () => null };
+    try {
+      renderMarkdownToElement(
+        root as unknown as HTMLElement,
+        "图中的 **(a) → (b) → (c) → (d) → (e)**\n\n### 子图 (C)\n\n| 子图 | 内容 |\n| --- | --- |\n| (c) | 语义先验 |\n\n(c) (C) (r) (R) (tm) (TM)；原有符号 © ® ™",
+      );
+    } finally {
+      (globalThis as any).Zotero = originalZotero;
+    }
+    const text = collectRenderedText(root);
+    assert.include(text, "(a) → (b) → (c) → (d) → (e)");
+    assert.include(text, "子图 (C)");
+    assert.include(
+      collectRenderedText(findElementByTagName(root, "td")!),
+      "(c)",
+    );
+    assert.include(text, "(c) (C) (r) (R) (tm) (TM)；原有符号 © ® ™");
+  });
+
   describe("markdown renderer emphasis", function () {
     it("renders a bold addition node label after a bold list heading", function () {
       const doc = new FakeDocument();

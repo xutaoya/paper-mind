@@ -61,7 +61,7 @@ const md = new MarkdownIt({
   xhtmlOut: true,
   typographer: true,
   linkify: true,
-});
+}).disable("replacements");
 
 function evidenceRefPlugin(mdInstance: MarkdownIt) {
   mdInstance.inline.ruler.before(

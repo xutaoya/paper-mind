@@ -25,7 +25,7 @@ const summaryMarkdown = new MarkdownIt({
   linkify: true,
   typographer: true,
   breaks: false,
-});
+}).disable("replacements");
 export class AISummaryProcessor {
   /**
    * 处理单个条目

@@ -67,6 +67,19 @@ function assertMessageFastPathParity(label: string, value: ChatMessage): void {
 }
 
 describe("chat search visible projection", function () {
+  it("keeps subfigure labels searchable as rendered rather than as copyright marks", function () {
+    const value = message(
+      "assistant",
+      "图中的 **(a) → (b) → (c) → (d) → (e)**，以及 (r)、(tm)。原有 © ® ™",
+    );
+    const document = projectMessage(value);
+    assert.include(document.displayText, "(a) → (b) → (c) → (d) → (e)");
+    assert.include(document.displayText, "(r)、(tm)");
+    assert.include(document.displayText, "原有 © ® ™");
+    assert.include(document.normalizedText, "(c)");
+    assertMessageFastPathParity("subfigure labels", value);
+  });
+
   describe("normalizeSearchValue", function () {
     it("applies NFKC, canonical newlines, Unicode lowercase, and whitespace collapse", function () {
       assert.equal(

@@ -7,6 +7,15 @@ import {
 } from "../src/utils/markdownToNoteHtml.ts";
 
 describe("markdownToNoteHtml", function () {
+  it("preserves parenthesized subfigure labels and literal copyright symbols", function () {
+    const html = markdownToNoteHtml(
+      "图中的 **(a) → (b) → (c) → (d) → (e)**，以及 (C)、(r)、(R)、(tm)。原有 © ® ™",
+    );
+    assert.include(html, "<strong>(a) → (b) → (c) → (d) → (e)</strong>");
+    assert.include(html, "(C)、(r)、(R)、(tm)");
+    assert.include(html, "原有 © ® ™");
+  });
+
   it("renders headings, bold, and thematic breaks as Zotero note HTML", function () {
     const html = markdownToNoteHtml(
       "## 核心总结\n\n这是 **MambaDFuse**。\n\n---\n\n### 引言",
