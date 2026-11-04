@@ -112,7 +112,6 @@ import {
   createQuotedMessageRef,
 } from "../../chat/quoted-messages";
 import { createEvidenceMarkdownAction } from "./EvidenceMarkdownAction";
-import { navigateToPdfQuote } from "./PdfQuoteNavigator";
 import { normalizeNoteSourceKey } from "./NoteSourceNavigator";
 import { sessionTurnQueue } from "./SessionTurnQueue";
 import { openSourceTarget, type SourceTarget } from "./SourceNavigator";
@@ -438,52 +437,6 @@ function createChatMarkdownRenderOptions(
         context.appendError?.(
           `${getString("chat-presentation-open-failed")}: ${error.message}`,
         );
-      },
-    },
-    blockquoteAction: {
-      label: getString("chat-jump-to-quote"),
-      title: getString("chat-jump-to-quote-title"),
-      onClick: async (quoteText, sourceGroup) => {
-        try {
-          const sourceTarget = sourceGroup
-            ? getSourceTarget(sourceGroup)
-            : null;
-          if (sourceTarget?.type === "annotation") {
-            await openSourceTarget(sourceTarget);
-            return;
-          }
-
-          const sourceItem =
-            sourceTarget?.type === "item"
-              ? getItemByLibraryKey(sourceTarget.key)
-              : null;
-          if (sourceTarget?.type === "item" && !sourceItem) {
-            await openSourceTarget(sourceTarget);
-            return;
-          }
-
-          const navigated = await navigateToPdfQuote(
-            quoteText,
-            sourceItem || context.getCurrentItem(),
-            {
-              allowActiveReaderFallback: sourceTarget?.type !== "item",
-              fallbackPageIndex:
-                sourceTarget?.type === "item" && sourceTarget.page
-                  ? sourceTarget.page - 1
-                  : undefined,
-            },
-          );
-          if (!navigated && sourceTarget?.type === "item") {
-            await openSourceTarget(sourceTarget);
-          }
-        } catch (error) {
-          const normalized =
-            error instanceof Error ? error : new Error(String(error));
-          ztoolkit.log("[ChatPanel] Failed to open quoted source:", normalized);
-          context.appendError?.(
-            `${getString("chat-open-source-failed")}: ${normalized.message}`,
-          );
-        }
       },
     },
     evidenceAction: createEvidenceMarkdownAction({
