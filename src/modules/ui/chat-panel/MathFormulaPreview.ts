@@ -9,7 +9,7 @@ const PREVIEW_ID = "paperchat-math-formula-preview";
 const referenceTargets = new WeakMap<HTMLElement, HTMLElement>();
 const EQUATION_NUMBER = "(?:[A-Za-z]\\.)?\\d+(?:\\.\\d+)*[A-Za-z]?";
 const EQUATION_REFERENCE_PREFIX = new RegExp(
-  `(?:公式|方程(?:式)?|等式|表达式|算式|式子|\\beq(?:uation)?s?\\.?|(?:^|[\\s:：，,；;。！？!?（(]|如|由|见|从|按|用|的|下|上|即|根据|通过|结合|代入|参照|参考|利用|依据)式)\\s*(?:[（(]\\s*${EQUATION_NUMBER}\\s*[)）]\\s*(?:[,，、\\-–—~～]|\\b(?:and|or)\\b|和|及|与|至|到)\\s*)*$`,
+  `(?:公式|方程(?:式)?|等式|表达式|算式|式子|\\beq(?:uation)?s?\\.?|(?:^|[\\s:：，,；;。！？!?（(]|如|由|见|从|按|用|的|下|上|即|是|为|此|故|将|把|对|于|与|及|和|该|本|其|根据|通过|结合|代入|参照|参考|利用|依据)式)\\s*(?:[（(]\\s*${EQUATION_NUMBER}\\s*[)）]\\s*(?:[,，、\\-–—~～]|\\b(?:and|or)\\b|和|及|与|至|到)\\s*)*$`,
   "i",
 );
 

@@ -317,6 +317,50 @@ describe("equation reference hover preview", function () {
       }
     });
 
+    it("recognizes equation references after Chinese copulas", function () {
+      for (const prefix of [
+        "不能仅凭这个式子断言神经网络输出一定是式 ",
+        "网络输出就是式",
+        "其结果为式 ",
+        "该关系可以改写为式",
+        "式（3）是网络化改写，结果是式 ",
+      ]) {
+        assert.isTrue(isEquationReferenceContext(prefix), prefix);
+      }
+      for (const prefix of [
+        "其形式 ",
+        "其方式 ",
+        "其模式 ",
+        "其格式 ",
+        "图（2）中的形式 ",
+      ]) {
+        assert.isFalse(isEquationReferenceContext(prefix), prefix);
+      }
+    });
+
+    it("recognizes Chinese connective and demonstrative equation references", function () {
+      for (const prefix of [
+        "正文没有完整展开每一步优化器更新，因此式",
+        "由上述条件可知，故式 ",
+        "对式",
+        "将式 ",
+        "把式",
+        "适用于式",
+        "结合图3与式",
+        "公式（1）和式",
+        "公式（1）及式",
+        "该式",
+        "本式",
+        "此式",
+        "其式",
+      ]) {
+        assert.isTrue(isEquationReferenceContext(prefix), prefix);
+      }
+      for (const prefix of ["样式", "范式", "款式", "程式", "仪式"]) {
+        assert.isFalse(isEquationReferenceContext(prefix), prefix);
+      }
+    });
+
     it("recognizes explicit tags, suffixes and spaced trailing numbers", function () {
       assert.equal(
         getMathEquationNumber(String.raw`F_i=Conv(F)\tag{12}`),

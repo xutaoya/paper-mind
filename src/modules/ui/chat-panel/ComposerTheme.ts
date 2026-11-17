@@ -22,7 +22,8 @@ export function applyFloatingQuickActionsBarSurface(
   bar.style.overflowX = "auto";
   bar.style.overflowY = "hidden";
   bar.style.gap = "6px";
-  bar.style.padding = "0 4px 0 2px";
+  // Keep the overhanging delete badge and hover lift inside the scrollport.
+  bar.style.padding = "10px 8px 4px 2px";
   bar.style.borderTop = "none";
   bar.style.background = "transparent";
   bar.style.boxShadow = "none";
