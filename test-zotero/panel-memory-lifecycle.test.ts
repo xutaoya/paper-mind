@@ -50,12 +50,23 @@ describe("panel memory lifecycle in Zotero", function () {
   });
 
   after(async function () {
-    await unregisterAll();
-    main.openDialog = originalOpen;
-    setPref("panelMode", savedMode || "sidebar");
-    for (const [name, descriptor] of descriptors) {
-      if (descriptor) Object.defineProperty(globalThis, name, descriptor);
-      else delete (globalThis as any)[name];
+    try {
+      await unregisterAll();
+    } catch (error) {
+      // Gecko errors do not always expose an enumerable message to the reporter.
+      const failure = new Error(String(error));
+      Object.defineProperty(failure, "message", {
+        value: `${String(error)}\n${(error as Error)?.stack || ""}`,
+        enumerable: true,
+      });
+      throw failure;
+    } finally {
+      main.openDialog = originalOpen;
+      setPref("panelMode", savedMode || "sidebar");
+      for (const [name, descriptor] of descriptors) {
+        if (descriptor) Object.defineProperty(globalThis, name, descriptor);
+        else delete (globalThis as any)[name];
+      }
     }
   });
 
