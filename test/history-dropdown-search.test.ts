@@ -110,6 +110,7 @@ class FakeElement extends FakeNode {
 
   setAttribute(name: string, value: string): void {
     this.attributes.set(name, value);
+    if (name === "class") this.className = value;
   }
 
   getAttribute(name: string): string | null {
@@ -419,7 +420,7 @@ describe("history dropdown grouped search UI", function () {
     assert.equal(searchCalls, 0);
   });
 
-  it("clears ordinary history while the first search is pending", function () {
+  it("replaces ordinary history with a status while the first search is pending", function () {
     const doc = new FakeDocument();
     const { dropdown, input, body } = createShell(doc);
     const state = createHistoryDropdownState();
@@ -443,7 +444,11 @@ describe("history dropdown grouped search UI", function () {
     input.value = "topic";
     input.dispatch("input");
 
-    assert.equal(body.children.length, 0);
+    assert.lengthOf(body.children, 1);
+    assert.equal(
+      body.querySelector(".history-search-empty")?.getAttribute("role"),
+      "status",
+    );
     dispose();
   });
 
@@ -478,7 +483,6 @@ describe("history dropdown grouped search UI", function () {
       unsafe,
       [{ start: 7, end: 27 }],
       asDocument(doc),
-      darkTheme,
     );
 
     assert.equal(container.textContent, unsafe);

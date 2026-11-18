@@ -7,10 +7,10 @@ import {
   containsInlineMathDelimiters,
   extractMathMLMarkup,
   findDisplayMathClosingDelimiter,
-  importMathMLIntoDocument,
   normalizeBlockquoteListIndentation,
   normalizeEmphasisDelimiters,
   normalizeMathContent,
+  parseMathMLMarkup,
   preserveStrongEmphasisAsHtml,
   repairIncompleteInlineMath,
 } from "../../../utils/chatMathMarkdown";
@@ -77,6 +77,7 @@ function evidenceRefPlugin(mdInstance: MarkdownIt) {
     "html_inline",
     "evidence_ref",
     (state, silent) => {
+      if (state.src.charCodeAt(state.pos) !== 0x3c /* < */) return false;
       const remaining = state.src.slice(state.pos, state.posMax);
       const match = remaining.match(/^<evidence-ref\b([^>]*?)\s*\/>/i);
       if (!match) return false;
@@ -1277,8 +1278,33 @@ function renderMarkdownFragment(
   content: string,
   options: MarkdownRenderOptions = {},
 ): void {
+  appendMarkdownTokens(
+    doc,
+    parent,
+    parseMarkdownFragment(content, options),
+    options,
+  );
+}
+
+function appendMarkdownTokens(
+  doc: Document,
+  parent: HTMLElement,
+  tokens: ReturnType<typeof md.parse>,
+  options: MarkdownRenderOptions,
+): void {
+  if (tokens.length === 0) return;
+  const builtContent = buildDOMFromTokens(doc, tokens, options);
+  while (builtContent.firstChild) {
+    parent.appendChild(builtContent.firstChild);
+  }
+}
+
+function parseMarkdownFragment(
+  content: string,
+  options: MarkdownRenderOptions,
+): ReturnType<typeof md.parse> {
   const normalized = stripIncompleteTrailingEvidenceReference(content).trim();
-  if (!normalized) return;
+  if (!normalized) return [];
 
   const { content: evidencePrepared } = sanitizeEvidenceReferences(
     normalized,
@@ -1287,11 +1313,7 @@ function renderMarkdownFragment(
   const prepared = stripEscapedEvidenceReferenceMarkup(
     preprocessMathDelimiters(evidencePrepared),
   );
-  const tokens = md.parse(prepared, {});
-  const builtContent = buildDOMFromTokens(doc, tokens, options);
-  while (builtContent.firstChild) {
-    parent.appendChild(builtContent.firstChild);
-  }
+  return md.parse(prepared, {});
 }
 
 function parseTagAttributes(attrs: string): Map<string, string> | null {
@@ -2481,6 +2503,45 @@ const KATEX_RENDER_OPTIONS = {
   maxExpand: 200,
 };
 
+// Store detached templates, not live spans, and cap the size of the retained
+// MathML. Long answers often repeat the same formulas on each streaming update.
+const mathTemplates = new WeakMap<Document, Map<string, Element>>();
+const MAX_CACHED_MATH_TEMPLATES = 96;
+const MAX_CACHED_MATHML_LENGTH = 8192;
+
+function getMathTemplate(
+  doc: Document,
+  content: string,
+  displayMode: boolean,
+): Element | null {
+  const key = `${displayMode ? "display" : "inline"}:${content}`;
+  let cache = mathTemplates.get(doc);
+  const cached = cache?.get(key);
+  if (cache && cached) {
+    cache.delete(key);
+    cache.set(key, cached);
+    return cached;
+  }
+  const markup = extractMathMLMarkup(
+    katex.renderToString(content, {
+      ...KATEX_RENDER_OPTIONS,
+      displayMode,
+      output: "mathml",
+    }),
+  );
+  if (!markup) return null;
+  const math = parseMathMLMarkup(markup);
+  if (math && markup.length <= MAX_CACHED_MATHML_LENGTH && key.length <= 1024) {
+    if (!cache) mathTemplates.set(doc, (cache = new Map()));
+    if (cache.size >= MAX_CACHED_MATH_TEMPLATES) {
+      const oldest = cache.keys().next().value;
+      if (oldest !== undefined) cache.delete(oldest);
+    }
+    cache.set(key, math);
+  }
+  return math;
+}
+
 function renderMathToElement(
   doc: Document,
   parent: HTMLElement,
@@ -2490,13 +2551,9 @@ function renderMathToElement(
   const normalized = normalizeMathContent(content);
 
   try {
-    const mathml = katex.renderToString(normalized, {
-      ...KATEX_RENDER_OPTIONS,
-      displayMode,
-      output: "mathml",
-    });
-    const mathMarkup = extractMathMLMarkup(mathml);
-    if (mathMarkup && importMathMLIntoDocument(doc, parent, mathMarkup)) {
+    const math = getMathTemplate(doc, normalized, displayMode);
+    if (math) {
+      parent.appendChild(doc.importNode(math, true));
       const equationNumber = displayMode
         ? getMathEquationNumber(normalized)
         : null;
@@ -2597,6 +2654,156 @@ export function renderMarkdownToElement(
     renderMarkdownFragment(doc, element, remainingContent, options);
   }
   bindMathEquationReferences(element);
+}
+
+type MarkdownToken = ReturnType<typeof md.parse>[number];
+type RenderedMarkdownBlock = { end: number; node: ChildNode };
+interface StreamingMarkdownView {
+  host: HTMLElement;
+  dark?: boolean;
+  tokens: MarkdownToken[];
+  blocks: RenderedMarkdownBlock[];
+}
+
+const streamingMarkdownViews = new WeakMap<
+  HTMLElement,
+  StreamingMarkdownView
+>();
+
+function getReusableStreamingMarkdown(
+  content: string,
+  options: MarkdownRenderOptions,
+): string | null {
+  // Interactions and trusted cards depend on data supplied outside the text.
+  if (
+    options.presentationArtifacts?.size ||
+    options.blockquoteAction ||
+    options.enableAgentMaxPlanningIterationsSettingsLink ||
+    options.evidenceRecords?.length ||
+    /<source-group\b/i.test(content)
+  ) {
+    return null;
+  }
+  if (!content.includes("<tool-call")) return content;
+  if (!options.suppressToolCallCards) return null;
+  const fragments = parseToolCallFragments(content);
+  let prose: string | undefined;
+  for (const fragment of fragments) {
+    if (fragment.kind === "markdown") {
+      if (prose !== undefined) return null;
+      prose = fragment.content;
+    } else if (isPresentationToolCallEntry(fragment.entry)) {
+      return null;
+    }
+  }
+  return prose ?? "";
+}
+
+function sameMarkdownToken(left: MarkdownToken, right: MarkdownToken): boolean {
+  if (
+    left.type !== right.type ||
+    left.tag !== right.tag ||
+    left.nesting !== right.nesting ||
+    left.content !== right.content ||
+    left.info !== right.info ||
+    (left.attrs !== right.attrs &&
+      JSON.stringify(left.attrs) !== JSON.stringify(right.attrs))
+  ) {
+    return false;
+  }
+  const children = left.children;
+  const nextChildren = right.children;
+  return children && nextChildren
+    ? children.length === nextChildren.length &&
+        children.every((child, index) =>
+          sameMarkdownToken(child, nextChildren[index]),
+        )
+    : children === nextChildren;
+}
+
+/**
+ * Keep the unchanged prefix mounted. Parse the full snapshot first because a
+ * later line can change the meaning of an earlier list, heading, or link.
+ */
+export function renderStreamingMarkdownToElement(
+  element: HTMLElement,
+  content: string,
+  messageId?: string,
+  options: MarkdownRenderOptions = {},
+): void {
+  const doc = element.ownerDocument;
+  if (!doc) return;
+  let view = streamingMarkdownViews.get(element);
+  if (!view || view.host.parentNode !== element) {
+    const host = doc.createElementNS(HTML_NS, "div") as HTMLElement;
+    element.textContent = "";
+    element.appendChild(host);
+    view = { host, tokens: [], blocks: [] };
+    streamingMarkdownViews.set(element, view);
+  }
+  const { host } = view;
+  const prose = getReusableStreamingMarkdown(content, options);
+  const tokens = prose === null ? null : parseMarkdownFragment(prose, options);
+  if (!tokens) {
+    view.tokens = [];
+    view.blocks = [];
+    renderMarkdownToElement(host, content, messageId, options);
+    return;
+  }
+  if (
+    tokens.some(
+      (token) =>
+        token.type === "math_block" &&
+        getMathEquationNumber(normalizeMathContent(token.content)),
+    )
+  ) {
+    view.tokens = [];
+    view.blocks = [];
+    closeActiveEvidencePopover(doc);
+    host.textContent = "";
+    appendMarkdownTokens(doc, host, tokens, options);
+    bindMathEquationReferences(host);
+    return;
+  }
+
+  const dark = isDarkMode();
+  const blockEnds: number[] = [];
+  let depth = 0;
+  tokens.forEach((token, index) => {
+    depth += token.nesting;
+    if (depth === 0) blockEnds.push(index + 1);
+  });
+
+  let keep = 0;
+  let start = 0;
+  if (view.dark === dark && host.childNodes.length === view.blocks.length) {
+    for (const block of view.blocks) {
+      if (blockEnds[keep] !== block.end || host.childNodes[keep] !== block.node)
+        break;
+      let index = start;
+      while (
+        index < block.end &&
+        sameMarkdownToken(view.tokens[index], tokens[index])
+      )
+        index++;
+      if (index < block.end) break;
+      start = block.end;
+      keep++;
+    }
+  }
+
+  if (keep === 0) host.textContent = "";
+  else while (host.childNodes.length > keep) host.removeChild(host.lastChild!);
+
+  appendMarkdownTokens(doc, host, tokens.slice(start), options);
+  view.dark = dark;
+  view.tokens = tokens;
+  // Some ignored tokens produce no node. Rebuild those snapshots without
+  // inferring a token-to-node mapping.
+  view.blocks =
+    host.childNodes.length === blockEnds.length
+      ? blockEnds.map((end, index) => ({ end, node: host.childNodes[index] }))
+      : [];
 }
 
 function appendBlockquoteAction(

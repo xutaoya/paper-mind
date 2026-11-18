@@ -90,41 +90,36 @@ function startReadingStatusUpdates(panel: HTMLElement): void {
   readingStatusTimers.set(panel, win.setInterval(update, 1000));
 }
 
-function getReadingAccent(theme: ThemeColors): string {
-  return theme.sendButtonBg || "#2563eb";
-}
-
 const HEATMAP_LEVEL_COLORS_LIGHT = [
-  "#eef1f3",
-  "#cce9df",
-  "#87cbb6",
-  "#409e83",
-  "#19755f",
+  "#eeeae1",
+  "#d7dfd1",
+  "#a6baa6",
+  "#748f7a",
+  "#425f4e",
 ] as const;
 
 const HEATMAP_LEVEL_COLORS_DARK = [
-  "#2b3237",
-  "#234b42",
-  "#326e5d",
-  "#4da88a",
-  "#88d6b9",
+  "#33352e",
+  "#3b4e43",
+  "#5a7564",
+  "#7e9c88",
+  "#adc4b0",
 ] as const;
 
-/** Token heatmap uses indigo/violet, separate from reading green. */
 const TOKEN_HEATMAP_LEVEL_COLORS_LIGHT = [
-  "#ebedf0",
-  "#ddd6fe",
-  "#a78bfa",
-  "#7c3aed",
-  "#5b21b6",
+  "#eeeae1",
+  "#dae3e9",
+  "#a7bece",
+  "#7291a9",
+  "#426888",
 ] as const;
 
 const TOKEN_HEATMAP_LEVEL_COLORS_DARK = [
-  "#2d333b",
-  "#2e1065",
-  "#5b21b6",
-  "#7c3aed",
-  "#a78bfa",
+  "#33352e",
+  "#374655",
+  "#506c84",
+  "#7695ad",
+  "#a5c1e4",
 ] as const;
 
 /** Chat activity heatmap — blue, distinct from reading green. */
@@ -248,44 +243,12 @@ function prefersReducedMotion(doc: Document): boolean {
   }
 }
 
-function easeOutCubic(t: number): number {
-  return 1 - (1 - t) ** 3;
-}
-
-function runCountUp(
-  element: HTMLElement,
-  durationMs: number,
-  render: (progress: number) => void,
-  onComplete?: () => void,
-): void {
-  const win = element.ownerDocument.defaultView;
-  if (!win) {
-    onComplete?.();
-    return;
-  }
-  const start = win.performance.now();
-  const tick = (now: number) => {
-    const t = Math.min(1, (now - start) / durationMs);
-    render(easeOutCubic(t));
-    if (t < 1) {
-      win.requestAnimationFrame(tick);
-    } else {
-      onComplete?.();
-    }
-  };
-  win.requestAnimationFrame(tick);
-}
-
-function pulseStatValue(element: HTMLElement): void {
-  element.classList.remove("paperchat-stats-metric-value--pulse");
-  void element.offsetWidth;
-  element.classList.add("paperchat-stats-metric-value--pulse");
-}
-
 function renderReadingTimeValue(element: HTMLElement, seconds: number): void {
   element.textContent = "";
   // Keep the existing localized duration, with quieter units than digits.
-  for (const part of formatReadingDurationCompact(seconds).split(/(\d+)/)) {
+  for (const part of formatReadingDurationCompact(seconds)
+    .split(/(\d+)/)
+    .filter(Boolean)) {
     const span = createElement(element.ownerDocument, "span", {});
     span.className = /^\d+$/.test(part)
       ? "paperchat-stats-time-number"
@@ -337,288 +300,73 @@ function createReadingWeekRhythm(
   return rhythm;
 }
 
-function animateMetricCards(
+function createStatsMetric(
   doc: Document,
-  cards: HTMLElement[],
-  values: {
-    total: number;
-    withReadingTime: number;
-    literatureTotal: number;
-    weekSeconds: number;
-    progressPercent: number;
-  },
-): void {
-  const reduced = prefersReducedMotion(doc);
-  cards.forEach((card, index) => {
-    card.classList.add("paperchat-stats-metric-card--enter");
-    card.style.animationDelay = reduced ? "0ms" : `${index * 50}ms`;
-  });
-
-  if (reduced) {
-    return;
-  }
-
-  const valueEls = cards.map((card) =>
-    card.querySelector(".paperchat-stats-metric-value"),
-  ) as (HTMLElement | null)[];
-  const progressFill = cards[1]?.querySelector(
-    ".paperchat-stats-progress-fill",
-  ) as HTMLElement | null;
-
-  if (valueEls[0]) {
-    valueEls[0].textContent = "0";
-    runCountUp(
-      valueEls[0],
-      520,
-      (p) => {
-        valueEls[0]!.textContent = String(Math.round(values.total * p));
-      },
-      () => pulseStatValue(valueEls[0]!),
-    );
-  }
-
-  if (valueEls[1]) {
-    const denom = values.literatureTotal;
-    valueEls[1].textContent = denom > 0 ? `0/${denom}` : "0";
-    runCountUp(
-      valueEls[1],
-      620,
-      (p) => {
-        const num = Math.round(values.withReadingTime * p);
-        valueEls[1]!.textContent = denom > 0 ? `${num}/${denom}` : String(num);
-      },
-      () => pulseStatValue(valueEls[1]!),
-    );
-  }
-
-  if (progressFill) {
-    progressFill.style.width = "0%";
-    winDelay(doc, 80, () => {
-      progressFill.style.width = `${Math.min(
-        100,
-        Math.max(values.progressPercent, values.progressPercent > 0 ? 5 : 0),
-      )}%`;
-    });
-  }
-
-  if (valueEls[2]) {
-    renderReadingTimeValue(valueEls[2], 0);
-    runCountUp(
-      valueEls[2],
-      500,
-      (p) => {
-        renderReadingTimeValue(
-          valueEls[2]!,
-          Math.round(values.weekSeconds * p),
-        );
-      },
-      () => pulseStatValue(valueEls[2]!),
-    );
-  }
-}
-
-function winDelay(doc: Document, ms: number, fn: () => void): void {
-  doc.defaultView?.setTimeout(fn, ms);
-}
-
-function getStatValueColor(
-  tone: "default" | "progress" | "time",
-  theme: ThemeColors,
-  muted?: boolean,
-): string {
-  if (muted) {
-    return theme.textMuted;
-  }
-  if (isDarkMode()) {
-    switch (tone) {
-      case "progress":
-        return "#34d399";
-      case "time":
-        return "#a5b4fc";
-      default:
-        return theme.sendButtonText === "#ffffff"
-          ? "#f8fafc"
-          : theme.textPrimary;
-    }
-  }
-  switch (tone) {
-    case "progress":
-      return "#059669";
-    case "time":
-      return "#4f46e5";
-    default:
-      return getReadingAccent(theme);
-  }
-}
-
-function metricCardBorder(theme: ThemeColors): string {
-  return isDarkMode()
-    ? "1px solid rgba(255, 255, 255, 0.08)"
-    : `1px solid ${theme.borderColor}`;
-}
-
-function createStatCard(
-  doc: Document,
-  theme: ThemeColors,
   label: string,
   value: string,
-  options?: {
-    progress?: number;
-    valueMuted?: boolean;
-    hint?: string;
-    hintTitle?: string;
-    valueTone?: "default" | "progress" | "time";
-  },
+  detail?: { hint?: string; hintTitle?: string },
 ): HTMLElement {
-  const card = createElement(doc, "div", {
-    flex: "1",
-    minWidth: "0",
-    minHeight: "76px",
-    padding: "10px 10px 9px",
-    borderRadius: "12px",
-    border: metricCardBorder(theme),
-    background: isDarkMode() ? "rgba(255, 255, 255, 0.03)" : theme.inputBg,
-    display: "flex",
-    flexDirection: "column",
-    gap: "5px",
-    boxShadow: isDarkMode() ? "none" : "0 1px 2px rgba(15, 23, 42, 0.04)",
-  });
-  card.className = "paperchat-stats-metric-card";
-
-  const labelEl = createElement(doc, "div", {
-    fontSize: "10px",
-    fontWeight: "600",
-    color: theme.textMuted,
-    lineHeight: "1.25",
-  });
-  labelEl.className = "paperchat-stats-metric-label";
-  labelEl.textContent = label;
-
-  const valueEl = createElement(doc, "div", {
-    fontSize: "18px",
-    fontWeight: "700",
-    color: getStatValueColor(
-      options?.valueTone ?? "default",
-      theme,
-      options?.valueMuted,
-    ),
-    lineHeight: "1.15",
-    letterSpacing: "-0.02em",
-    fontVariantNumeric: "tabular-nums",
-    wordBreak: "keep-all",
-  });
-  valueEl.textContent = value;
-  valueEl.className = "paperchat-stats-metric-value";
-
-  card.appendChild(labelEl);
-  card.appendChild(valueEl);
-
-  if (options?.progress != null && options.progress >= 0) {
-    const accent = getReadingAccent(theme);
-    const track = createElement(doc, "div", {
-      height: "3px",
-      borderRadius: "999px",
-      background: isDarkMode()
-        ? "rgba(255, 255, 255, 0.08)"
-        : "rgba(15, 23, 42, 0.06)",
-      overflow: "hidden",
-      marginTop: "2px",
-    });
-    const targetWidth = Math.min(
-      100,
-      Math.max(options.progress, options.progress > 0 ? 5 : 0),
-    );
-    const fill = createElement(doc, "div", {
-      height: "100%",
-      width: "0%",
-      borderRadius: "999px",
-      background: accent,
-      opacity: isDarkMode() ? "0.85" : "0.75",
-    });
-    fill.className = "paperchat-stats-progress-fill";
-    fill.dataset.targetWidth = String(targetWidth);
-    if (prefersReducedMotion(doc)) {
-      fill.style.width = `${targetWidth}%`;
-    }
-    track.appendChild(fill);
-    card.appendChild(track);
-  }
-
-  if (options?.hint) {
-    const hintEl = createElement(doc, "div", {
-      fontSize: "10px",
-      color: theme.textMuted,
-      lineHeight: "1.35",
-      marginTop: "auto",
-    });
-    hintEl.className = "paperchat-stats-metric-hint";
-    hintEl.textContent = options.hint;
-    if (options.hintTitle) {
-      hintEl.title = options.hintTitle;
-    }
-    card.appendChild(hintEl);
-  }
-
-  return card;
-}
-
-function createReadingProgressStatCard(
-  doc: Document,
-  theme: ThemeColors,
-  snapshot: ReadingStatsSnapshot,
-): HTMLElement {
-  const { total, withReadingTime } = snapshot.literature;
-  const ratio = total > 0 ? withReadingTime / total : 0;
-  const value =
-    total > 0 ? `${withReadingTime}/${total}` : String(withReadingTime);
-
-  return createStatCard(
+  const metric = createElement(
     doc,
-    theme,
-    getString("chat-stats-literature-read"),
-    value,
+    "div",
+    {},
     {
-      progress: ratio * 100,
-      valueMuted: withReadingTime === 0 && total > 0,
-      valueTone: "progress",
+      class: "paperchat-stats-metric",
     },
   );
-}
-
-function createSectionTitle(
-  doc: Document,
-  theme: ThemeColors,
-  text: string,
-  options?: { first?: boolean },
-): HTMLElement {
-  const title = createElement(doc, "div", {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    fontSize: "13px",
-    fontWeight: "650",
-    color: theme.textPrimary,
-    marginTop: options?.first ? "2px" : "20px",
-    marginBottom: "10px",
-    letterSpacing: "-0.01em",
-  });
-  title.className = "paperchat-stats-section-title";
-  const label = createElement(doc, "span", { minWidth: "0" });
-  label.textContent = text;
-  title.appendChild(label);
-  return title;
+  const name = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "paperchat-stats-metric-label",
+    },
+  );
+  name.textContent = label;
+  const amount = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "paperchat-stats-metric-value",
+    },
+  );
+  amount.textContent = value;
+  metric.append(name, amount);
+  if (detail?.hint) {
+    const note = createElement(
+      doc,
+      "div",
+      {},
+      {
+        class: "paperchat-stats-metric-hint",
+      },
+    );
+    note.textContent = detail.hint;
+    if (detail.hintTitle) note.title = detail.hintTitle;
+    metric.appendChild(note);
+  }
+  return metric;
 }
 
 function appendStatsSection(
   host: HTMLElement,
   doc: Document,
-  theme: ThemeColors,
   title: string,
   content: HTMLElement,
 ): void {
   const section = createElement(doc, "section", {});
   section.className = "paperchat-stats-section";
-  section.appendChild(createSectionTitle(doc, theme, title, { first: true }));
+  const heading = createElement(
+    doc,
+    "h2",
+    {},
+    {
+      class: "paperchat-stats-section-title",
+    },
+  );
+  heading.textContent = title;
+  section.appendChild(heading);
   section.appendChild(content);
   host.appendChild(section);
 }
@@ -688,13 +436,6 @@ function createEmptyHint(
   const wrap = createElement(doc, "div", {
     padding: "28px 16px 20px",
     textAlign: "center",
-    borderRadius: "12px",
-    border: isDarkMode()
-      ? "1px dashed rgba(255, 255, 255, 0.1)"
-      : `1px dashed ${theme.borderColor}`,
-    background: isDarkMode()
-      ? "rgba(255, 255, 255, 0.02)"
-      : "rgba(15, 23, 42, 0.02)",
   });
   wrap.className = "paperchat-stats-empty";
   wrap.appendChild(createStatsEmptyIcon(doc, theme));
@@ -1123,44 +864,37 @@ function renderChatActivitySection(
   chat: ChatActivitySnapshot,
 ): HTMLElement {
   const wrap = createElement(doc, "div", {});
-  const cards = createElement(doc, "div", {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "8px",
-    marginBottom: "12px",
-  });
-  cards.className = "paperchat-stats-metric-grid";
-  cards.appendChild(
-    createStatCard(
+  const metrics = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "paperchat-stats-ledger paperchat-stats-chat-totals",
+    },
+  );
+  metrics.appendChild(
+    createStatsMetric(
       doc,
-      theme,
       getString("chat-stats-chat-user-total"),
       String(chat.totalUserMessages),
-      { valueTone: "default" },
     ),
   );
-  cards.appendChild(
-    createStatCard(
+  metrics.appendChild(
+    createStatsMetric(
       doc,
-      theme,
       getString("chat-stats-chat-assistant-total"),
       String(chat.totalAssistantMessages),
-      { valueTone: "default" },
     ),
   );
-  cards.appendChild(
-    createStatCard(
+  metrics.appendChild(
+    createStatsMetric(
       doc,
-      theme,
       getString("chat-stats-chat-this-week"),
       String(chat.messagesThisWeek),
-      {
-        ...buildChatWeekCardHint(chat),
-        valueTone: "default",
-      },
+      buildChatWeekCardHint(chat),
     ),
   );
-  wrap.appendChild(cards);
+  wrap.appendChild(metrics);
   wrap.appendChild(renderChatActivityHeatmap(doc, theme, chat));
   const hint = createElement(doc, "div", {
     fontSize: "11px",
@@ -1554,7 +1288,7 @@ function buildTokenWeekCardHint(snapshot: TokenStatsSnapshot): {
       }),
     );
   }
-  const hint = weekDelta || weekLine;
+  const hint = [weekLine, weekDelta].filter(Boolean).join(" · ");
   return {
     hint,
     hintTitle: details.length > 1 ? details.join(" · ") : undefined,
@@ -1657,7 +1391,25 @@ function renderContributionHeatmap(
     minWidth: "0",
   });
   wrap.className = "paperchat-stats-heatmap";
-  wrap.appendChild(renderMonthAxis(doc, theme, cells, weekCount));
+  const viewport = createElement(
+    doc,
+    "div",
+    {},
+    { class: "paperchat-stats-calendar-scroll" },
+  );
+  const calendar = createElement(
+    doc,
+    "div",
+    { minWidth: `${24 + weekCount * 9}px` },
+    { class: "paperchat-stats-calendar" },
+  );
+  calendar.appendChild(renderMonthAxis(doc, theme, cells, weekCount));
+  viewport.appendChild(calendar);
+  wrap.appendChild(viewport);
+  viewport.addEventListener("scroll", () => {
+    const panel = wrap.closest<HTMLElement>(`#${PANEL_ID}`);
+    if (panel) closeHeatmapDayPopover(panel);
+  });
 
   const grid = createElement(doc, "div", {
     display: "grid",
@@ -1676,6 +1428,7 @@ function renderContributionHeatmap(
       lineHeight: "1.1",
       alignSelf: "center",
     });
+    weekday.className = "paperchat-stats-calendar-weekday";
     const weekdayDate = cells[row]?.date;
     const weekdayNumber = weekdayDate?.getDay();
     if (weekdayNumber === 1 || weekdayNumber === 3 || weekdayNumber === 5) {
@@ -1747,7 +1500,7 @@ function renderContributionHeatmap(
       grid.appendChild(cell);
     }
   }
-  wrap.appendChild(grid);
+  calendar.appendChild(grid);
 
   const legend = createElement(doc, "div", {
     display: "flex",
@@ -1878,46 +1631,31 @@ function readStatsView(panel: HTMLElement): StatsView {
   return panel.dataset.statsView === "tokens" ? "tokens" : "reading";
 }
 
-function syncStatsViewSwitcher(
-  panel: HTMLElement,
-  theme: ThemeColors,
-  current: StatsView,
-): void {
-  const bar = panel.querySelector(".paperchat-stats-view-switcher");
-  if (!bar) {
-    return;
-  }
-  bar.querySelectorAll("button[data-stats-view-id]").forEach((node) => {
-    const button = node as HTMLButtonElement;
-    const id = button.dataset.statsViewId as StatsView;
-    const selected = id === current;
-    button.setAttribute("aria-selected", selected ? "true" : "false");
-    button.style.background = "transparent";
-    button.style.color = selected ? theme.textPrimary : theme.textMuted;
-    button.style.boxShadow = "none";
-  });
+function syncStatsViewSwitcher(panel: HTMLElement, current: StatsView): void {
+  panel
+    .querySelectorAll<HTMLElement>("button[data-stats-view-id]")
+    .forEach((tab) => {
+      tab.setAttribute(
+        "aria-selected",
+        String(tab.getAttribute("data-stats-view-id") === current),
+      );
+    });
 }
 
 function createViewSwitcher(
   doc: Document,
-  theme: ThemeColors,
   panel: HTMLElement,
   current: StatsView,
 ): HTMLElement {
-  const bar = createElement(doc, "div", {
-    display: "grid",
-    gridTemplateColumns: "1fr 1fr",
-    gap: "2px",
-    padding: "3px",
-    marginBottom: "0",
-    borderRadius: "10px",
-    border: `1px solid ${theme.borderColor}`,
-    background: isDarkMode()
-      ? "rgba(255, 255, 255, 0.04)"
-      : "rgba(15, 23, 42, 0.04)",
-  });
-  bar.className = "paperchat-stats-view-switcher";
-  bar.setAttribute("role", "tablist");
+  const bar = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "paperchat-stats-view-switcher",
+      role: "tablist",
+    },
+  );
   const views: Array<[StatsView, string]> = [
     ["reading", getString("chat-stats-view-reading")],
     ["tokens", getString("chat-stats-view-tokens")],
@@ -1927,17 +1665,7 @@ function createViewSwitcher(
     const button = createElement(
       doc,
       "button",
-      {
-        border: "none",
-        borderRadius: "8px",
-        padding: "6px 8px",
-        fontSize: "12px",
-        fontWeight: "650",
-        cursor: "pointer",
-        background: selected ? theme.inputBg : "transparent",
-        color: selected ? theme.textPrimary : theme.textMuted,
-        boxShadow: selected ? "0 1px 2px rgba(15, 23, 42, 0.06)" : "none",
-      },
+      {},
       {
         type: "button",
         role: "tab",
@@ -1952,7 +1680,7 @@ function createViewSwitcher(
       }
       panel.dataset.statsView = id;
       const currentTheme = getCurrentTheme();
-      syncStatsViewSwitcher(panel, currentTheme, id);
+      syncStatsViewSwitcher(panel, id);
       void refreshReadingStatsPanel(panel, currentTheme);
     });
     bar.appendChild(button);
@@ -2009,8 +1737,8 @@ function appendTokenIoRatioBar(
   if (total <= 0) {
     return;
   }
-  const inputColor = isDarkMode() ? "#c4b5fd" : "#ddd6fe";
-  const outputColor = isDarkMode() ? "#8b5cf6" : "#7c3aed";
+  const inputColor = "var(--stats-plot)";
+  const outputColor = "var(--stats-output)";
   const inputPct = Math.round((inputTokens / total) * 100);
   const outputPct = Math.round((outputTokens / total) * 100);
 
@@ -2391,8 +2119,8 @@ function renderTokenDailyChart(
     height: "104px",
   });
   chart.className = "paperchat-stats-daily-chart";
-  const inputColor = isDarkMode() ? "#c4b5fd" : "#ddd6fe";
-  const outputColor = isDarkMode() ? "#8b5cf6" : "#7c3aed";
+  const inputColor = "var(--stats-plot)";
+  const outputColor = "var(--stats-output)";
   for (let dayIndex = 0; dayIndex < days.length; dayIndex += 1) {
     const day = days[dayIndex];
     const column = createElement(doc, "div", {
@@ -2539,7 +2267,6 @@ function renderTokenDailyChart(
 
 function renderTokenModelList(
   doc: Document,
-  theme: ThemeColors,
   snapshot: TokenStatsSnapshot,
 ): HTMLElement {
   const list = createElement(doc, "div", {
@@ -2569,7 +2296,7 @@ function renderTokenModelList(
     const name = createElement(doc, "div", {
       fontSize: "13px",
       fontWeight: "550",
-      color: theme.textPrimary,
+      color: "var(--stats-text)",
       lineHeight: "1.35",
       overflow: "hidden",
       display: "-webkit-box",
@@ -2581,7 +2308,7 @@ function renderTokenModelList(
     const value = createElement(doc, "div", {
       fontSize: "12px",
       fontWeight: "650",
-      color: isDarkMode() ? "#a5b4fc" : "#4f46e5",
+      color: "var(--stats-output)",
       fontVariantNumeric: "tabular-nums",
       whiteSpace: "nowrap",
     });
@@ -2596,7 +2323,7 @@ function renderTokenModelList(
     head.appendChild(value);
     const split = createElement(doc, "div", {
       fontSize: "10px",
-      color: theme.textMuted,
+      color: "var(--stats-muted)",
       lineHeight: "1.35",
     });
     split.textContent = getString("chat-stats-token-day-split", {
@@ -2606,18 +2333,14 @@ function renderTokenModelList(
       },
     });
     const track = createElement(doc, "div", {
-      height: "6px",
-      borderRadius: "999px",
-      background: isDarkMode()
-        ? "rgba(255, 255, 255, 0.06)"
-        : "rgba(15, 23, 42, 0.06)",
+      height: "4px",
+      background: "var(--stats-inset)",
       overflow: "hidden",
     });
     const fill = createElement(doc, "div", {
       height: "100%",
       width: "0%",
-      borderRadius: "999px",
-      background: isDarkMode() ? "#818cf8" : "#4f46e5",
+      background: "var(--stats-output)",
     });
     fill.className = "paperchat-stats-read-bar-fill";
     track.appendChild(fill);
@@ -2628,6 +2351,29 @@ function renderTokenModelList(
     list.appendChild(row);
   });
   return list;
+}
+
+function createOverview(
+  doc: Document,
+  primary: HTMLElement,
+  details: HTMLElement[],
+): HTMLElement {
+  const overview = createElement(
+    doc,
+    "section",
+    {},
+    { class: "paperchat-stats-overview" },
+  );
+  primary.classList.add("paperchat-stats-primary");
+  const ledger = createElement(
+    doc,
+    "div",
+    {},
+    { class: "paperchat-stats-ledger" },
+  );
+  ledger.append(...details);
+  overview.append(primary, ledger);
+  return overview;
 }
 
 async function renderTokenStats(
@@ -2644,100 +2390,37 @@ async function renderTokenStats(
     );
     return;
   }
-  const cards = createElement(doc, "div", {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "8px",
-    marginBottom: "12px",
-  });
-  cards.className = "paperchat-stats-metric-grid";
-  const tokenTotal = snapshot.totalTokens;
-  cards.appendChild(
-    createStatCard(
-      doc,
-      theme,
-      getString("chat-stats-token-total"),
-      formatCompactTokenCount(snapshot.totalTokens),
-      {
-        ...buildTokenWeekCardHint(snapshot),
-        valueTone: "default",
-      },
-    ),
+  const total = createStatsMetric(
+    doc,
+    getString("chat-stats-token-total"),
+    formatCompactTokenCount(snapshot.totalTokens),
+    buildTokenWeekCardHint(snapshot),
   );
-  cards.appendChild(
-    createStatCard(
-      doc,
-      theme,
-      getString("chat-stats-token-input"),
-      formatCompactTokenCount(snapshot.inputTokens),
-      {
-        valueTone: "time",
-        hint:
-          tokenTotal > 0
-            ? getString("chat-stats-token-share", {
-                args: {
-                  percent: String(
-                    Math.round((snapshot.inputTokens / tokenTotal) * 100),
-                  ),
-                },
-              })
-            : undefined,
-      },
-    ),
+  const metrics = [
+    [getString("chat-stats-token-input"), snapshot.inputTokens],
+    [getString("chat-stats-token-output"), snapshot.outputTokens],
+  ] as const;
+  const split = createElement(
+    doc,
+    "div",
+    {},
+    { class: "paperchat-stats-token-split", "aria-hidden": "true" },
   );
-  cards.appendChild(
-    createStatCard(
-      doc,
-      theme,
-      getString("chat-stats-token-output"),
-      formatCompactTokenCount(snapshot.outputTokens),
-      {
-        valueTone: "progress",
-        hint:
-          tokenTotal > 0
-            ? getString("chat-stats-token-share", {
-                args: {
-                  percent: String(
-                    Math.round((snapshot.outputTokens / tokenTotal) * 100),
-                  ),
-                },
-              })
-            : undefined,
-      },
-    ),
-  );
-  cards.classList.add(
-    "paperchat-stats-overview",
-    "paperchat-stats-overview--tokens",
-  );
-  host.appendChild(cards);
-  if (!prefersReducedMotion(doc)) {
-    const values = cards.querySelectorAll(".paperchat-stats-metric-value");
-    const targets = [
-      snapshot.totalTokens,
-      snapshot.inputTokens,
-      snapshot.outputTokens,
-    ];
-    values.forEach((node, index) => {
-      const element = node as HTMLElement;
-      element.textContent = formatCompactTokenCount(0);
-      runCountUp(
-        element,
-        480,
-        (progress) => {
-          element.textContent = formatCompactTokenCount(
-            Math.round(targets[index] * progress),
-          );
-        },
-        () => pulseStatValue(element),
-      );
+  const details = metrics.map(([label, count]) => {
+    const share = (count / snapshot.totalTokens) * 100;
+    split.appendChild(createElement(doc, "span", { width: `${share}%` }));
+    return createStatsMetric(doc, label, formatCompactTokenCount(count), {
+      hint: getString("chat-stats-token-share", {
+        args: { percent: String(Math.round(share)) },
+      }),
     });
-  }
+  });
+  total.appendChild(split);
+  host.appendChild(createOverview(doc, total, details));
 
   appendStatsSection(
     host,
     doc,
-    theme,
     getString("chat-stats-token-daily-title"),
     renderTokenHeatmap(doc, theme, snapshot),
   );
@@ -2763,9 +2446,8 @@ async function renderTokenStats(
     appendStatsSection(
       host,
       doc,
-      theme,
       getString("chat-stats-token-models-title"),
-      renderTokenModelList(doc, theme, snapshot),
+      renderTokenModelList(doc, snapshot),
     );
   }
   const footnote = createElement(doc, "div", {
@@ -2787,62 +2469,50 @@ async function renderReadingStatsContent(
 ): Promise<void> {
   host.textContent = "";
   const snapshot = await getReadingStatsSnapshot();
-  const cards = createElement(doc, "div", {
-    display: "grid",
-    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-    gap: "8px",
-    marginBottom: "12px",
-  });
-  cards.className = "paperchat-stats-metric-grid";
-  cards.appendChild(
-    createStatCard(
-      doc,
-      theme,
-      getString("chat-stats-literature-total"),
-      String(snapshot.literature.total),
-      { valueTone: "default" },
-    ),
+  const weekly = createStatsMetric(
+    doc,
+    getString("chat-stats-reading-this-week"),
+    formatReadingDurationCompact(snapshot.totalSecondsThisWeek),
+    buildReadingWeekCardHint(snapshot),
   );
-  cards.appendChild(createReadingProgressStatCard(doc, theme, snapshot));
-  cards.appendChild(
-    createStatCard(
-      doc,
-      theme,
-      getString("chat-stats-reading-this-week"),
-      formatReadingDurationCompact(snapshot.totalSecondsThisWeek),
-      {
-        ...buildReadingWeekCardHint(snapshot),
-        valueTone: "time",
-      },
-    ),
-  );
-
-  cards.classList.add(
-    "paperchat-stats-overview",
-    "paperchat-stats-overview--reading",
-  );
-  const weeklyCard = cards.lastElementChild as HTMLElement;
-  const weeklyValue = weeklyCard.querySelector(
+  const value = weekly.querySelector<HTMLElement>(
     ".paperchat-stats-metric-value",
-  ) as HTMLElement;
-  renderReadingTimeValue(weeklyValue, snapshot.totalSecondsThisWeek);
-  weeklyCard.appendChild(createReadingWeekRhythm(doc, snapshot));
-  host.appendChild(cards);
-  animateMetricCards(doc, Array.from(cards.children) as HTMLElement[], {
-    total: snapshot.literature.total,
-    withReadingTime: snapshot.literature.withReadingTime,
-    literatureTotal: snapshot.literature.total,
-    weekSeconds: snapshot.totalSecondsThisWeek,
-    progressPercent:
-      snapshot.literature.total > 0
-        ? (snapshot.literature.withReadingTime / snapshot.literature.total) *
-          100
-        : 0,
+  )!;
+  renderReadingTimeValue(value, snapshot.totalSecondsThisWeek);
+  const weekRange = createElement(
+    doc,
+    "div",
+    {},
+    { class: "paperchat-stats-week-range" },
+  );
+  const weekStart = getStartOfLocalWeek(snapshot.rangeEnd);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 6);
+  const format = new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
   });
+  weekRange.textContent = `${format.format(weekStart)} – ${format.format(weekEnd)}`;
+  weekly.append(weekRange, createReadingWeekRhythm(doc, snapshot));
+  host.appendChild(
+    createOverview(doc, weekly, [
+      createStatsMetric(
+        doc,
+        getString("chat-stats-literature-total"),
+        String(snapshot.literature.total),
+      ),
+      createStatsMetric(
+        doc,
+        getString("chat-stats-literature-read"),
+        snapshot.literature.total > 0
+          ? `${snapshot.literature.withReadingTime}/${snapshot.literature.total}`
+          : "0",
+      ),
+    ]),
+  );
   appendStatsSection(
     host,
     doc,
-    theme,
     getString("chat-stats-daily-reading-title"),
     renderHeatmap(doc, theme, snapshot),
   );
@@ -2851,14 +2521,12 @@ async function renderReadingStatsContent(
   appendStatsSection(
     host,
     doc,
-    theme,
     getString("chat-stats-top-reading-title"),
     renderTopReadingList(doc, theme, snapshot.topReadItems),
   );
   appendStatsSection(
     host,
     doc,
-    theme,
     getString("chat-stats-recent-added-title"),
     renderRecentlyAddedList(doc, theme, snapshot.recentlyAdded),
   );
@@ -2867,7 +2535,6 @@ async function renderReadingStatsContent(
   appendStatsSection(
     host,
     doc,
-    theme,
     getString("chat-stats-chat-activity-title"),
     renderChatActivitySection(doc, theme, chatActivity),
   );
@@ -2929,10 +2596,10 @@ export async function refreshReadingStatsPanel(
   if (switcherHost) {
     body.querySelector(".paperchat-stats-view-switcher")?.remove();
     if (!switcher) {
-      switcher = createViewSwitcher(doc, theme, panel, view);
+      switcher = createViewSwitcher(doc, panel, view);
       switcherHost.appendChild(switcher);
     } else {
-      syncStatsViewSwitcher(panel, theme, view);
+      syncStatsViewSwitcher(panel, view);
     }
   }
 
@@ -2953,7 +2620,7 @@ export async function refreshReadingStatsPanel(
 
   readingHost.style.display = view === "reading" ? "block" : "none";
   tokenHost.style.display = view === "tokens" ? "block" : "none";
-  syncStatsViewSwitcher(panel, theme, view);
+  syncStatsViewSwitcher(panel, view);
 
   if (view === "tokens") {
     closeHeatmapDayPopover(panel);
@@ -3048,7 +2715,7 @@ export function createReadingStatsPanel(
     background: isDarkMode()
       ? "rgba(96, 165, 250, 0.14)"
       : "rgba(37, 99, 235, 0.1)",
-    border: metricCardBorder(theme),
+    border: "none",
   });
   iconWrap.className = "paperchat-stats-panel-brand-icon";
   const brandIcon = doc.createElementNS(HTML_NS, "img") as HTMLImageElement;

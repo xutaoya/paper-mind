@@ -49,20 +49,22 @@ export function bindMathEquationReferences(root: HTMLElement): void {
   if (equations.size === 0) return;
 
   const walker = doc.createTreeWalker(root, 4 /* SHOW_TEXT */);
+  const pattern = new RegExp(`[（(]\\s*(${EQUATION_NUMBER})\\s*[)）]`, "g");
   const texts: Text[] = [];
   let node: Node | null;
   while ((node = walker.nextNode())) {
+    const text = node as Text;
+    pattern.lastIndex = 0;
     if (
-      !node.parentElement?.closest(
+      pattern.test(text.data) &&
+      !text.parentElement?.closest(
         "h1, h2, h3, h4, h5, h6, math, pre, code, button, a, [data-math-preview-source], [data-equation-number]",
       )
     ) {
-      texts.push(node as Text);
+      texts.push(text);
     }
   }
   for (const text of texts) {
-    const pattern = new RegExp(`[（(]\\s*(${EQUATION_NUMBER})\\s*[)）]`, "g");
-    if (!pattern.test(text.data)) continue;
     pattern.lastIndex = 0;
     // Markdown emphasis may split "Fig. 2" and "(2)" into separate text nodes.
     const block =

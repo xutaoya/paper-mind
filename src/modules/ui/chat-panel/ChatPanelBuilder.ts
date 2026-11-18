@@ -14,6 +14,7 @@ import type { ThemeColors } from "./types";
 import { HTML_NS } from "./types";
 import { monitorChatPanelRoot } from "./chatUIFontScale";
 import { createUiChevron } from "./UiChevron";
+import { createWindowPinIcon } from "./FloatingWindowPin";
 
 let composerFocusGradientSequence = 0;
 
@@ -712,24 +713,7 @@ export function createChatContainer(
       "aria-pressed": "false",
     },
   );
-  const pinIcon = doc.createElementNS("http://www.w3.org/2000/svg", "svg");
-  for (const [name, value] of Object.entries({
-    viewBox: "0 0 24 24",
-    width: "16",
-    height: "16",
-    fill: "none",
-    stroke: "currentColor",
-    "stroke-width": "1.8",
-    "stroke-linecap": "round",
-    "stroke-linejoin": "round",
-    "aria-hidden": "true",
-  })) {
-    pinIcon.setAttribute(name, value);
-  }
-  const pinPath = doc.createElementNS("http://www.w3.org/2000/svg", "path");
-  pinPath.setAttribute("d", "M16 3l5 5-4 1-3 5v3l-2 2-7-7 2-2h3l5-3zM2 22l6-6");
-  pinIcon.appendChild(pinPath);
-  pinWindowBtn.appendChild(pinIcon);
+  pinWindowBtn.appendChild(createWindowPinIcon(doc));
 
   toolbarButtons.appendChild(panelModeBtn);
   toolbarButtons.appendChild(pinWindowBtn);
@@ -856,8 +840,6 @@ export function createChatContainer(
       boxShadow: theme.composerShadow,
       overflow: "hidden",
       flexShrink: "0",
-      transition:
-        "border-color 220ms cubic-bezier(0.32, 0.72, 0, 1), box-shadow 260ms cubic-bezier(0.32, 0.72, 0, 1), background-color 220ms cubic-bezier(0.32, 0.72, 0, 1)",
     },
     { id: "chat-input-wrapper" },
   );
@@ -874,10 +856,6 @@ export function createChatContainer(
   inputWrapper.style.setProperty(
     "--composer-border-focus",
     theme.inputFocusBorderColor,
-  );
-  inputWrapper.style.setProperty(
-    "--composer-shadow-idle",
-    theme.composerShadow,
   );
   inputWrapper.style.setProperty("--composer-context-focus", theme.textPrimary);
 
@@ -963,6 +941,12 @@ export function createChatContainer(
   focusSparks.appendChild(satellite);
   focusFx.appendChild(focusSparks);
 
+  focusFx.addEventListener("animationend", (event) => {
+    if (event.animationName === "chat-composer-glint") {
+      focusFx.classList.remove("is-playing");
+    }
+  });
+
   const contextItemBanner = createContextItemBanner(doc, theme);
   inputWrapper.appendChild(contextItemBanner);
 
@@ -1045,7 +1029,9 @@ export function createChatContainer(
   ) as HTMLTextAreaElement;
 
   const applyComposerFocus = () => {
+    if (inputWrapper.classList.contains("is-focused")) return;
     inputWrapper.classList.add("is-focused");
+    focusFx.classList.add("is-playing");
   };
   const clearComposerFocus = () => {
     inputWrapper.classList.remove("is-focused");
@@ -1375,9 +1361,14 @@ export function createChatContainer(
     },
     { id: "chat-history-search-header" },
   );
-  const historySearchField = createElement(doc, "div", {
-    position: "relative",
-  });
+  const historySearchField = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "history-search-field",
+    },
+  );
   const historySearchInput = createElement(
     doc,
     "input",
@@ -1386,7 +1377,7 @@ export function createChatContainer(
       width: "100%",
       height: "32px",
       boxSizing: "border-box",
-      padding: "6px 32px 6px 10px",
+      padding: "6px 32px 6px 33px",
       color: theme.textPrimary,
       background: theme.inputBg,
       border: `1px solid ${theme.inputBorderColor}`,

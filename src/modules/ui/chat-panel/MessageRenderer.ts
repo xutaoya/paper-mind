@@ -29,6 +29,7 @@ import {
   messageHasAgentActivityContent,
   type MarkdownRenderOptions,
   renderMarkdownToElement,
+  renderStreamingMarkdownToElement,
 } from "./MarkdownRenderer";
 import { createAgentActivityPanel } from "./AgentActivityPanel";
 import {
@@ -1142,7 +1143,7 @@ export function createMessageElement(
           }
         : messageMarkdownOptions;
     if (msg.streamingState === "in_progress") {
-      renderMarkdownToElement(
+      renderStreamingMarkdownToElement(
         content,
         msg.content,
         msg.id,
@@ -1681,6 +1682,10 @@ function createMessageActions(
   onBookmarkMessageError?: (error: Error) => void,
   onOpenMessageReader?: (assistantMessageId: string) => void | Promise<void>,
 ): HTMLElement | null {
+  if (msg.role === "assistant" && msg.streamingState === "in_progress") {
+    return null;
+  }
+
   const actions = createElement(
     doc,
     "div",

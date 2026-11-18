@@ -1,4 +1,3 @@
-import { applyBookmarkToolbarControlsTheme } from "./BookmarkToolbarTheme";
 import { darkTheme } from "./ChatPanelTheme";
 import type { ThemeColors } from "./types";
 
@@ -25,9 +24,7 @@ function applyPanelChrome(
         el.style.color = theme.textPrimary;
       }
     });
-    const close = (chrome.querySelector(
-      "#chat-stats-close-btn, #chat-bookmark-close-btn",
-    ) ||
+    const close = (chrome.querySelector("#chat-stats-close-btn") ||
       chrome.querySelector("button:last-of-type")) as HTMLButtonElement | null;
     if (close) {
       close.style.color = theme.textMuted;
@@ -61,13 +58,5 @@ export function applyOverlayPanelsShellTheme(
   ) as HTMLElement | null;
   if (bookmarkPanel) {
     bookmarkPanel.dataset.theme = isDark ? "dark" : "light";
-    applyPanelChrome(bookmarkPanel, theme, "#chat-bookmark-panel-body");
-    applyBookmarkToolbarControlsTheme(bookmarkPanel, theme);
-    const meta = bookmarkPanel.querySelector(
-      "#chat-bookmark-toolbar-meta",
-    ) as HTMLElement | null;
-    if (meta) {
-      meta.style.color = theme.textMuted;
-    }
   }
 }

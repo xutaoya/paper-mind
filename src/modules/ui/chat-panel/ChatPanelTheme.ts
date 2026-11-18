@@ -222,10 +222,6 @@ export function applyThemeToContainer(container: HTMLElement): void {
       theme.inputFocusBorderColor,
     );
     inputWrapper.style.setProperty(
-      "--composer-shadow-idle",
-      theme.composerShadow,
-    );
-    inputWrapper.style.setProperty(
       "--composer-context-focus",
       theme.textPrimary,
     );
@@ -298,15 +294,6 @@ export function applyThemeToContainer(container: HTMLElement): void {
   if (historySearchClearButton) {
     historySearchClearButton.style.color = theme.textMuted;
   }
-
-  container.querySelectorAll(".history-search-group").forEach((group) => {
-    (group as HTMLElement).style.borderBottomColor = theme.borderColor;
-  });
-  container.querySelectorAll(".history-search-highlight").forEach((mark) => {
-    const element = mark as HTMLElement;
-    element.style.background = theme.buttonHoverBg;
-    element.style.color = theme.textPrimary;
-  });
 
   // Mention popup
   const mentionPopup = container.querySelector(

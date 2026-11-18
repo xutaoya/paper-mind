@@ -66,13 +66,12 @@ describe("floating composer styles in Zotero", function () {
     win.close();
   });
 
-  it("loads the same composer stylesheet as the sidebar and hides idle SVG effects", function () {
-    const sparks = container.querySelector(".chat-composer-focus-sparks")!;
-    const spark = container.querySelector(".chat-composer-focus-spark")!;
-    const glint = container.querySelector(".chat-composer-focus-glint path")!;
-    assert.equal(win.getComputedStyle(sparks).position, "absolute");
-    assert.equal(win.getComputedStyle(spark).opacity, "0");
-    assert.equal(win.getComputedStyle(glint).opacity, "0");
+  it("loads the focus layer without intercepting pointer input", function () {
+    const effect = container.querySelector(".chat-composer-focus-fx")!;
+    assert.equal(win.getComputedStyle(effect).position, "absolute");
+    assert.equal(win.getComputedStyle(effect).pointerEvents, "none");
+    assert.equal(win.getComputedStyle(effect).opacity, "0");
+    assert.equal(effect.getAttribute("aria-hidden"), "true");
   });
 
   it("keeps long MathML above a thin scrollbar in floating and sidebar modes", function () {
@@ -316,8 +315,13 @@ describe("floating composer styles in Zotero", function () {
   it("uses unique SVG gradients and the border's shared rainbow palette", function () {
     const doc = win.document;
     const second = createChatContainer(doc, lightTheme);
+    doc.getElementById("chat-window-root")!.appendChild(second);
     try {
-      const gradients = [...doc.querySelectorAll("linearGradient")];
+      const gradients = [container, second].flatMap((panel) =>
+        Array.from(
+          panel.querySelectorAll(".chat-composer-focus-fx linearGradient"),
+        ),
+      );
       assert.lengthOf(gradients, 4);
       assert.equal(new Set(gradients.map((gradient) => gradient.id)).size, 4);
       for (const gradient of gradients) {
@@ -348,52 +352,40 @@ describe("floating composer styles in Zotero", function () {
     }
   });
 
-  it("positions focus sparkles at the right edge and fades them out in light and dark modes", async function () {
-    const input = container.querySelector(
+  it("fades focus in and out without cycling in either theme", async function () {
+    const input = container.querySelector<HTMLTextAreaElement>(
       "#chat-message-input",
-    ) as HTMLTextAreaElement;
-    const wrapper = container.querySelector(
+    )!;
+    const wrapper = container.querySelector<HTMLElement>(
       "#chat-input-wrapper",
-    ) as HTMLElement;
-    const sparks = container.querySelector(
-      ".chat-composer-focus-sparks",
-    ) as SVGSVGElement;
-    const spark = container.querySelector(".chat-composer-focus-spark")!;
-    const glint = container.querySelector(".chat-composer-focus-glint path")!;
-    for (const theme of [lightTheme, darkTheme]) {
-      applyComposerChromeTheme(container, theme);
-      input.focus();
-      // Isolated test windows may not own OS focus. Exercise the actual focus
-      // listeners without relying on which application is in the foreground.
-      const view = win.document.defaultView!;
+    )!;
+    const effect = container.querySelector(".chat-composer-focus-fx")!;
+    const glint = effect.querySelector(".chat-composer-focus-glint path")!;
+    const reduced = win.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const view = win.document.defaultView!;
+    const settle = () =>
+      new Promise<void>((resolve) => win.setTimeout(resolve, 350));
+
+    for (const theme of ["light", "dark"]) {
+      wrapper.dataset.theme = theme;
+      // Isolated test windows may not own OS focus.
+      assert.equal(win.getComputedStyle(effect).opacity, "0");
       input.dispatchEvent(new view.FocusEvent("focus"));
       assert.isTrue(wrapper.classList.contains("is-focused"));
-      const sparkRect = sparks.getBoundingClientRect();
-      const wrapperRect = wrapper.getBoundingClientRect();
-      assert.isAbove(sparkRect.left, wrapperRect.left + wrapperRect.width / 2);
-      assert.isAtMost(sparkRect.right, wrapperRect.right);
-      if (!win.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-        assert.equal(
-          win.getComputedStyle(spark).animationName,
-          "chat-composer-spark",
-        );
-        assert.notEqual(win.getComputedStyle(sparks).fill, "rgb(0, 0, 0)");
-        const stops = [...sparks.querySelectorAll("stop")];
-        assert.equal(
-          win.getComputedStyle(stops[0]).stopColor,
-          "rgb(236, 145, 166)",
-        );
-        assert.equal(
-          win.getComputedStyle(stops[6]).stopColor,
-          "rgb(190, 153, 226)",
-        );
-        await new Promise<void>((resolve) => setTimeout(resolve, 1400));
-        assert.equal(win.getComputedStyle(spark).opacity, "0");
-        assert.equal(win.getComputedStyle(glint).opacity, "0");
-      }
-      input.blur();
+      await settle();
+      assert.equal(win.getComputedStyle(effect).opacity, "1");
+      assert.equal(win.getComputedStyle(effect).animationName, "none");
+      assert.equal(
+        win.getComputedStyle(glint).animationName,
+        reduced ? "none" : "chat-composer-glint",
+      );
+
       input.dispatchEvent(new view.FocusEvent("blur"));
       assert.isFalse(wrapper.classList.contains("is-focused"));
+      await settle();
+      assert.equal(win.getComputedStyle(effect).opacity, "0");
+      await new Promise<void>((resolve) => win.setTimeout(resolve, 600));
+      if (!reduced) assert.isFalse(effect.classList.contains("is-playing"));
     }
   });
 });

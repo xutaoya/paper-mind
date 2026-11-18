@@ -181,27 +181,30 @@ export function extractMathMLMarkup(katexHtml: string): string | null {
   return match?.[0] ?? null;
 }
 
+export function parseMathMLMarkup(mathMarkup: string): Element | null {
+  const parser = new DOMParser();
+  const mathDoc = parser.parseFromString(mathMarkup, "application/xml");
+  if (mathDoc.querySelector("parsererror")) {
+    return null;
+  }
+  const mathNode = mathDoc.documentElement;
+  if (!mathNode || mathNode.localName !== "math") {
+    return null;
+  }
+  if (!mathNode.namespaceURI) {
+    mathNode.setAttribute("xmlns", MATH_NS);
+  }
+  return mathNode;
+}
+
 export function importMathMLIntoDocument(
   doc: Document,
   parent: HTMLElement,
   mathMarkup: string,
 ): boolean {
-  const parser = new DOMParser();
-  const mathDoc = parser.parseFromString(mathMarkup, "application/xml");
-  if (mathDoc.querySelector("parsererror")) {
-    return false;
-  }
-
-  const mathNode = mathDoc.documentElement;
-  if (!mathNode || mathNode.localName !== "math") {
-    return false;
-  }
-
-  const imported = doc.importNode(mathNode, true) as Element;
-  if (!imported.namespaceURI) {
-    imported.setAttribute("xmlns", MATH_NS);
-  }
-  parent.appendChild(imported);
+  const mathNode = parseMathMLMarkup(mathMarkup);
+  if (!mathNode) return false;
+  parent.appendChild(doc.importNode(mathNode, true));
   return true;
 }
 

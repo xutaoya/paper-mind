@@ -39,19 +39,12 @@ function createProviderListItem(
 
   const item = doc.createElementNS(
     "http://www.w3.org/1999/xhtml",
-    "div",
-  ) as HTMLDivElement;
+    "button",
+  ) as HTMLButtonElement;
   item.className = "provider-list-item";
   item.setAttribute("data-provider-id", config.id);
-  item.style.cssText = `
-    padding: 8px 12px;
-    margin-bottom: 4px;
-    border-radius: 4px;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  `;
+  item.type = "button";
+  item.setAttribute("aria-pressed", "false");
 
   const nameSpan = doc.createElementNS(
     "http://www.w3.org/1999/xhtml",
@@ -62,8 +55,9 @@ function createProviderListItem(
 
   const statusContainer = doc.createElementNS(
     "http://www.w3.org/1999/xhtml",
-    "div",
-  ) as HTMLDivElement;
+    "span",
+  ) as HTMLSpanElement;
+  statusContainer.className = "provider-list-status";
   statusContainer.style.cssText =
     "display: flex; align-items: center; gap: 4px;";
 
@@ -110,19 +104,7 @@ function createProviderListItem(
     statusContainer.appendChild(activeCheck);
   }
 
-  item.appendChild(statusContainer);
-
-  item.addEventListener("mouseenter", () => {
-    if (item.getAttribute("data-selected") !== "true") {
-      item.style.backgroundColor = prefColors.providerItemHover;
-    }
-  });
-
-  item.addEventListener("mouseleave", () => {
-    if (item.getAttribute("data-selected") !== "true") {
-      item.style.backgroundColor = "";
-    }
-  });
+  if (statusContainer.childNodes.length) item.appendChild(statusContainer);
 
   return item;
 }
@@ -147,15 +129,9 @@ export function selectProvider(
   const items = doc.querySelectorAll(".provider-list-item");
   items.forEach((item: Element) => {
     const el = item as HTMLElement;
-    if (el.getAttribute("data-provider-id") === providerId) {
-      el.style.backgroundColor = prefColors.providerItemSelected;
-      el.style.color = prefColors.providerItemSelectedText;
-      el.setAttribute("data-selected", "true");
-    } else {
-      el.style.backgroundColor = "";
-      el.style.color = "";
-      el.setAttribute("data-selected", "false");
-    }
+    const selected = String(el.getAttribute("data-provider-id") === providerId);
+    el.setAttribute("data-selected", selected);
+    el.setAttribute("aria-pressed", selected);
   });
 
   const paperchatPanel = doc.getElementById("pref-panel-paperchat");

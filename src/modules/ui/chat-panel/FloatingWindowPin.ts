@@ -1,6 +1,30 @@
 import { getString } from "../../../utils/locale";
 import { showChatPanelToast } from "./ChatPanelToast";
 
+const pinnedWindows = new WeakSet<Window>();
+
+export function createWindowPinIcon(doc: Document): SVGSVGElement {
+  const ns = "http://www.w3.org/2000/svg";
+  const icon = doc.createElementNS(ns, "svg");
+  for (const [name, value] of Object.entries({
+    viewBox: "0 0 24 24",
+    width: "16",
+    height: "16",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "1.8",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+    "aria-hidden": "true",
+  })) {
+    icon.setAttribute(name, value);
+  }
+  const path = doc.createElementNS(ns, "path");
+  path.setAttribute("d", "M16 3l5 5-4 1-3 5v3l-2 2-7-7 2-2h3l5-3zM2 22l6-6");
+  icon.appendChild(path);
+  return icon;
+}
+
 /** Change the existing native window, without reloading the conversation. */
 export function setFloatingWindowPinned(win: Window, pinned: boolean): void {
   if (win.closed) throw new Error("Floating window is closed");
@@ -100,6 +124,35 @@ export function setFloatingWindowPinned(win: Window, pinned: boolean): void {
   }
 }
 
+export function bindWindowPinButton(
+  button: HTMLButtonElement,
+  win: Window,
+  onError: (message: string) => void,
+): void {
+  const updateButton = () => {
+    const pinned = pinnedWindows.has(win);
+    const label = getString(pinned ? "chat-unpin-window" : "chat-pin-window");
+    button.setAttribute("aria-pressed", String(pinned));
+    button.title = label;
+    button.setAttribute("aria-label", label);
+  };
+  updateButton();
+  button.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const pinned = !pinnedWindows.has(win);
+    try {
+      setFloatingWindowPinned(win, pinned);
+      if (pinned) pinnedWindows.add(win);
+      else pinnedWindows.delete(win);
+      updateButton();
+    } catch (error) {
+      ztoolkit.log("Failed to change floating window pin", error);
+      onError(getString("chat-pin-window-failed"));
+    }
+  });
+}
+
 export function setupFloatingWindowPin(
   container: HTMLElement,
   win: Window,
@@ -109,23 +162,7 @@ export function setupFloatingWindowPin(
   );
   if (!button) return;
   button.style.display = "flex";
-  button.addEventListener("click", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const pinned = button.getAttribute("aria-pressed") !== "true";
-    try {
-      setFloatingWindowPinned(win, pinned);
-      button.setAttribute("aria-pressed", String(pinned));
-      const label = getString(pinned ? "chat-unpin-window" : "chat-pin-window");
-      button.title = label;
-      button.setAttribute("aria-label", label);
-    } catch (error) {
-      ztoolkit.log("Failed to change floating window pin", error);
-      showChatPanelToast(
-        container,
-        getString("chat-pin-window-failed"),
-        "error",
-      );
-    }
-  });
+  bindWindowPinButton(button, win, (message) =>
+    showChatPanelToast(container, message, "error"),
+  );
 }

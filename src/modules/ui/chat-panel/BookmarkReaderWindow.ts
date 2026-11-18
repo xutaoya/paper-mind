@@ -1,31 +1,34 @@
 import { config } from "../../../../package.json";
 import {
+  type BookmarkTurnContent,
   prepareReaderAssistantContent,
   resolveBookmarkTurnContent,
 } from "../../bookmarks/bookmarkTurnContent";
-import type { EvidenceRecord } from "../../../types/evidence";
 import type { BookmarkRecord } from "../../../types/bookmark";
 import type { ChatSession } from "../../../types/chat";
 import type { QuotedMessageRef } from "../../../types/chat";
-import { isPersistedBookmarkRecord } from "../../bookmarks";
+import {
+  deriveBookmarkTitle,
+  isPersistedBookmarkRecord,
+} from "../../bookmarks";
 import { getString } from "../../../utils/locale";
 import { isWindowAlive } from "../../../utils/window";
-import { createBookmarkDialogButton } from "./BookmarkUiPrompts";
 import { copyToClipboard, createElement } from "./ChatPanelBuilder";
-import { darkTheme, getCurrentTheme, isDarkMode } from "./ChatPanelTheme";
+import { darkTheme, getCurrentTheme } from "./ChatPanelTheme";
 import { createEvidenceMarkdownAction } from "./EvidenceMarkdownAction";
 import { renderMarkdownToElement } from "./MarkdownRenderer";
-import type { MarkdownRenderOptions } from "./MarkdownRenderer";
 import type { ThemeColors } from "./types";
-import { HTML_NS } from "./types";
+import { createUiChevron } from "./UiChevron";
+import { sanitizeMessagePreview } from "./HistoryDropdown";
 import { setupChatHistorySelectionQuote } from "./ChatHistorySelectionQuote";
+import { bindWindowPinButton, createWindowPinIcon } from "./FloatingWindowPin";
 
 const READER_WINDOW_NAME = "paperchat-bookmark-reader";
 const READER_HOST_ID = "bookmark-reader-root";
-const READER_BODY_WRAP_ID = "chat-bookmark-reader-body-wrap";
-const READER_OUTLINE_RAIL_ID = "chat-bookmark-reader-outline-rail";
+const READER_OUTLINE_TOGGLE_ID = "chat-bookmark-reader-outline-toggle";
 const READER_OUTLINE_PANEL_ID = "chat-bookmark-reader-outline-panel";
 const READER_BOOKMARK_BTN_ID = "chat-bookmark-reader-bookmark";
+const READER_HEADING_SELECTOR = "h1, h2, h3, h4, h5, h6";
 
 interface ReaderHeading {
   level: number;
@@ -100,344 +103,60 @@ function toQuotedMessageRef(bookmark: BookmarkRecord): QuotedMessageRef | null {
   };
 }
 
+function readerIconMask(iconName: string): string {
+  return `url("chrome://${config.addonRef}/content/icons/${iconName}.svg")`;
+}
+
 function createIconButton(
   doc: Document,
-  theme: ThemeColors,
-  iconName: string,
+  id: string,
   title: string,
-  onClick: () => void,
+  iconName?: string,
 ): HTMLButtonElement {
   const button = createElement(
     doc,
     "button",
+    {},
     {
-      width: "32px",
-      height: "32px",
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      border: `1px solid ${theme.borderColor}`,
-      background: theme.buttonBg,
-      borderRadius: "8px",
-      cursor: "pointer",
-      padding: "0",
-      appearance: "none",
+      type: "button",
+      id,
+      title,
+      "aria-label": title,
+      class: "paperchat-reader-button",
     },
-    { type: "button", title, "aria-label": title },
   ) as HTMLButtonElement;
-  const icon = doc.createElementNS(HTML_NS, "img") as HTMLImageElement;
-  icon.src = `chrome://${config.addonRef}/content/icons/${iconName}.svg`;
-  icon.alt = "";
-  icon.setAttribute("aria-hidden", "true");
-  Object.assign(icon.style, {
-    width: "16px",
-    height: "16px",
-    display: "block",
-    pointerEvents: "none",
-    filter: isDarkMode()
-      ? "brightness(0) invert(0.88)"
-      : "brightness(0) invert(0.35)",
-  });
-  button.appendChild(icon);
-  button.addEventListener("click", (event) => {
-    event.stopPropagation();
-    onClick();
-  });
-  return button;
-}
-
-function readerBookmarkIconUrl(filled: boolean): string {
-  const name = filled ? "bookmark-filled" : "bookmark";
-  return `chrome://${config.addonRef}/content/icons/${name}.svg`;
-}
-
-function readerBookmarkIconFilter(filled: boolean): string {
-  if (filled) {
-    return "none";
+  if (iconName) {
+    button.appendChild(
+      createElement(
+        doc,
+        "span",
+        {
+          maskImage: readerIconMask(iconName),
+        },
+        { class: "paperchat-reader-icon", "aria-hidden": "true" },
+      ),
+    );
   }
-  return isDarkMode()
-    ? "brightness(0) invert(0.88)"
-    : "brightness(0) invert(0.35)";
+  return button;
 }
 
 function setReaderBookmarkButtonState(
   button: HTMLButtonElement | null,
   isSaved: boolean,
 ): void {
-  if (!button) {
-    return;
-  }
-  const saveLabel = getString("chat-bookmark-reader-toggle-save");
-  const removeLabel = getString("chat-bookmark-reader-toggle-remove");
-  button.classList.toggle("is-saved", isSaved);
-  button.title = isSaved ? removeLabel : saveLabel;
+  if (!button) return;
+  button.title = getString(
+    isSaved
+      ? "chat-bookmark-reader-toggle-remove"
+      : "chat-bookmark-reader-toggle-save",
+  );
   button.setAttribute("aria-label", button.title);
-  button.setAttribute("aria-pressed", isSaved ? "true" : "false");
-  const icon = button.querySelector("img");
-  if (icon) {
-    icon.src = readerBookmarkIconUrl(isSaved);
-    icon.style.filter = readerBookmarkIconFilter(isSaved);
-    icon.style.opacity = isSaved ? "1" : "0.72";
-    icon.style.transform = isSaved ? "scale(1.08)" : "scale(1)";
-  }
-}
-
-function injectReaderStyles(doc: Document): void {
-  if (doc.getElementById("paperchat-reader-style")) {
-    return;
-  }
-  const style = doc.createElement("style");
-  style.id = "paperchat-reader-style";
-  style.textContent = `
-    .paperchat-reader-content {
-      max-width: 760px;
-      margin: 0 auto;
-    }
-    .paperchat-reader-section {
-      margin-bottom: 18px;
-    }
-    .paperchat-reader-section-label {
-      margin-bottom: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      letter-spacing: 0.02em;
-      text-transform: none;
-    }
-    .paperchat-reader-section-body {
-      border-radius: 14px;
-      padding: 16px 18px;
-      font-size: 14px;
-      line-height: 1.7;
-      overflow-wrap: anywhere;
-    }
-    .paperchat-reader-section--user .paperchat-reader-section-body {
-      border-left: 3px solid #2563eb;
-      white-space: pre-wrap;
-    }
-    .paperchat-reader-section--assistant .paperchat-reader-section-body {
-      padding: 12px 14px;
-    }
-    .paperchat-reader-markdown > :first-child {
-      margin-top: 0;
-    }
-    .paperchat-reader-markdown > :last-child {
-      margin-bottom: 0;
-    }
-    .paperchat-reader-markdown h1,
-    .paperchat-reader-markdown h2,
-    .paperchat-reader-markdown h3,
-    .paperchat-reader-markdown h4 {
-      margin: 1.1em 0 0.55em;
-      line-height: 1.35;
-      scroll-margin-top: 16px;
-    }
-    .paperchat-reader-markdown p,
-    .paperchat-reader-markdown ul,
-    .paperchat-reader-markdown ol,
-    .paperchat-reader-markdown blockquote,
-    .paperchat-reader-markdown pre {
-      margin: 0.65em 0;
-    }
-    .paperchat-reader-markdown ul,
-    .paperchat-reader-markdown ol {
-      padding-left: 1.35em;
-    }
-    .paperchat-reader-markdown li + li {
-      margin-top: 0.25em;
-    }
-    .paperchat-reader-markdown .md-table-scroll {
-      overflow-x: auto;
-      overflow-y: visible;
-      border: 1px solid rgba(148, 163, 184, 0.28);
-      border-radius: 10px;
-      margin: 0.8em 0;
-    }
-    .paperchat-reader-markdown table,
-    .paperchat-reader-markdown .md-table {
-      width: 100%;
-      max-width: none;
-      table-layout: auto;
-      border-collapse: collapse;
-      margin: 0;
-      font-size: 13px;
-      line-height: 1.45;
-    }
-    .paperchat-reader-markdown th,
-    .paperchat-reader-markdown td {
-      border: 1px solid rgba(148, 163, 184, 0.45);
-      padding: 8px 10px;
-      vertical-align: top;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-      white-space: normal;
-    }
-    .paperchat-reader-markdown blockquote {
-      margin-left: 0;
-      padding-left: 12px;
-    }
-    .paperchat-reader-body-wrap {
-      position: relative;
-      flex: 1 1 auto;
-      min-height: 0;
-      display: flex;
-    }
-    .paperchat-reader-outline-rail {
-      position: absolute;
-      top: 18px;
-      right: 10px;
-      z-index: 4;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 8px;
-      padding: 0;
-      background: transparent;
-      border: none;
-      box-shadow: none;
-    }
-    .paperchat-reader-outline-rail.is-empty {
-      display: none;
-    }
-    .paperchat-reader-outline-tick {
-      width: 18px;
-      height: 3px;
-      border: none;
-      border-radius: 999px;
-      background: #d1d5db;
-      padding: 0;
-      cursor: pointer;
-      transition: background 0.15s ease, transform 0.15s ease;
-    }
-    .paperchat-reader-outline-tick.is-active {
-      background: #2563eb;
-      transform: scaleX(1.08);
-    }
-    .paperchat-reader-outline-tick:hover {
-      background: #93c5fd;
-    }
-    .paperchat-reader-outline-panel {
-      position: absolute;
-      top: 16px;
-      right: 40px;
-      z-index: 5;
-      width: min(360px, calc(100% - 64px));
-      max-height: min(480px, calc(100% - 32px));
-      overflow-x: hidden;
-      overflow-y: auto;
-      overscroll-behavior: contain;
-      scrollbar-width: thin;
-      border-radius: 12px;
-      border: 1px solid #e2e5eb;
-      background: #ffffff;
-      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
-      padding: 8px;
-      box-sizing: border-box;
-    }
-    .paperchat-reader-outline-panel.is-empty {
-      display: none;
-    }
-    .paperchat-reader-outline-item {
-      appearance: none;
-      display: grid;
-      grid-template-columns: 24px minmax(0, 1fr);
-      align-items: start;
-      gap: 8px;
-      width: 100%;
-      min-width: 0;
-      height: auto;
-      min-height: 36px;
-      max-height: none;
-      margin: 0;
-      border: none;
-      border-radius: 8px;
-      background: transparent;
-      color: inherit;
-      text-align: left;
-      padding: 8px 12px;
-      padding-inline-start: calc(12px + var(--reader-outline-indent, 0px));
-      cursor: pointer;
-      font: inherit;
-      line-height: 20px;
-      white-space: normal;
-      box-sizing: border-box;
-      transition: background-color 160ms cubic-bezier(0.32, 0.72, 0, 1);
-    }
-    .paperchat-reader-outline-item:hover {
-      background: #f8fafc;
-    }
-    .paperchat-reader-outline-item.is-active {
-      background: #eff6ff;
-      color: #2563eb;
-    }
-    .paperchat-reader-outline-item:focus-visible {
-      outline: 2px solid #93c5fd;
-      outline-offset: -2px;
-    }
-    .paperchat-reader-outline-level {
-      font-size: 12px;
-      font-weight: 500;
-      color: #94a3b8;
-      line-height: 20px;
-    }
-    .paperchat-reader-outline-item.is-active .paperchat-reader-outline-level {
-      color: #60a5fa;
-    }
-    .paperchat-reader-outline-title {
-      min-width: 0;
-      font-size: 14px;
-      line-height: 20px;
-      color: #334155;
-      display: block;
-      white-space: normal;
-      overflow-wrap: anywhere;
-    }
-    .paperchat-reader-outline-item.is-active .paperchat-reader-outline-title {
-      color: #2563eb;
-      font-weight: 600;
-    }
-    .paperchat-reader-bookmark-btn img {
-      transition: transform 0.15s ease, opacity 0.15s ease;
-    }
-    .paperchat-reader-bookmark-btn.is-saved {
-      background: #fef3c7 !important;
-      border-color: #f59e0b !important;
-      box-shadow: inset 0 0 0 1px rgba(245, 158, 11, 0.35);
-    }
-    .paperchat-reader-bookmark-btn.is-saved img {
-      opacity: 1 !important;
-      filter: none !important;
-    }
-    [data-theme="dark"] .paperchat-reader-outline-panel {
-      background: #1f1f1f;
-      border-color: #313131;
-      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
-      color: #e5e7eb;
-    }
-    [data-theme="dark"] .paperchat-reader-outline-item:hover {
-      background: #272727;
-    }
-    [data-theme="dark"] .paperchat-reader-outline-item.is-active {
-      background: rgba(59, 130, 246, 0.22);
-      color: #93c5fd;
-    }
-    [data-theme="dark"] .paperchat-reader-outline-title {
-      color: #d1d5db;
-    }
-    [data-theme="dark"] .paperchat-reader-outline-item.is-active .paperchat-reader-outline-title {
-      color: #93c5fd;
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .paperchat-reader-outline-item {
-        transition: none;
-      }
-    }
-    [data-theme="dark"] .paperchat-reader-bookmark-btn.is-saved {
-      background: rgba(245, 158, 11, 0.32) !important;
-      border-color: #fbbf24 !important;
-      box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.45);
-    }
-  `;
-  doc.head.appendChild(style);
+  button.setAttribute("aria-pressed", String(isSaved));
+  const icon = button.firstElementChild as HTMLElement | null;
+  if (icon)
+    icon.style.maskImage = readerIconMask(
+      isSaved ? "bookmark-filled" : "bookmark",
+    );
 }
 
 function collectReaderHeadings(
@@ -447,7 +166,7 @@ function collectReaderHeadings(
     return [];
   }
   const headings: ReaderHeading[] = [];
-  markdownRoot.querySelectorAll("h1, h2, h3, h4").forEach((node) => {
+  markdownRoot.querySelectorAll(READER_HEADING_SELECTOR).forEach((node) => {
     const element = node as HTMLElement;
     const level = Number(element.tagName.slice(1));
     const text = element.textContent?.trim() || "";
@@ -468,6 +187,11 @@ function resolveActiveHeadingIndex(
 ): number {
   if (headings.length === 0) {
     return -1;
+  }
+  const maxScrollTop =
+    scrollContainer.scrollHeight - scrollContainer.clientHeight;
+  if (maxScrollTop > 0 && scrollContainer.scrollTop >= maxScrollTop - 1) {
+    return headings.length - 1;
   }
   const containerTop = scrollContainer.getBoundingClientRect().top;
   const anchor = containerTop + 72;
@@ -500,25 +224,12 @@ function scrollReaderToHeading(
   );
   scrollContainer.scrollTo({
     top: targetScrollTop,
-    behavior: "smooth",
+    behavior: scrollContainer.ownerDocument.defaultView?.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    )?.matches
+      ? "auto"
+      : "smooth",
   });
-}
-
-function setReaderOutlineActive(
-  rail: HTMLElement,
-  panel: HTMLElement,
-  activeIndex: number,
-): void {
-  rail
-    .querySelectorAll(".paperchat-reader-outline-tick")
-    .forEach((node, index) => {
-      node.classList.toggle("is-active", index === activeIndex);
-    });
-  panel
-    .querySelectorAll(".paperchat-reader-outline-item")
-    .forEach((node, index) => {
-      node.classList.toggle("is-active", index === activeIndex);
-    });
 }
 
 function setupReaderOutline(
@@ -526,71 +237,56 @@ function setupReaderOutline(
   scrollContainer: HTMLElement,
 ): void {
   readerOutlineControllers.get(host)?.dispose();
+  readerOutlineControllers.delete(host);
 
-  const rail = host.querySelector(
-    `#${READER_OUTLINE_RAIL_ID}`,
-  ) as HTMLElement | null;
   const panel = host.querySelector(
     `#${READER_OUTLINE_PANEL_ID}`,
-  ) as HTMLElement | null;
+  ) as HTMLElement;
+  const toggle = host.querySelector(
+    `#${READER_OUTLINE_TOGGLE_ID}`,
+  ) as HTMLButtonElement;
+  const list = panel.querySelector(
+    ".paperchat-reader-outline-list",
+  ) as HTMLElement;
   const markdownRoot = scrollContainer.querySelector(
     ".paperchat-reader-section--assistant .paperchat-reader-markdown",
   ) as HTMLElement | null;
-  if (!rail || !panel) {
-    return;
-  }
-
   const headings = collectReaderHeadings(markdownRoot);
-  rail.textContent = "";
-  panel.textContent = "";
-  rail.classList.toggle("is-empty", headings.length === 0);
-  panel.classList.toggle("is-empty", headings.length === 0);
-  if (headings.length === 0) {
+  list.replaceChildren();
+  toggle.hidden = headings.length === 0;
+  if (!headings.length) {
+    panel.hidden = true;
+    toggle.setAttribute("aria-expanded", "false");
     return;
   }
 
-  const doc = host.ownerDocument!;
-  let hidePanelTimer: ReturnType<typeof setTimeout> | null = null;
-
-  const showPanel = () => {
-    if (hidePanelTimer) {
-      clearTimeout(hidePanelTimer);
-      hidePanelTimer = null;
-    }
-    panel.style.display = "block";
+  const doc = host.ownerDocument;
+  const wide = doc.defaultView?.matchMedia("(min-width: 720px)");
+  const setVisible = (visible: boolean) => {
+    panel.hidden = !visible;
+    toggle.setAttribute("aria-expanded", String(visible));
   };
-
-  const scheduleHidePanel = () => {
-    if (hidePanelTimer) {
-      clearTimeout(hidePanelTimer);
-    }
-    hidePanelTimer = setTimeout(() => {
-      panel.style.display = "none";
-      hidePanelTimer = null;
-    }, 180);
-  };
-
-  const baseLevel = Math.min(...headings.map((heading) => heading.level));
-  headings.forEach((heading, index) => {
-    const tick = createElement(
-      doc,
-      "button",
-      {},
-      {
-        type: "button",
-        class: "paperchat-reader-outline-tick",
-        title: heading.text,
-        "aria-label": heading.text,
-      },
+  const syncVisibility = () => {
+    setVisible(
+      host.dataset.outlineOpen === undefined
+        ? Boolean(wide?.matches)
+        : host.dataset.outlineOpen === "true",
     );
-    tick.addEventListener("click", (event) => {
-      event.stopPropagation();
-      scrollReaderToHeading(scrollContainer, heading);
-      setReaderOutlineActive(rail, panel, index);
-      showPanel();
-    });
-    rail.appendChild(tick);
+  };
+  const onToggle = () => {
+    host.dataset.outlineOpen = String(panel.hidden);
+    syncVisibility();
+  };
+  const onEscape = (event: KeyboardEvent) => {
+    if (event.key === "Escape" && !panel.hidden && !wide?.matches) {
+      host.dataset.outlineOpen = "false";
+      syncVisibility();
+      toggle.focus();
+    }
+  };
 
+  const firstLevel = Math.min(...headings.map(({ level }) => level));
+  const items = headings.map((heading, index) => {
     const item = createElement(
       doc,
       "button",
@@ -603,141 +299,129 @@ function setupReaderOutline(
     );
     item.style.setProperty(
       "--reader-outline-indent",
-      `${(heading.level - baseLevel) * 8}px`,
+      `${(heading.level - firstLevel) * 9}px`,
     );
-    const level = createElement(
-      doc,
-      "span",
-      {},
-      { class: "paperchat-reader-outline-level" },
-    );
-    level.textContent = `H${heading.level}`;
-    const title = createElement(
-      doc,
-      "span",
-      {},
-      { class: "paperchat-reader-outline-title" },
-    );
-    title.textContent = heading.text;
-    item.appendChild(level);
-    item.appendChild(title);
-    item.addEventListener("click", (event) => {
-      event.stopPropagation();
+    item.textContent = heading.text;
+    item.addEventListener("click", () => {
       scrollReaderToHeading(scrollContainer, heading);
-      setReaderOutlineActive(rail, panel, index);
+      setActive(index);
+      if (!wide?.matches) {
+        host.dataset.outlineOpen = "false";
+        syncVisibility();
+        toggle.focus();
+      }
     });
-    panel.appendChild(item);
+    list.appendChild(item);
+    return item;
   });
-
-  rail.setAttribute("aria-label", getString("chat-bookmark-reader-outline"));
-  panel.setAttribute("aria-label", getString("chat-bookmark-reader-outline"));
-
-  const updateActiveFromScroll = () => {
-    const activeIndex = resolveActiveHeadingIndex(scrollContainer, headings);
-    if (activeIndex >= 0) {
-      setReaderOutlineActive(rail, panel, activeIndex);
-    }
+  let active = -1;
+  const setActive = (next: number) => {
+    if (next === active) return;
+    items[active]?.removeAttribute("aria-current");
+    items[next]?.setAttribute("aria-current", "location");
+    active = next;
   };
-
-  const onScroll = () => {
-    updateActiveFromScroll();
-  };
+  const onScroll = () =>
+    setActive(resolveActiveHeadingIndex(scrollContainer, headings));
   scrollContainer.addEventListener("scroll", onScroll, { passive: true });
-
-  rail.addEventListener("mouseenter", showPanel);
-  rail.addEventListener("mouseleave", scheduleHidePanel);
-  panel.addEventListener("mouseenter", showPanel);
-  panel.addEventListener("mouseleave", scheduleHidePanel);
-  rail.addEventListener("focusin", showPanel);
-  rail.addEventListener("focusout", scheduleHidePanel);
-
-  updateActiveFromScroll();
+  toggle.addEventListener("click", onToggle);
+  host.addEventListener("keydown", onEscape);
+  wide?.addEventListener("change", syncVisibility);
+  syncVisibility();
+  onScroll();
 
   readerOutlineControllers.set(host, {
     dispose: () => {
       scrollContainer.removeEventListener("scroll", onScroll);
-      if (hidePanelTimer) {
-        clearTimeout(hidePanelTimer);
-      }
-      panel.style.display = "none";
+      toggle.removeEventListener("click", onToggle);
+      host.removeEventListener("keydown", onEscape);
+      wide?.removeEventListener("change", syncVisibility);
     },
   });
 }
 
-function renderReaderSection(
-  doc: Document,
-  theme: ThemeColors,
-  label: string,
-  content: string,
-  asMarkdown: boolean,
-  options: {
-    variant: "user" | "assistant";
-    messageId?: string;
-    evidenceRecords?: EvidenceRecord[];
-    evidenceAction?: MarkdownRenderOptions["evidenceAction"];
-  },
-): HTMLElement {
-  const section = createElement(doc, "section", {
-    marginBottom: "18px",
-  });
-  section.className = `paperchat-reader-section paperchat-reader-section--${options.variant}`;
-  if (options.variant === "assistant" && options.messageId) {
-    section.setAttribute("data-message-id", options.messageId);
-  }
+function renderReaderQuestion(doc: Document, question: string): HTMLElement {
+  const details = createElement(
+    doc,
+    "details",
+    {},
+    {
+      class: "paperchat-reader-question",
+    },
+  );
+  const summary = createElement(doc, "summary");
+  summary.append(
+    createUiChevron(doc, { kind: "right", size: 14, opacity: 1 }),
+    getString("chat-bookmark-reader-user-message"),
+  );
+  const body = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "paperchat-reader-question-text",
+    },
+  );
+  body.textContent = question;
+  details.append(summary, body);
+  return details;
+}
 
-  const heading = createElement(doc, "div", {
-    marginBottom: "8px",
-    fontSize: "12px",
-    fontWeight: "600",
-    color: theme.textMuted,
-    letterSpacing: "0.02em",
-  });
-  heading.className = "paperchat-reader-section-label";
+function updateReaderTitle(
+  host: HTMLElement,
+  bookmark: BookmarkRecord,
+  question?: string | null,
+): void {
+  const readerLabel = getString("chat-bookmark-reader-title");
+  let label = bookmark.title.trim() || readerLabel;
+  if (
+    question &&
+    label === deriveBookmarkTitle(question) &&
+    label !== sanitizeMessagePreview(question)
+  ) {
+    label =
+      getReaderPaperTitle(bookmark) ||
+      getReaderAnswerTitle(host) ||
+      readerLabel;
+  }
+  const heading = host.querySelector(
+    "#chat-bookmark-reader-title",
+  ) as HTMLElement;
   heading.textContent = label;
+  heading.title = label;
+  host.ownerDocument.title =
+    label === readerLabel ? label : `${readerLabel} - ${label}`;
+}
 
-  const body = createElement(doc, "div", {
-    border: `1px solid ${theme.borderColor}`,
-    background:
-      options.variant === "user" ? theme.inputBg : theme.assistantBubbleBg,
-    color: theme.textPrimary,
-  });
-  body.className = "paperchat-reader-section-body";
-  if (asMarkdown) {
-    body.classList.add("paperchat-reader-markdown");
+function getReaderPaperTitle(bookmark: BookmarkRecord): string {
+  if (!bookmark.itemKey) return "";
+  try {
+    const libraryId = bookmark.itemLibraryId ?? bookmark.libraryId;
+    const item = Zotero.Items.getByLibraryAndKey(libraryId, bookmark.itemKey);
+    return item
+      ? String((item.parentItem ?? item).getField("title") || "").trim()
+      : "";
+  } catch {
+    return "";
   }
+}
 
-  const normalized = content.trim();
-  if (!normalized) {
-    body.textContent = getString("chat-bookmark-reader-empty-content");
-  } else if (asMarkdown) {
-    try {
-      renderMarkdownToElement(body, normalized, options.messageId, {
-        suppressToolCallCards: true,
-        evidenceRecords: options.evidenceRecords,
-        evidenceAction: options.evidenceAction,
-      });
-    } catch (error) {
-      ztoolkit.log("[BookmarkReader] Markdown render failed:", error);
-      body.textContent = normalized;
-    }
-  } else {
-    body.textContent = normalized;
-  }
-
-  section.appendChild(heading);
-  section.appendChild(body);
-  return section;
+function getReaderAnswerTitle(host: HTMLElement): string {
+  const answer = host.querySelector(".paperchat-reader-markdown");
+  const heading = answer
+    ?.querySelector(READER_HEADING_SELECTOR)
+    ?.textContent?.trim();
+  const paragraph = answer?.querySelector("p")?.textContent?.trim();
+  const firstSentence = paragraph
+    ?.split(/[。！？!?]|\.(?=\s|$)/u, 1)[0]
+    ?.trim();
+  const summary = heading || firstSentence;
+  return summary ? deriveBookmarkTitle(summary) : "";
 }
 
 function paintReaderBody(
   host: HTMLElement,
-  theme: ThemeColors,
-  turn: {
-    userContent: string | null;
-    assistantContent: string;
-    evidenceRecords?: EvidenceRecord[];
-    assistantMessageId?: string;
-  },
+  turn: BookmarkTurnContent,
   readerActions?: BookmarkReaderActions,
 ): void {
   const evidenceAction = turn.evidenceRecords?.length
@@ -759,46 +443,67 @@ function paintReaderBody(
 
   body.textContent = "";
   const doc = body.ownerDocument!;
-  injectReaderStyles(doc);
 
-  const contentWrap = createElement(doc, "div", {});
-  contentWrap.className = "paperchat-reader-content";
-
-  if (turn.userContent?.trim()) {
-    contentWrap.appendChild(
-      renderReaderSection(
-        doc,
-        theme,
-        getString("chat-bookmark-reader-user-message"),
-        turn.userContent,
-        false,
-        { variant: "user" },
-      ),
-    );
+  const contentWrap = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "paperchat-reader-content",
+    },
+  );
+  const question = turn.userContent?.trim();
+  if (question) {
+    contentWrap.appendChild(renderReaderQuestion(doc, question));
   }
 
-  contentWrap.appendChild(
-    renderReaderSection(
-      doc,
-      theme,
-      getString("chat-bookmark-reader-assistant-message"),
-      turn.assistantContent || "",
-      true,
-      {
-        variant: "assistant",
-        messageId: turn.assistantMessageId,
+  const answer = createElement(
+    doc,
+    "section",
+    {},
+    {
+      class: "paperchat-reader-section--assistant",
+    },
+  );
+  if (turn.assistantMessageId) {
+    answer.dataset.messageId = turn.assistantMessageId;
+  }
+  const label = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "paperchat-reader-section-label",
+    },
+  );
+  label.textContent = getString("chat-bookmark-reader-assistant-message");
+  const markdown = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "paperchat-reader-markdown",
+    },
+  );
+  const content = turn.assistantContent.trim();
+  if (!content) {
+    markdown.textContent = getString("chat-bookmark-reader-empty-content");
+  } else {
+    try {
+      renderMarkdownToElement(markdown, content, turn.assistantMessageId, {
+        suppressToolCallCards: true,
         evidenceRecords: turn.evidenceRecords,
         evidenceAction,
-      },
-    ),
-  );
-  body.appendChild(contentWrap);
-  const bodyWrap = host.querySelector(
-    `#${READER_BODY_WRAP_ID}`,
-  ) as HTMLElement | null;
-  if (bodyWrap) {
-    setupReaderOutline(host, body);
+      });
+    } catch (error) {
+      ztoolkit.log("[BookmarkReader] Markdown render failed:", error);
+      markdown.textContent = content;
+    }
   }
+  answer.append(label, markdown);
+  contentWrap.appendChild(answer);
+  body.appendChild(contentWrap);
+  setupReaderOutline(host, body);
 }
 
 function updateReaderPosition(
@@ -809,8 +514,11 @@ function updateReaderPosition(
   const footerPosition = host.querySelector(
     "#chat-bookmark-reader-footer-position",
   ) as HTMLElement | null;
-  const label = `${index + 1}/${bookmarks.length}`;
-  if (footerPosition) footerPosition.textContent = label;
+  const label = `${index + 1} / ${bookmarks.length}`;
+  if (footerPosition) {
+    footerPosition.textContent = label;
+    footerPosition.parentElement!.hidden = bookmarks.length < 2;
+  }
 
   const prevBtn = host.querySelector(
     "#chat-bookmark-reader-prev",
@@ -835,213 +543,153 @@ function getReaderDialogHost(host: HTMLElement): BookmarkReaderDialogHost {
   };
 }
 
-function buildReaderShell(host: HTMLElement, theme: ThemeColors): void {
-  const doc = host.ownerDocument!;
-  host.dataset.theme = getCurrentTheme() === darkTheme ? "dark" : "light";
+function buildReaderShell(
+  host: HTMLElement,
+  theme: ThemeColors,
+  win: Window,
+): void {
+  readerOutlineControllers.get(host)?.dispose();
+  readerOutlineControllers.delete(host);
+  const doc = host.ownerDocument;
+  host.dataset.theme = theme === darkTheme ? "dark" : "light";
 
-  Object.assign(host.style, {
-    display: "flex",
-    flexDirection: "column",
-    width: "100%",
-    height: "100%",
-    background: theme.chatHistoryBg,
-    overflow: "hidden",
-  });
-
-  while (host.firstChild) {
-    host.removeChild(host.firstChild);
-  }
-
-  const header = createElement(doc, "div", {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "12px",
-    padding: "12px 14px",
-    borderBottom: `1px solid ${theme.borderColor}`,
-    background: theme.toolbarBg,
-    flexShrink: "0",
-  });
-
-  const headerLeft = createElement(doc, "div", {
-    display: "grid",
-    gap: "2px",
-    minWidth: "0",
-    flex: "1",
-  });
-  const readerLabel = createElement(doc, "div", {
-    fontSize: "15px",
-    fontWeight: "600",
-    color: theme.textPrimary,
-  });
-  readerLabel.textContent = getString("chat-bookmark-reader-title");
+  const header = createElement(
+    doc,
+    "header",
+    {},
+    {
+      class: "paperchat-reader-header",
+    },
+  );
   const title = createElement(
     doc,
-    "div",
-    {
-      fontSize: "13px",
-      color: theme.textSecondary,
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-      minWidth: "0",
-    },
+    "h1",
+    {},
     { id: "chat-bookmark-reader-title" },
   );
-  headerLeft.appendChild(readerLabel);
-  headerLeft.appendChild(title);
-
-  const headerActions = createElement(doc, "div", {
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    flexShrink: "0",
-  });
-  const bookmarkBtn = createIconButton(
-    doc,
-    theme,
-    "bookmark",
-    getString("chat-bookmark-reader-toggle-save"),
-    () => undefined,
-  );
-  bookmarkBtn.id = READER_BOOKMARK_BTN_ID;
-  bookmarkBtn.classList.add("paperchat-reader-bookmark-btn");
-  bookmarkBtn.setAttribute("aria-pressed", "false");
-  const jumpBtn = createIconButton(
-    doc,
-    theme,
-    "quote",
-    getString("chat-bookmark-reader-jump-to-chat"),
-    () => undefined,
-  );
-  jumpBtn.id = "chat-bookmark-reader-jump";
-  const copyBtn = createIconButton(
-    doc,
-    theme,
-    "copy",
-    getString("chat-copy"),
-    () => undefined,
-  );
-  copyBtn.id = "chat-bookmark-reader-copy";
-  const closeBtn = createIconButton(
-    doc,
-    theme,
-    "close",
-    getString("chat-bookmark-close"),
-    () => undefined,
-  );
-  closeBtn.id = "chat-bookmark-reader-close";
-  headerActions.appendChild(bookmarkBtn);
-  headerActions.appendChild(jumpBtn);
-  headerActions.appendChild(copyBtn);
-  headerActions.appendChild(closeBtn);
-
-  header.appendChild(headerLeft);
-  header.appendChild(headerActions);
-
-  const bodyWrap = createElement(doc, "div", {}, { id: READER_BODY_WRAP_ID });
-  bodyWrap.className = "paperchat-reader-body-wrap";
-
-  const body = createElement(
-    doc,
-    "div",
-    {
-      flex: "1 1 auto",
-      minHeight: "0",
-      overflowY: "auto",
-      padding: "18px 44px 24px 20px",
-      background: theme.chatHistoryBg,
-      width: "100%",
-      boxSizing: "border-box",
-    },
-    { id: "chat-bookmark-reader-body" },
-  );
-
-  const outlineRail = createElement(
+  const actions = createElement(
     doc,
     "div",
     {},
-    { id: READER_OUTLINE_RAIL_ID },
+    { class: "paperchat-reader-actions" },
   );
-  outlineRail.className = "paperchat-reader-outline-rail is-empty";
 
-  const outlinePanel = createElement(
+  const outlineToggle = createIconButton(
+    doc,
+    READER_OUTLINE_TOGGLE_ID,
+    getString("chat-bookmark-reader-outline"),
+    "right-bar",
+  );
+  outlineToggle.hidden = true;
+  outlineToggle.setAttribute("aria-controls", READER_OUTLINE_PANEL_ID);
+  outlineToggle.setAttribute("aria-expanded", "false");
+  const bookmarkBtn = createIconButton(
+    doc,
+    READER_BOOKMARK_BTN_ID,
+    getString("chat-bookmark-reader-toggle-save"),
+    "bookmark",
+  );
+  bookmarkBtn.setAttribute("aria-pressed", "false");
+  const pinBtn = createIconButton(
+    doc,
+    "chat-bookmark-reader-pin",
+    getString("chat-pin-window"),
+  );
+  pinBtn.appendChild(createWindowPinIcon(doc));
+  bindWindowPinButton(pinBtn, win, (message) => win.alert(message));
+  actions.append(
+    outlineToggle,
+    bookmarkBtn,
+    createIconButton(
+      doc,
+      "chat-bookmark-reader-jump",
+      getString("chat-bookmark-reader-jump-to-chat"),
+      "quote",
+    ),
+    createIconButton(
+      doc,
+      "chat-bookmark-reader-copy",
+      getString("chat-copy"),
+      "copy",
+    ),
+    pinBtn,
+    createIconButton(
+      doc,
+      "chat-bookmark-reader-close",
+      getString("chat-bookmark-close"),
+      "close",
+    ),
+  );
+  header.append(title, actions);
+
+  const bodyWrap = createElement(
     doc,
     "div",
-    { display: "none" },
-    { id: READER_OUTLINE_PANEL_ID },
+    {},
+    { class: "paperchat-reader-body-wrap" },
   );
-  outlinePanel.className = "paperchat-reader-outline-panel is-empty";
-
-  bodyWrap.appendChild(body);
-  bodyWrap.appendChild(outlineRail);
-  bodyWrap.appendChild(outlinePanel);
-
-  const footer = createElement(doc, "div", {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "10px",
-    padding: "10px 14px 14px",
-    borderTop: `1px solid ${theme.borderColor}`,
-    background: theme.toolbarBg,
-    flexShrink: "0",
-  });
-
-  const prevBtn = createBookmarkDialogButton(
+  const body = createElement(
     doc,
-    "‹",
-    {
-      border: `1px solid ${theme.borderColor}`,
-      background: theme.buttonBg,
-      color: theme.textPrimary,
-      borderRadius: "999px",
-      width: "34px",
-      height: "34px",
-      minWidth: "34px",
-      padding: "0",
-      fontSize: "18px",
-      lineHeight: "1",
-      cursor: "pointer",
-    },
-    { type: "button", id: "chat-bookmark-reader-prev" },
+    "main",
+    {},
+    { id: "chat-bookmark-reader-body" },
   );
-  const footerPosition = createElement(
+  const outline = createElement(
+    doc,
+    "nav",
+    {},
+    {
+      id: READER_OUTLINE_PANEL_ID,
+      "aria-label": getString("chat-bookmark-reader-outline"),
+    },
+  );
+  outline.hidden = true;
+  const outlineHeading = createElement(
     doc,
     "div",
-    {
-      fontSize: "12px",
-      color: theme.textMuted,
-      minWidth: "48px",
-      textAlign: "center",
-    },
-    { id: "chat-bookmark-reader-footer-position" },
+    {},
+    { class: "paperchat-reader-outline-heading" },
   );
-  const nextBtn = createBookmarkDialogButton(
-    doc,
-    "›",
-    {
-      border: `1px solid ${theme.borderColor}`,
-      background: theme.buttonBg,
-      color: theme.textPrimary,
-      borderRadius: "999px",
-      width: "34px",
-      height: "34px",
-      minWidth: "34px",
-      padding: "0",
-      fontSize: "18px",
-      lineHeight: "1",
-      cursor: "pointer",
-    },
-    { type: "button", id: "chat-bookmark-reader-next" },
+  outlineHeading.textContent = getString("chat-bookmark-reader-outline");
+  outline.append(
+    outlineHeading,
+    createElement(doc, "div", {}, { class: "paperchat-reader-outline-list" }),
   );
-  footer.appendChild(prevBtn);
-  footer.appendChild(footerPosition);
-  footer.appendChild(nextBtn);
+  bodyWrap.append(body, outline);
 
-  host.appendChild(header);
-  host.appendChild(bodyWrap);
-  host.appendChild(footer);
+  const footer = createElement(
+    doc,
+    "footer",
+    {},
+    { class: "paperchat-reader-footer" },
+  );
+  const previous = createIconButton(
+    doc,
+    "chat-bookmark-reader-prev",
+    getString("chat-bookmark-reader-previous"),
+  );
+  previous.appendChild(
+    createUiChevron(doc, { kind: "right", size: 16, opacity: 1 }),
+  );
+  const next = createIconButton(
+    doc,
+    "chat-bookmark-reader-next",
+    getString("chat-bookmark-reader-next"),
+  );
+  next.appendChild(
+    createUiChevron(doc, { kind: "right", size: 16, opacity: 1 }),
+  );
+  const position = createElement(
+    doc,
+    "span",
+    {},
+    {
+      id: "chat-bookmark-reader-footer-position",
+      "aria-live": "polite",
+    },
+  );
+  footer.append(previous, position, next);
+  host.replaceChildren(header, bodyWrap, footer);
 }
 
 function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
@@ -1053,20 +701,17 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
   ) as HTMLButtonElement | null;
 
   const syncBookmarkButton = async (bookmark: BookmarkRecord) => {
+    if (!bookmarkBtn) return;
     if (
       !state.actions.isBookmarkSaved ||
       !state.actions.onToggleBookmark ||
       !bookmark.sessionId ||
       !bookmark.messageId
     ) {
-      if (bookmarkBtn) {
-        bookmarkBtn.style.display = "none";
-      }
+      bookmarkBtn.hidden = true;
       return;
     }
-    if (bookmarkBtn) {
-      bookmarkBtn.style.display = "inline-flex";
-    }
+    bookmarkBtn.hidden = false;
     try {
       const isSaved = await state.actions.isBookmarkSaved(bookmark);
       if (generation !== renderGeneration) {
@@ -1090,22 +735,15 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
 
     currentIndex = index;
     const bookmark = bookmarks[currentIndex];
-    const theme = getCurrentTheme();
-
     updateReaderPosition(host, bookmarks, currentIndex);
-    const title = host.querySelector(
-      "#chat-bookmark-reader-title",
-    ) as HTMLElement | null;
-    if (title) {
-      title.textContent = bookmark.title;
-    }
-    if (readerWindow && !readerWindow.closed) {
-      readerWindow.document.title = `${getString("chat-bookmark-reader-title")} - ${bookmark.title}`;
-    }
+    updateReaderTitle(host, bookmark);
 
+    const readerBody = host.querySelector(
+      "#chat-bookmark-reader-body",
+    ) as HTMLElement;
+    readerBody.scrollTop = 0;
     paintReaderBody(
       host,
-      theme,
       {
         userContent: null,
         assistantContent: prepareReaderAssistantContent(bookmark.content),
@@ -1118,10 +756,11 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
       state.actions.loadSession ?? (async () => null as ChatSession | null);
     try {
       const turn = await resolveBookmarkTurnContent(bookmark, loadSession);
-      if (generation !== renderGeneration) {
+      if (generation !== renderGeneration || currentIndex !== index) {
         return;
       }
-      paintReaderBody(host, theme, turn, state.actions);
+      paintReaderBody(host, turn, state.actions);
+      updateReaderTitle(host, bookmark, turn.userContent);
     } catch (error) {
       ztoolkit.log("[BookmarkReader] Failed to resolve turn content:", error);
     }
@@ -1268,9 +907,8 @@ function mountReaderWindow(win: Window, state: ReaderOpenState): void {
   readerHosts.set(host, win);
   win.document.documentElement.style.display = "";
   const theme = getCurrentTheme();
-  buildReaderShell(host, theme);
+  buildReaderShell(host, theme, win);
   bindReaderEvents(host, state);
-  win.document.title = getString("chat-bookmark-reader-title");
 }
 
 function isReaderWindow(win: Window): boolean {
@@ -1324,30 +962,6 @@ function restoreReaderWindowVisibility(win: Window): void {
   }
 }
 
-function raiseChromeWindow(win: Window): void {
-  try {
-    const Ci = Components.interfaces;
-    const requestor = win as unknown as {
-      QueryInterface: (uuid: unknown) => {
-        getInterface: (uuid: unknown) => {
-          QueryInterface: (uuid: unknown) => {
-            getInterface: (uuid: unknown) => { zLevel: number };
-          };
-        };
-      };
-    };
-    const baseWindow = requestor
-      .QueryInterface(Ci.nsIInterfaceRequestor)
-      .getInterface(Ci.nsIWebNavigation)
-      .QueryInterface(Ci.nsIInterfaceRequestor)
-      .getInterface(Ci.nsIBaseWindow);
-    // nsIBaseWindow.raisedZ
-    baseWindow.zLevel = 3;
-  } catch (error) {
-    ztoolkit.log("[BookmarkReader] raise window failed:", error);
-  }
-}
-
 function bringReaderWindowToFront(win: Window): void {
   if (!isWindowAlive(win)) {
     return;
@@ -1358,7 +972,6 @@ function bringReaderWindowToFront(win: Window): void {
   } catch (error) {
     ztoolkit.log("[BookmarkReader] focus failed:", error);
   }
-  raiseChromeWindow(win);
 }
 
 function resolveReaderWindow(targetWin?: Window | null): Window | null {

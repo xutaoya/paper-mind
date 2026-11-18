@@ -1,0 +1,385 @@
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+#bookmark-reader-root {
+  --reader-paper: #faf8f2;
+  --reader-text: #262722;
+  --reader-muted: #645f54;
+  --reader-rule: #ded8cb;
+  --reader-inset: #f0ece3;
+  --reader-accent: #913e2a;
+  --reader-accent-soft: #f3e5d8;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--reader-paper);
+  color: var(--reader-text);
+  font-family: system-ui, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+#bookmark-reader-root[data-theme="dark"] {
+  --reader-paper: #242520;
+  --reader-text: #eeeade;
+  --reader-muted: #b7b5a8;
+  --reader-rule: #45463b;
+  --reader-inset: #30312a;
+  --reader-accent: #f1a285;
+  --reader-accent-soft: #432f28;
+  color-scheme: dark;
+}
+
+.paperchat-reader-header,
+.paperchat-reader-footer {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+.paperchat-reader-header {
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px clamp(16px, 3.3vw, 36px);
+  border-bottom: 1px solid var(--reader-rule);
+}
+
+#chat-bookmark-reader-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: "Helvetica Neue", "PingFang SC", sans-serif;
+  font-size: clamp(16px, 2.65vw, 21px);
+  font-weight: 600;
+  line-height: 1.32;
+}
+
+.paperchat-reader-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+}
+
+#bookmark-reader-root .paperchat-reader-button {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  min-width: 30px;
+  height: 30px;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--reader-muted);
+  cursor: pointer;
+}
+
+#bookmark-reader-root .paperchat-reader-button:hover:not(:disabled) {
+  background: var(--reader-inset);
+  color: var(--reader-text);
+}
+
+#bookmark-reader-root
+  .paperchat-reader-button:is([aria-expanded="true"], [aria-pressed="true"]) {
+  color: var(--reader-accent);
+  background: var(--reader-accent-soft);
+}
+
+#bookmark-reader-root .paperchat-reader-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+#bookmark-reader-root .paperchat-reader-button[hidden],
+#chat-bookmark-reader-outline-panel[hidden],
+.paperchat-reader-footer[hidden] {
+  display: none;
+}
+
+.paperchat-reader-icon {
+  width: 17px;
+  height: 17px;
+  background: currentColor;
+  mask-position: center;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+  pointer-events: none;
+}
+
+.paperchat-reader-body-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
+#chat-bookmark-reader-body {
+  min-width: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px clamp(16px, 4vw, 52px) 34px;
+}
+
+#chat-bookmark-reader-body,
+#chat-bookmark-reader-outline-panel {
+  scrollbar-width: thin;
+  scrollbar-color: var(--reader-rule) transparent;
+}
+
+.paperchat-reader-content {
+  max-width: 690px;
+  margin-inline: auto;
+  font-size: 14px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+}
+
+.paperchat-reader-section-label,
+.paperchat-reader-outline-heading {
+  color: var(--reader-muted);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.paperchat-reader-section-label {
+  margin-bottom: 9px;
+}
+
+.paperchat-reader-question {
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--reader-rule);
+}
+
+.paperchat-reader-question > summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  padding: 0 8px 7px 0;
+  list-style: none;
+  color: var(--reader-muted);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.paperchat-reader-question > summary:hover,
+.paperchat-reader-question[open] > summary {
+  color: var(--reader-accent);
+}
+
+.paperchat-reader-question > summary:focus-visible {
+  outline: 1px solid var(--reader-accent);
+  outline-offset: -1px;
+}
+
+.paperchat-reader-question[open] > summary .paperchat-ui-chevron {
+  transform: rotate(90deg);
+}
+
+.paperchat-reader-question:not([open]) > .paperchat-reader-question-text {
+  display: none;
+}
+
+.paperchat-reader-question-text {
+  margin: 0 0 12px 6px;
+  padding-inline-start: 12px;
+  border-inline-start: 2px solid var(--reader-rule);
+  color: var(--reader-muted);
+  white-space: pre-wrap;
+}
+
+.paperchat-reader-markdown :is(h1, h2, h3, h4, h5, h6) {
+  margin: 1.4em 0 0.5em;
+  color: var(--reader-text);
+  line-height: 1.4;
+  font-weight: 650;
+}
+
+.paperchat-reader-markdown h1 {
+  font-size: 1.46em;
+}
+
+.paperchat-reader-markdown h2 {
+  font-size: 1.28em;
+}
+
+.paperchat-reader-markdown h3 {
+  font-size: 1.12em;
+}
+
+.paperchat-reader-markdown :is(h4, h5, h6) {
+  font-size: 1em;
+}
+
+.paperchat-reader-markdown :is(p, ul, ol, blockquote, pre) {
+  margin-block: 0.68em;
+}
+
+.paperchat-reader-markdown > :first-child {
+  margin-block-start: 0;
+}
+
+.paperchat-reader-markdown > :last-child {
+  margin-block-end: 0;
+}
+
+.paperchat-reader-markdown :is(ul, ol) {
+  padding-inline-start: 1.45em;
+}
+
+.paperchat-reader-markdown li + li {
+  margin-block-start: 0.25em;
+}
+
+.paperchat-reader-markdown blockquote {
+  margin-inline: 0;
+}
+
+.paperchat-reader-markdown .md-table-scroll {
+  overflow-x: auto;
+  margin-block: 0.85em;
+  border: 1px solid var(--reader-rule);
+  border-radius: 6px;
+}
+
+.paperchat-reader-markdown :is(table, .md-table) {
+  width: 100%;
+  max-width: none;
+  table-layout: auto;
+  border-collapse: collapse;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Match the reading surface when Markdown supplies inline table colors. */
+.paperchat-reader-markdown .md-table :is(th, td) {
+  border-color: var(--reader-rule) !important;
+}
+
+.paperchat-reader-markdown .md-table th {
+  background: var(--reader-inset) !important;
+}
+
+#chat-bookmark-reader-outline-panel {
+  box-sizing: border-box;
+  flex: 0 0 clamp(184px, 28vw, 248px);
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-inline-start: 1px solid var(--reader-rule);
+  padding: 23px 12px;
+  background: var(--reader-paper);
+}
+
+.paperchat-reader-outline-heading {
+  margin: 0 10px 10px;
+}
+
+.paperchat-reader-outline-list {
+  display: grid;
+  gap: 3px;
+}
+
+#bookmark-reader-root .paperchat-reader-outline-item {
+  appearance: none;
+  width: 100%;
+  height: auto;
+  max-height: none;
+  min-width: 0;
+  min-height: 28px;
+  margin: 0;
+  padding: 5px 8px;
+  padding-inline-start: calc(9px + var(--reader-outline-indent, 0px));
+  border: 0;
+  border-inline-start: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--reader-muted);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+#bookmark-reader-root .paperchat-reader-outline-item:hover {
+  background: var(--reader-inset);
+}
+
+#bookmark-reader-root .paperchat-reader-outline-item[aria-current="location"] {
+  border-inline-start-color: var(--reader-accent);
+  background: var(--reader-accent-soft);
+  color: var(--reader-accent);
+  font-weight: 600;
+}
+
+#bookmark-reader-root button:focus-visible {
+  outline: 1px solid var(--reader-accent);
+  outline-offset: -2px;
+}
+
+.paperchat-reader-footer {
+  justify-content: center;
+  gap: 8px;
+  padding: 5px 16px;
+  border-top: 1px solid var(--reader-rule);
+}
+
+#chat-bookmark-reader-footer-position {
+  min-width: 42px;
+  text-align: center;
+  color: var(--reader-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+#chat-bookmark-reader-prev .paperchat-ui-chevron {
+  transform: rotate(180deg);
+}
+
+@media (width < 720px) {
+  #chat-bookmark-reader-outline-panel {
+    position: absolute;
+    z-index: 4;
+    inset-block-start: 8px;
+    inset-inline-end: 12px;
+    width: min(284px, calc(100% - 24px));
+    max-height: calc(100% - 16px);
+    border: 1px solid var(--reader-rule);
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 6px 18px rgb(20 19 16 / 15%);
+  }
+}
+
+@media (max-width: 430px) {
+  .paperchat-reader-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 5px;
+    padding-block: 10px 7px;
+  }
+
+  .paperchat-reader-actions {
+    align-self: flex-end;
+  }
+
+  #chat-bookmark-reader-body {
+    padding-top: 16px;
+  }
+}

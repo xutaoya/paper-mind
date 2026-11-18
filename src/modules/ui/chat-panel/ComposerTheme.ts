@@ -234,10 +234,6 @@ export function applyComposerChromeTheme(
 
   if (inputWrapper) {
     inputWrapper.style.boxShadow = theme.composerShadow;
-    inputWrapper.style.setProperty(
-      "--composer-shadow-idle",
-      theme.composerShadow,
-    );
   }
 
   const editBanner = container.querySelector(

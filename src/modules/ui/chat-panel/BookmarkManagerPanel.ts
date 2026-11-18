@@ -9,27 +9,17 @@ import { config } from "../../../../package.json";
 import { getString } from "../../../utils/locale";
 import { copyToClipboard, createElement } from "./ChatPanelBuilder";
 import { createUiChevron, setUiChevronExpanded } from "./UiChevron";
-import { HTML_NS } from "./types";
 import {
-  createBookmarkDialogButton,
-  bindBookmarkRowHoverEffects,
   createBookmarkDragHandle,
   createBookmarkIconButton,
-  createBookmarkRowCheckbox,
   createBookmarkRowIcon,
-  createBookmarkRowTrailingSlot,
   createFolderIcon,
   openBookmarkConfirm,
   openBookmarkTextPrompt,
 } from "./BookmarkUiPrompts";
 import { sanitizeMessagePreview } from "./HistoryDropdown";
 import type { ThemeColors } from "./types";
-import { isDarkMode } from "./ChatPanelTheme";
-import { overlayPanelIconFilter } from "./OverlayPanelsTheme";
-import {
-  applyBookmarkToolbarControlsTheme,
-  bookmarkToolbarControlSurface,
-} from "./BookmarkToolbarTheme";
+import { darkTheme, getCurrentTheme, isDarkMode } from "./ChatPanelTheme";
 
 const bookmarkPanelActions = new WeakMap<HTMLElement, BookmarkManagerActions>();
 
@@ -38,24 +28,6 @@ export function attachBookmarkManagerActions(
   actions: BookmarkManagerActions,
 ): void {
   bookmarkPanelActions.set(panel, actions);
-}
-
-function bookmarkSearchHighlightBg(): string {
-  return isDarkMode() ? "rgba(96, 165, 250, 0.32)" : "#dbeafe";
-}
-
-function bookmarkFolderExpandedBg(): string {
-  return isDarkMode() ? "rgba(96, 165, 250, 0.14)" : "#eff6ff22";
-}
-
-function bookmarkDropLineColor(): string {
-  return isDarkMode() ? "#60a5fa" : "#2563eb";
-}
-
-function bookmarkDropLineGlow(): string {
-  return isDarkMode()
-    ? "0 0 0 1px rgba(96, 165, 250, 0.35)"
-    : "0 0 0 1px #eff6ff";
 }
 
 export async function reapplyBookmarkManagerPanelTheme(
@@ -280,7 +252,6 @@ export async function refreshBookmarkManagerPanel(
   if (!panel || panel.style.display === "none") {
     return;
   }
-  applyBookmarkToolbarControlsTheme(panel, theme);
   const state = getBookmarkManagerState(panel);
   syncBookmarkToolbarMeta(panel, state);
   await renderBookmarkManagerBody(panel, theme, actions, state);
@@ -447,9 +418,9 @@ function deriveBookmarkRowPreview(bookmark: BookmarkRecord): string | null {
     if (!remainder) {
       return null;
     }
-    return remainder.length > 56 ? `${remainder.slice(0, 55)}…` : remainder;
+    return remainder.length > 180 ? `${remainder.slice(0, 179)}…` : remainder;
   }
-  return cleaned.length > 56 ? `${cleaned.slice(0, 55)}…` : cleaned;
+  return cleaned.length > 180 ? `${cleaned.slice(0, 179)}…` : cleaned;
 }
 
 function appendHighlightedText(
@@ -476,12 +447,7 @@ function appendHighlightedText(
     if (index > start) {
       parent.appendChild(doc.createTextNode(text.slice(start, index)));
     }
-    const mark = createElement(doc, "mark", {
-      background: bookmarkSearchHighlightBg(),
-      color: "inherit",
-      padding: "0 1px",
-      borderRadius: "2px",
-    });
+    const mark = createElement(doc, "mark");
     mark.textContent = text.slice(index, index + normalized.length);
     parent.appendChild(mark);
     start = index + normalized.length;
@@ -494,73 +460,23 @@ function appendHighlightedText(
 
 function createToolbarIconButton(
   doc: Document,
-  theme: ThemeColors,
   iconName: string,
   title: string,
-  attributes: Record<string, string> = {},
+  id: string,
 ): HTMLButtonElement {
-  const surface = bookmarkToolbarControlSurface(theme);
   const button = createElement(
     doc,
     "button",
-    {
-      width: "36px",
-      height: "36px",
-      minWidth: "36px",
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      border: surface.border,
-      background: surface.background,
-      borderRadius: "10px",
-      cursor: "pointer",
-      padding: "0",
-      appearance: "none",
-      color: theme.textMuted,
-      boxShadow: surface.boxShadow,
-      transition:
-        "background 0.18s ease, border-color 0.18s ease, color 0.18s ease",
-      flexShrink: "0",
-    },
+    {},
     {
       type: "button",
+      id,
       title,
       "aria-label": title,
-      ...attributes,
       class: "paperchat-bookmark-toolbar-btn",
     },
   ) as HTMLButtonElement;
-  const icon = doc.createElementNS(HTML_NS, "img") as HTMLImageElement;
-  icon.src = `chrome://${config.addonRef}/content/icons/${iconName}.svg`;
-  icon.alt = "";
-  icon.setAttribute("aria-hidden", "true");
-  Object.assign(icon.style, {
-    width: "16px",
-    height: "16px",
-    display: "block",
-    pointerEvents: "none",
-    opacity: "0.9",
-    filter: overlayPanelIconFilter(theme),
-  });
-  button.appendChild(icon);
-  const hoverBg = isDarkMode()
-    ? "rgba(255, 255, 255, 0.1)"
-    : theme.buttonHoverBg;
-  const hoverBorder = isDarkMode()
-    ? "rgba(255, 255, 255, 0.18)"
-    : theme.inputFocusBorderColor;
-  button.addEventListener("mouseenter", () => {
-    button.style.background = hoverBg;
-    button.style.borderColor = hoverBorder;
-    button.style.color = theme.textPrimary;
-  });
-  button.addEventListener("mouseleave", () => {
-    button.style.background = surface.background;
-    button.style.borderColor = isDarkMode()
-      ? "rgba(255, 255, 255, 0.12)"
-      : theme.inputBorderColor;
-    button.style.color = theme.textMuted;
-  });
+  button.appendChild(createBookmarkRowIcon(doc, iconName, 16));
   return button;
 }
 
@@ -689,7 +605,7 @@ async function renderBookmarkManagerBody(
   const dropContext: BookmarkDropContext = { panel, theme, actions };
   const doc = body.ownerDocument!;
   const rootBookmarks = bookmarksByFolder.get(null) || [];
-  if (!isSearchActive || rootBookmarks.length > 0) {
+  if (rootBookmarks.length > 0 || (!isSearchActive && folderTree.length > 0)) {
     body.appendChild(
       renderUngroupedSection(
         panel,
@@ -726,18 +642,29 @@ async function renderBookmarkManagerBody(
     );
   }
 
-  const hasVisibleFolders = folderTree.length > 0;
-  const hasVisibleBookmarks = bookmarks.length > 0;
-  if (!hasVisibleBookmarks && (!hasVisibleFolders || shouldPruneFolders)) {
-    const empty = createElement(body.ownerDocument!, "div", {
-      padding: "32px 16px",
-      textAlign: "center",
-      color: theme.textMuted,
-      fontSize: "14px",
-    });
-    empty.textContent = isSearchActive
-      ? getString("chat-bookmark-search-no-results")
-      : getString("chat-bookmark-empty");
+  if (bookmarks.length === 0 && folderTree.length === 0) {
+    const empty = createElement(
+      doc,
+      "div",
+      {},
+      {
+        class: "paperchat-bookmark-empty",
+      },
+    );
+    const icon = createBookmarkRowIcon(doc, "bookmark", 24);
+    const title = createElement(doc, "strong");
+    title.textContent = getString(
+      isSearchActive
+        ? "chat-bookmark-search-no-results"
+        : "chat-bookmark-empty",
+    );
+    const hint = createElement(doc, "span");
+    hint.textContent = getString(
+      isSearchActive
+        ? "chat-bookmark-search-empty-hint"
+        : "chat-bookmark-empty-hint",
+    );
+    empty.append(icon, title, hint);
     body.appendChild(empty);
   }
 }
@@ -774,9 +701,9 @@ function clearDropTargetStyle(element: HTMLElement): void {
   delete element.dataset.dropPlacement;
 }
 
-function applyDropTargetStyle(element: HTMLElement, theme: ThemeColors): void {
-  element.style.outline = `2px dashed ${theme.inputFocusBorderColor}`;
-  element.style.background = theme.buttonHoverBg;
+function applyDropTargetStyle(element: HTMLElement): void {
+  element.style.outline = "2px dashed var(--bookmark-accent)";
+  element.style.background = "var(--bookmark-accent-soft)";
 }
 
 function isFolderDragEvent(event: DragEvent): boolean {
@@ -808,14 +735,11 @@ function getFolderDropPlacement(
 function applyFolderDropIndicator(
   row: HTMLElement,
   placement: FolderDropPlacement,
-  theme: ThemeColors,
-  expanded: boolean,
 ): void {
   clearDropTargetStyle(row);
   row.dataset.dropPlacement = placement;
   if (placement === "inside") {
-    row.style.outline = `2px dashed ${theme.inputFocusBorderColor}`;
-    row.style.background = theme.buttonHoverBg;
+    applyDropTargetStyle(row);
     return;
   }
 
@@ -828,14 +752,12 @@ function applyFolderDropIndicator(
     right: "8px",
     height: "2px",
     borderRadius: "999px",
-    background: bookmarkDropLineColor(),
+    background: "var(--bookmark-accent)",
     pointerEvents: "none",
     zIndex: "2",
-    boxShadow: bookmarkDropLineGlow(),
   });
   line.style[placement === "before" ? "top" : "bottom"] = "-1px";
   row.appendChild(line);
-  row.style.background = expanded ? bookmarkFolderExpandedBg() : theme.inputBg;
 }
 
 function readDragPayload(event: DragEvent): DragPayload | null {
@@ -963,7 +885,6 @@ async function moveFolderToParent(
 function attachFolderRowDropTarget(
   row: HTMLElement,
   folder: BookmarkFolder,
-  expanded: boolean,
   context: BookmarkDropContext,
 ): void {
   const dropKey = folder.id;
@@ -978,15 +899,10 @@ function attachFolderRowDropTarget(
       event.dataTransfer.dropEffect = "move";
     }
     if (isFolderDragEvent(event)) {
-      applyFolderDropIndicator(
-        row,
-        getFolderDropPlacement(row, event),
-        context.theme,
-        expanded,
-      );
+      applyFolderDropIndicator(row, getFolderDropPlacement(row, event));
       return;
     }
-    applyDropTargetStyle(row, context.theme);
+    applyDropTargetStyle(row);
   });
   row.addEventListener("dragleave", (event) => {
     const related = event.relatedTarget as Node | null;
@@ -994,9 +910,6 @@ function attachFolderRowDropTarget(
       return;
     }
     clearDropTargetStyle(row);
-    row.style.background = expanded
-      ? bookmarkFolderExpandedBg()
-      : context.theme.inputBg;
   });
   row.addEventListener("drop", (event) => {
     event.preventDefault();
@@ -1004,9 +917,6 @@ function attachFolderRowDropTarget(
     const placement =
       (row.dataset.dropPlacement as FolderDropPlacement) || "inside";
     clearDropTargetStyle(row);
-    row.style.background = expanded
-      ? bookmarkFolderExpandedBg()
-      : context.theme.inputBg;
     const payload = readDragPayload(event);
     if (!payload) {
       return;
@@ -1042,7 +952,7 @@ function attachTreeDropTarget(
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = "move";
     }
-    applyDropTargetStyle(element, context.theme);
+    applyDropTargetStyle(element);
   });
   element.addEventListener("dragleave", (event) => {
     const related = event.relatedTarget as Node | null;
@@ -1092,7 +1002,6 @@ function attachBookmarkRowDrag(
       .querySelectorAll(".paperchat-bookmark-row")
       .forEach((element) => {
         clearDropTargetStyle(element as HTMLElement);
-        (element as HTMLElement).style.background = context.theme.inputBg;
       });
   });
 }
@@ -1109,27 +1018,23 @@ function attachBookmarkRowDropTarget(
     const rect = row.getBoundingClientRect();
     return event.clientY < rect.top + rect.height / 2 ? "before" : "after";
   };
-  const clearIndicator = () => {
-    clearDropTargetStyle(row);
-    row.style.background = context.theme.inputBg;
-  };
   row.addEventListener("dragover", (event) => {
     if (!accepts(event)) return;
     event.preventDefault();
     event.stopPropagation();
     if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
-    applyFolderDropIndicator(row, placement(event), context.theme, false);
+    applyFolderDropIndicator(row, placement(event));
   });
   row.addEventListener("dragleave", (event) => {
     const related = event.relatedTarget as Node | null;
     if (related && row.contains(related)) return;
-    clearIndicator();
+    clearDropTargetStyle(row);
   });
   row.addEventListener("drop", (event) => {
     if (!accepts(event)) return;
     event.preventDefault();
     event.stopPropagation();
-    clearIndicator();
+    clearDropTargetStyle(row);
     const payload = readDragPayload(event);
     if (!payload || payload.type !== "bookmark" || payload.id === bookmark.id)
       return;
@@ -1240,86 +1145,84 @@ function createBookmarkRow(
   depth = 0,
   searchQuery = "",
 ): HTMLElement {
-  const row = createElement(doc, "div", {
-    position: "relative",
-    display: "grid",
-    gridTemplateColumns: "16px 18px minmax(0, 1fr)",
-    columnGap: "10px",
-    alignItems: "start",
-    padding: "10px 12px",
-    borderRadius: "12px",
-    border: `1px solid ${theme.borderColor}`,
-    background: theme.inputBg,
-    marginTop: "6px",
-    marginLeft: `${depth * 18}px`,
-  });
-  row.className = "paperchat-bookmark-row";
-  row.dataset.bookmarkId = bookmark.id;
+  const row = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "paperchat-bookmark-row",
+      "data-bookmark-id": bookmark.id,
+    },
+  );
+  row.style.setProperty("--bookmark-indent", `${Math.min(depth, 4) * 12}px`);
   attachBookmarkRowDropTarget(row, bookmark, { panel, theme, actions });
 
-  const checkbox = createBookmarkRowCheckbox(doc);
-  Object.assign(checkbox.style, { marginTop: "2px" });
-  const icon =
-    bookmark.type === "message"
-      ? createBookmarkRowIcon(doc, "favicon", 16)
-      : createBookmarkRowIcon(doc, "bookmark", 16);
-  Object.assign(icon.style, { marginTop: "1px" });
-
-  const main = createElement(doc, "div", {
-    minWidth: "0",
-    cursor: "pointer",
-    display: "flex",
-    flexDirection: "column",
-    gap: "3px",
-    overflow: "hidden",
-    paddingRight: "76px",
-  });
-  const title = createElement(doc, "div", {
-    fontSize: "13px",
-    fontWeight: "500",
-    lineHeight: "1.4",
-    color: theme.textPrimary,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    minWidth: "0",
-  });
-  title.title = bookmark.title;
+  const icon = createBookmarkRowIcon(
+    doc,
+    bookmark.type === "message" ? "quote" : "bookmark",
+    16,
+  );
+  icon.className = "paperchat-bookmark-item-icon";
+  const main = createElement(
+    doc,
+    "button",
+    {},
+    {
+      class: "paperchat-bookmark-item-open",
+      type: "button",
+    },
+  );
+  const title = createElement(
+    doc,
+    "span",
+    {},
+    {
+      class: "paperchat-bookmark-item-title",
+      title: bookmark.title,
+    },
+  );
   appendHighlightedText(title, bookmark.title, searchQuery);
   main.appendChild(title);
   const previewText = deriveBookmarkRowPreview(bookmark);
   if (previewText) {
-    const preview = createElement(doc, "div", {
-      fontSize: "11px",
-      lineHeight: "1.4",
-      color: theme.textMuted,
-      overflow: "hidden",
-      textOverflow: "ellipsis",
-      whiteSpace: "nowrap",
-      minWidth: "0",
-    });
-    preview.title = previewText;
+    const preview = createElement(
+      doc,
+      "span",
+      {},
+      {
+        class: "paperchat-bookmark-item-preview",
+      },
+    );
     appendHighlightedText(preview, previewText, searchQuery);
     main.appendChild(preview);
   }
 
-  const date = createElement(doc, "span", {
-    fontSize: "11px",
-    lineHeight: "1.3",
-    color: theme.textMuted,
-    whiteSpace: "nowrap",
-    fontVariantNumeric: "tabular-nums",
-  });
+  const footer = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "paperchat-bookmark-item-footer",
+    },
+  );
+  const date = createElement(
+    doc,
+    "span",
+    {},
+    {
+      class: "paperchat-bookmark-item-date",
+    },
+  );
   date.textContent = formatBookmarkDate(bookmark.createdAt);
 
-  const actionBar = createElement(doc, "div", {
-    display: "flex",
-    alignItems: "center",
-    gap: "2px",
-    flexShrink: "0",
-    overflow: "visible",
-  });
-  actionBar.className = "paperchat-bookmark-row-actions";
+  const actionBar = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "paperchat-bookmark-row-actions",
+    },
+  );
 
   if (bookmark.type === "message") {
     actionBar.appendChild(
@@ -1397,18 +1300,12 @@ function createBookmarkRow(
     ),
   );
 
-  bindBookmarkRowHoverEffects(row, theme, date, actionBar, theme.inputBg);
-
   main.addEventListener("click", () => {
     openBookmarkReader(bookmark, allBookmarks, actions);
   });
 
-  row.appendChild(checkbox);
-  row.appendChild(icon);
-  row.appendChild(main);
-  row.appendChild(
-    createBookmarkRowTrailingSlot(doc, date, actionBar, { align: "top" }),
-  );
+  footer.append(date, actionBar);
+  row.append(icon, main, footer);
   return row;
 }
 
@@ -1425,80 +1322,84 @@ function createFolderRow(
   dropContext: BookmarkDropContext,
   searchQuery = "",
 ): HTMLElement {
-  const row = createElement(doc, "div", {
-    position: "relative",
-    display: "grid",
-    gridTemplateColumns: "20px 16px 18px minmax(0, 1fr)",
-    columnGap: "8px",
-    alignItems: "center",
-    padding: "9px 12px",
-    borderRadius: "12px",
-    border: `1px solid ${theme.borderColor}`,
-    background: theme.inputBg,
-    marginTop: "6px",
-    marginLeft: `${depth * 18}px`,
-    transition: "background 0.16s ease, border-color 0.16s ease",
-  });
-  row.className = "paperchat-bookmark-folder-row";
-  if (expanded) {
-    row.style.borderColor = theme.inputFocusBorderColor;
-  }
-  row.dataset.folderId = folder.id;
+  const row = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "paperchat-bookmark-folder-row",
+      "data-folder-id": folder.id,
+      "data-expanded": String(expanded),
+    },
+  );
+  row.style.setProperty("--bookmark-indent", `${Math.min(depth, 4) * 12}px`);
 
+  const toggle = createElement(
+    doc,
+    "button",
+    {},
+    {
+      class: "paperchat-bookmark-folder-toggle",
+      type: "button",
+      "aria-expanded": String(expanded),
+      title: folder.name,
+    },
+  );
   const chevron = createUiChevron(doc, {
-    className: "paperchat-bookmark-folder-chevron",
     kind: "right",
-    size: 16,
-    color: theme.textMuted,
-    opacity: 0.55,
+    size: 12,
+    color: "currentColor",
   });
-  chevron.style.pointerEvents = "none";
   setUiChevronExpanded(chevron, expanded);
-
-  const toggleFolderExpanded = async () => {
+  const name = createElement(
+    doc,
+    "span",
+    {},
+    {
+      class: "paperchat-bookmark-folder-name",
+    },
+  );
+  appendHighlightedText(name, folder.name, searchQuery);
+  toggle.append(chevron, createFolderIcon(doc, "16px"), name);
+  toggle.addEventListener("click", async () => {
     const nextState = getBookmarkManagerState(panel);
     if (nextState.expandedFolderIds.has(folder.id)) {
       nextState.expandedFolderIds.delete(folder.id);
     } else {
       nextState.expandedFolderIds.add(folder.id);
     }
+    const hadFocus = doc.activeElement === toggle;
     setBookmarkManagerState(panel, nextState);
     await renderBookmarkManagerBody(panel, theme, actions, nextState);
-  };
-
-  const checkbox = createBookmarkRowCheckbox(doc);
-  const folderIcon = createFolderIcon(doc, "18px");
-  const name = createElement(doc, "span", {
-    fontSize: "13px",
-    fontWeight: "600",
-    lineHeight: "1.35",
-    color: theme.textPrimary,
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    minWidth: "0",
-    paddingRight: "40px",
+    if (hadFocus && (!doc.activeElement || doc.activeElement === doc.body)) {
+      const buttons = Array.from(
+        panel.querySelectorAll(".paperchat-bookmark-folder-toggle"),
+      ) as HTMLButtonElement[];
+      const nextToggle = buttons.find(
+        (button) => button.parentElement?.dataset.folderId === folder.id,
+      );
+      nextToggle?.focus({ preventScroll: true });
+    }
   });
-  appendHighlightedText(name, folder.name, searchQuery);
 
-  const count = createElement(doc, "span", {
-    fontSize: "11px",
-    lineHeight: "1.3",
-    color: theme.textMuted,
-    whiteSpace: "nowrap",
-    fontVariantNumeric: "tabular-nums",
-  });
+  const count = createElement(
+    doc,
+    "span",
+    {},
+    {
+      class: "paperchat-bookmark-folder-count",
+    },
+  );
   count.textContent = String(bookmarkCount);
 
-  const actionBar = createElement(doc, "div", {
-    display: "flex",
-    alignItems: "center",
-    gap: "2px",
-  });
-  actionBar.className = "paperchat-bookmark-row-actions";
-  actionBar.addEventListener("click", (event) => {
-    event.stopPropagation();
-  });
+  const actionBar = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "paperchat-bookmark-row-actions",
+    },
+  );
 
   actionBar.appendChild(
     createBookmarkIconButton(
@@ -1578,26 +1479,8 @@ function createFolderRow(
     ),
   );
 
-  const restingBackground = theme.inputBg;
-  bindBookmarkRowHoverEffects(row, theme, count, actionBar, restingBackground);
-
-  row.style.cursor = "pointer";
-  row.setAttribute("role", "button");
-  row.setAttribute("aria-expanded", expanded ? "true" : "false");
-  row.setAttribute("aria-label", folder.name);
-  row.addEventListener("click", () => {
-    void toggleFolderExpanded();
-  });
-
-  attachFolderRowDropTarget(row, folder, expanded, dropContext);
-
-  row.appendChild(chevron);
-  row.appendChild(checkbox);
-  row.appendChild(folderIcon);
-  row.appendChild(name);
-  row.appendChild(
-    createBookmarkRowTrailingSlot(doc, count, actionBar, { align: "center" }),
-  );
+  attachFolderRowDropTarget(row, folder, dropContext);
+  row.append(toggle, count, actionBar);
   return row;
 }
 
@@ -1613,38 +1496,34 @@ function renderUngroupedSection(
   searchQuery = "",
   _isSearchActive = false,
 ): HTMLElement {
-  const section = createElement(doc, "div", {
-    marginBottom: "12px",
-    borderRadius: "12px",
-    padding: "4px",
-  });
-  section.className = "paperchat-bookmark-drop-group";
-  const header = createElement(doc, "div", {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    fontSize: "13px",
-    fontWeight: "600",
-    color: theme.textMuted,
-    padding: "6px 10px",
-    borderRadius: "8px",
-  });
-  const left = createElement(doc, "span", {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: "8px",
-  });
-  left.appendChild(createFolderIcon(doc, "16px"));
-  const label = createElement(doc, "span", {});
+  const section = createElement(
+    doc,
+    "section",
+    {},
+    {
+      class: "paperchat-bookmark-ungrouped",
+    },
+  );
+  const header = createElement(
+    doc,
+    "h3",
+    {},
+    {
+      class: "paperchat-bookmark-ungrouped-heading",
+    },
+  );
+  const label = createElement(doc, "span");
   label.textContent = getString("chat-bookmark-ungrouped");
-  left.appendChild(label);
-  const count = createElement(doc, "span", {
-    fontSize: "12px",
-    color: theme.textMuted,
-  });
+  const count = createElement(
+    doc,
+    "span",
+    {},
+    {
+      class: "paperchat-bookmark-folder-count",
+    },
+  );
   count.textContent = String(bookmarks.length);
-  header.appendChild(left);
-  header.appendChild(count);
+  header.append(label, count);
   section.appendChild(header);
   attachTreeDropTarget(section, null, dropContext);
   attachTreeDropTarget(header, null, dropContext);
@@ -1681,7 +1560,7 @@ function renderFolderTreeNode(
   isSearchActive = false,
   visibleFolderIds: Set<string> = new Set(),
 ): HTMLElement {
-  const container = createElement(doc, "div", { marginBottom: "4px" });
+  const container = createElement(doc, "div");
   const folder = node.folder;
   const bookmarks = bookmarksByFolder.get(folder.id) || [];
   const expanded =
@@ -1758,211 +1637,130 @@ export function createBookmarkManagerPanel(
       inset: "0",
       display: "none",
       flexDirection: "column",
-      background: theme.chatHistoryBg,
       zIndex: "10002",
     },
     { id: PANEL_ID },
   );
-  panel.dataset.theme = isDarkMode() ? "dark" : "light";
+  panel.dataset.theme = theme === darkTheme ? "dark" : "light";
 
-  const toolbar = createElement(doc, "div", {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-    padding: "12px 14px 10px",
-    borderBottom: `1px solid ${theme.borderColor}`,
-    background: theme.toolbarBg,
-    flexShrink: "0",
-  });
-
-  const headerRow = createElement(doc, "div", {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "10px",
-    minWidth: "0",
-  });
-  const headerMain = createElement(doc, "div", {
-    display: "flex",
-    flexDirection: "column",
-    gap: "2px",
-    minWidth: "0",
-    flex: "1",
-  });
-  const title = createElement(doc, "div", {
-    fontSize: "15px",
-    fontWeight: "650",
-    color: theme.textPrimary,
-    letterSpacing: "-0.01em",
-    lineHeight: "1.2",
-  });
+  const toolbar = createElement(
+    doc,
+    "header",
+    {},
+    {
+      class: "paperchat-bookmark-toolbar",
+    },
+  );
+  const headerRow = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "paperchat-bookmark-head",
+    },
+  );
+  const brand = createElement(
+    doc,
+    "span",
+    {
+      maskImage: `url("chrome://${config.addonRef}/content/icons/bookmark.svg")`,
+    },
+    {
+      class: "paperchat-bookmark-brand",
+      "aria-hidden": "true",
+    },
+  );
+  const headerMain = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "paperchat-bookmark-heading",
+    },
+  );
+  const title = createElement(doc, "h2");
   title.textContent = getString("chat-bookmarks");
   const toolbarMeta = createElement(
     doc,
     "div",
+    {},
     {
-      fontSize: "12px",
-      lineHeight: "1.35",
-      color: theme.textMuted,
-      whiteSpace: "nowrap",
-      overflow: "hidden",
-      textOverflow: "ellipsis",
+      id: BOOKMARK_TOOLBAR_META_ID,
+      "aria-live": "polite",
     },
-    { id: BOOKMARK_TOOLBAR_META_ID },
   );
 
-  const closeBtn = createElement(
+  const closeBtn = createToolbarIconButton(
     doc,
-    "button",
-    {
-      width: "32px",
-      height: "32px",
-      minWidth: "32px",
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      border: "none",
-      borderRadius: "8px",
-      background: "transparent",
-      cursor: "pointer",
-      padding: "0",
-      appearance: "none",
-      color: theme.textMuted,
-    },
-    {
-      type: "button",
-      title: getString("chat-bookmark-close"),
-      "aria-label": getString("chat-bookmark-close"),
-    },
-  ) as HTMLButtonElement;
-  const closeIcon = doc.createElementNS(HTML_NS, "img") as HTMLImageElement;
-  closeIcon.src = `chrome://${config.addonRef}/content/icons/close.svg`;
-  closeIcon.alt = "";
-  closeIcon.setAttribute("aria-hidden", "true");
-  Object.assign(closeIcon.style, {
-    width: "14px",
-    height: "14px",
-    display: "block",
-    opacity: "0.82",
-    filter: overlayPanelIconFilter(theme),
-  });
-  closeBtn.appendChild(closeIcon);
-  closeBtn.addEventListener("mouseenter", () => {
-    closeBtn.style.background = theme.buttonHoverBg;
-    closeBtn.style.color = theme.textPrimary;
-  });
-  closeBtn.addEventListener("mouseleave", () => {
-    closeBtn.style.background = "transparent";
-    closeBtn.style.color = theme.textMuted;
-  });
-
-  const searchRow = createElement(doc, "div", {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    minWidth: "0",
-  });
-  const searchWrap = createElement(doc, "div", {
-    position: "relative",
-    flex: "1",
-    minWidth: "0",
-  });
-  const searchInput = doc.createElement("input");
-  searchInput.type = "search";
-  searchInput.id = BOOKMARK_SEARCH_INPUT_ID;
-  searchInput.placeholder = getString("chat-bookmark-search-placeholder");
-  const searchSurface = bookmarkToolbarControlSurface(theme);
-  Object.assign(searchInput.style, {
-    width: "100%",
-    boxSizing: "border-box",
-    border: searchSurface.border,
-    borderRadius: "10px",
-    padding: "8px 34px 8px 12px",
-    fontSize: "13px",
-    lineHeight: "1.4",
-    background: searchSurface.background,
-    color: theme.textPrimary,
-    outline: "none",
-    boxShadow: searchSurface.boxShadow,
-    transition: "border-color 0.18s ease, box-shadow 0.18s ease",
-    colorScheme: isDarkMode() ? "dark" : "light",
-  });
-  searchInput.addEventListener("focus", () => {
-    searchInput.style.borderColor = theme.inputFocusBorderColor;
-    searchInput.style.boxShadow = `0 0 0 3px ${theme.inputFocusRingColor}`;
-  });
-  searchInput.addEventListener("blur", () => {
-    searchInput.style.borderColor = isDarkMode()
-      ? "rgba(255, 255, 255, 0.12)"
-      : theme.inputBorderColor;
-    searchInput.style.boxShadow = searchSurface.boxShadow;
-  });
-  const searchClearBtn = createBookmarkDialogButton(
+    "close",
+    getString("chat-bookmark-close"),
+    "chat-bookmark-close-btn",
+  );
+  const searchRow = createElement(
     doc,
-    "×",
+    "div",
+    {},
     {
-      position: "absolute",
-      top: "50%",
-      right: "6px",
-      transform: "translateY(-50%)",
-      width: "24px",
-      height: "24px",
-      minWidth: "24px",
-      display: "none",
-      alignItems: "center",
-      justifyContent: "center",
-      border: "none",
-      background: "transparent",
-      borderRadius: "999px",
-      padding: "0",
-      cursor: "pointer",
-      color: theme.textMuted,
-      fontSize: "16px",
-      lineHeight: "1",
+      class: "paperchat-bookmark-search-row",
     },
+  );
+  const searchWrap = createElement(
+    doc,
+    "div",
+    {},
     {
-      type: "button",
-      id: BOOKMARK_SEARCH_CLEAR_ID,
-      title: getString("chat-bookmark-search-clear"),
-      "aria-label": getString("chat-bookmark-search-clear"),
+      class: "paperchat-bookmark-search-field",
     },
+  );
+  const searchInput = createElement(
+    doc,
+    "input",
+    {},
+    {
+      id: BOOKMARK_SEARCH_INPUT_ID,
+      type: "search",
+      placeholder: getString("chat-bookmark-search-placeholder"),
+      "aria-label": getString("chat-bookmark-search-placeholder"),
+    },
+  ) as HTMLInputElement;
+  const searchClearBtn = createToolbarIconButton(
+    doc,
+    "close",
+    getString("chat-bookmark-search-clear"),
+    BOOKMARK_SEARCH_CLEAR_ID,
   );
   const treeToggleBtn = createToolbarIconButton(
     doc,
-    theme,
     "expand-text-input",
     getString("chat-bookmark-expand-all"),
-    { id: BOOKMARK_TREE_TOGGLE_ID },
+    BOOKMARK_TREE_TOGGLE_ID,
   );
   const newFolderBtn = createToolbarIconButton(
     doc,
-    theme,
     "folder-plus",
     getString("chat-bookmark-new-folder"),
+    "chat-bookmark-new-folder-btn",
   );
+  const newFolderLabel = createElement(doc, "span");
+  newFolderLabel.textContent = getString("chat-bookmark-new-folder");
+  newFolderBtn.appendChild(newFolderLabel);
 
   const body = createElement(
     doc,
     "div",
-    {
-      flex: "1",
-      minHeight: "0",
-      overflowY: "auto",
-      padding: "12px",
-    },
+    {},
     { id: "chat-bookmark-panel-body" },
   );
 
   const rerender = async () => {
     const state = getBookmarkManagerState(panel);
-    await renderBookmarkManagerBody(panel, theme, actions, state);
+    await renderBookmarkManagerBody(panel, getCurrentTheme(), actions, state);
   };
 
   const applySearchQuery = async (query: string) => {
     const state = getBookmarkManagerState(panel);
     state.query = query;
     setBookmarkManagerState(panel, state);
-    syncBookmarkToolbarMeta(panel, state);
     await rerender();
   };
 
@@ -1992,7 +1790,7 @@ export function createBookmarkManagerPanel(
   });
 
   newFolderBtn.addEventListener("click", async () => {
-    const name = await openBookmarkTextPrompt(doc, theme, {
+    const name = await openBookmarkTextPrompt(doc, getCurrentTheme(), {
       title: getString("chat-bookmark-new-folder"),
       label: getString("chat-bookmark-new-folder-prompt"),
       confirmLabel: getString("chat-bookmark-save"),
@@ -2015,19 +1813,13 @@ export function createBookmarkManagerPanel(
     await rerender();
   });
 
-  searchWrap.appendChild(searchInput);
-  searchWrap.appendChild(searchClearBtn);
-  searchRow.appendChild(searchWrap);
-  searchRow.appendChild(newFolderBtn);
-  searchRow.appendChild(treeToggleBtn);
-  headerMain.appendChild(title);
-  headerMain.appendChild(toolbarMeta);
-  headerRow.appendChild(headerMain);
-  headerRow.appendChild(closeBtn);
-  toolbar.appendChild(headerRow);
-  toolbar.appendChild(searchRow);
-  syncBookmarkToolbarMeta(panel, getBookmarkManagerState(panel));
+  searchWrap.append(searchInput, searchClearBtn);
+  searchRow.append(searchWrap, treeToggleBtn);
+  headerMain.append(title, toolbarMeta);
+  headerRow.append(brand, headerMain, newFolderBtn, closeBtn);
+  toolbar.append(headerRow, searchRow);
   panel.appendChild(toolbar);
   panel.appendChild(body);
+  syncBookmarkToolbarMeta(panel, getBookmarkManagerState(panel));
   return panel;
 }

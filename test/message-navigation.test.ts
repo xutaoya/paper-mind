@@ -98,6 +98,10 @@ class FakeElement {
     return this.children.length;
   }
 
+  get childNodes(): FakeElement[] {
+    return this.children;
+  }
+
   get textContent(): string {
     return this.textValue;
   }
@@ -1313,6 +1317,31 @@ describe("chat message exact navigation", function () {
     pending[1].finish();
     await Promise.resolve();
     assert.isNull(button.getAttribute("aria-busy"));
+  });
+
+  it("shows reply actions only after an active stream ends", function () {
+    const doc = new FakeDocument();
+    const reply = message("assistant-copy", {
+      role: "assistant",
+      content: "Partial answer",
+      streamingState: "in_progress",
+    });
+    const render = (msg: ChatMessage) =>
+      createMessageElement(
+        doc as unknown as Document,
+        msg,
+        darkTheme,
+        true,
+      ) as unknown as FakeElement;
+
+    assert.isNull(render(reply).querySelector(".message-actions"));
+    assert.isNotNull(
+      render({
+        ...reply,
+        content: "Complete answer",
+        streamingState: undefined,
+      }).querySelector(".copy-message-btn"),
+    );
   });
 
   it("offers quoting for completed assistant replies", function () {

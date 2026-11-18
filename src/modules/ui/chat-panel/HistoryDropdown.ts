@@ -203,7 +203,6 @@ export function appendHighlightedSearchText(
   text: string,
   ranges: SearchHighlightRange[],
   doc: Document,
-  theme: ThemeColors,
 ): void {
   let offset = 0;
   for (const range of normalizeHighlightRanges(ranges, text.length)) {
@@ -212,14 +211,14 @@ export function appendHighlightedSearchText(
         doc.createTextNode(text.slice(offset, range.start)),
       );
     }
-    const highlight = createElement(doc, "span", {
-      background: theme.buttonHoverBg,
-      color: theme.textPrimary,
-      borderRadius: "3px",
-      padding: "0 1px",
-      fontWeight: "600",
-    });
-    highlight.className = "history-search-highlight";
+    const highlight = createElement(
+      doc,
+      "mark",
+      {},
+      {
+        class: "history-search-highlight",
+      },
+    );
     highlight.appendChild(
       doc.createTextNode(text.slice(range.start, range.end)),
     );
@@ -490,90 +489,39 @@ function invokeSafely(
 
 function createSearchActionRow(
   doc: Document,
-  theme: ThemeColors,
+  className: string,
 ): HTMLButtonElement {
   return createElement(
     doc,
     "button",
+    {},
     {
-      display: "grid",
-      gridTemplateRows: "auto auto",
-      alignContent: "start",
-      rowGap: "3px",
-      width: "100%",
-      height: "auto",
-      minHeight: "0",
-      maxHeight: "none",
-      boxSizing: "border-box",
-      margin: "1px 0",
-      padding: "8px 10px",
-      background: "transparent",
-      border: "none",
-      borderRadius: "6px",
-      appearance: "none",
-      overflow: "hidden",
-      color: theme.textPrimary,
-      fontFamily: "inherit",
-      fontSize: "12px",
-      lineHeight: "17px",
-      textAlign: "left",
-      whiteSpace: "normal",
-      cursor: "pointer",
+      type: "button",
+      class: `history-search-action ${className}`,
     },
-    { type: "button" },
   ) as HTMLButtonElement;
-}
-
-function addSearchRowHover(row: HTMLElement, theme: ThemeColors): void {
-  row.addEventListener("mouseenter", () => {
-    row.style.background = theme.dropdownItemHoverBg;
-  });
-  row.addEventListener("mouseleave", () => {
-    row.style.background = "transparent";
-  });
 }
 
 function createTitleMatchRow(
   doc: Document,
   group: ChatHistorySearchGroup,
-  theme: ThemeColors,
   callbacks: HistoryDropdownSearchCallbacks,
   disabled: boolean,
 ): HTMLElement {
-  const row = createSearchActionRow(doc, theme);
-  row.className = "history-search-title-match";
+  const row = createSearchActionRow(doc, "history-search-title-match");
   row.setAttribute("data-session-id", group.sessionId);
+  row.setAttribute(
+    "title",
+    group.sessionTitle || getString("chat-history-search-title-match"),
+  );
   row.disabled = disabled;
-  row.style.opacity = disabled ? "0.55" : "1";
-  row.style.cursor = disabled ? "default" : "pointer";
-  addSearchRowHover(row, theme);
 
-  const label = createElement(doc, "span", {
-    display: "block",
-    color: theme.textMuted,
-    fontSize: "10px",
-    fontWeight: "600",
-    lineHeight: "14px",
-  });
-  label.textContent = getString("chat-history-search-title-match");
-
-  const snippet = createElement(doc, "span", {
-    display: "block",
-    minWidth: "0",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    lineHeight: "17px",
-  });
   appendHighlightedSearchText(
-    snippet,
+    row,
     group.titleMatch?.snippet || group.sessionTitle || "",
     group.titleMatch?.highlightRanges || [],
     doc,
-    theme,
   );
-  row.appendChild(label);
-  row.appendChild(snippet);
   row.addEventListener("click", (event) => {
     event.stopPropagation();
     if (row.disabled) return;
@@ -589,63 +537,47 @@ function createMessageMatchRow(
   doc: Document,
   group: ChatHistorySearchGroup,
   match: ChatHistoryMessageMatch,
-  theme: ThemeColors,
   callbacks: HistoryDropdownSearchCallbacks,
   disabled: boolean,
 ): HTMLElement {
-  const row = createSearchActionRow(doc, theme);
-  row.className = "history-search-message-match";
+  const row = createSearchActionRow(doc, "history-search-message-match");
   row.setAttribute("data-session-id", group.sessionId);
   row.setAttribute("data-message-id", match.messageId);
   row.disabled = disabled;
-  row.style.opacity = disabled ? "0.55" : "1";
-  row.style.cursor = disabled ? "default" : "pointer";
-  addSearchRowHover(row, theme);
 
-  const meta = createElement(doc, "span", {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) max-content",
-    alignItems: "baseline",
-    columnGap: "8px",
-    minWidth: "0",
-    color: theme.textMuted,
-    fontSize: "10px",
-    lineHeight: "14px",
-  });
-  const role = createElement(doc, "span", { fontWeight: "600" });
+  const meta = createElement(
+    doc,
+    "span",
+    {},
+    { class: "history-search-message-meta" },
+  );
+  const role = createElement(
+    doc,
+    "span",
+    {},
+    { class: "history-search-message-role", "data-role": match.role },
+  );
   role.textContent = getString(
     match.role === "user"
       ? "chat-history-search-user"
       : "chat-history-search-assistant",
   );
-  const time = createElement(doc, "span", {
-    whiteSpace: "nowrap",
-    fontVariantNumeric: "tabular-nums",
-  });
+  const time = createElement(doc, "span", {});
   time.textContent = formatTimestamp(match.messageTimestamp);
   meta.appendChild(role);
   meta.appendChild(time);
 
-  const snippet = createElement(doc, "span", {
-    color: theme.textSecondary,
-    width: "100%",
-    minWidth: "0",
-    overflow: "hidden",
-    display: "-webkit-box",
-    webkitLineClamp: "2",
-    webkitBoxOrient: "vertical",
-    lineHeight: "17px",
-    maxHeight: "34px",
-    whiteSpace: "normal",
-    overflowWrap: "anywhere",
-    wordBreak: "break-word",
-  });
+  const snippet = createElement(
+    doc,
+    "span",
+    {},
+    { class: "history-search-snippet" },
+  );
   appendHighlightedSearchText(
     snippet,
     match.snippet,
     match.highlightRanges,
     doc,
-    theme,
   );
 
   row.appendChild(meta);
@@ -718,20 +650,24 @@ function mergeMessagePage(
   state.expandedCounts[group.sessionId] = group.matches.length;
 }
 
-function renderSearchEmptyState(
+function renderSearchStatus(
   body: HTMLElement,
   doc: Document,
-  theme: ThemeColors,
+  pending: boolean,
 ): void {
-  const empty = createElement(doc, "div", {
-    padding: "24px 16px",
-    textAlign: "center",
-    color: theme.textMuted,
-    fontSize: "13px",
-  });
-  empty.className = "history-search-empty";
-  empty.textContent = getString("chat-history-search-no-results");
-  body.appendChild(empty);
+  const status = createElement(
+    doc,
+    "div",
+    {},
+    {
+      class: "history-search-empty",
+      role: "status",
+    },
+  );
+  status.textContent = getString(
+    pending ? "chat-history-search-pending" : "chat-history-search-no-results",
+  );
+  body.appendChild(status);
 }
 
 function renderSearchGroup(
@@ -744,64 +680,54 @@ function renderSearchGroup(
   onExpand: (sessionId: string) => void,
   actionsDisabled: boolean,
 ): void {
-  const wrapper = createElement(doc, "section", {
-    padding: "10px 8px 12px",
-    borderBottom: `1px solid ${theme.borderColor}`,
-  });
-  wrapper.className = "history-search-group";
-  wrapper.setAttribute("data-session-id", group.sessionId);
+  const wrapper = createElement(
+    doc,
+    "section",
+    {},
+    {
+      class: "history-search-group",
+      "data-session-id": group.sessionId,
+    },
+  );
 
-  const header = createElement(doc, "div", {
-    display: "grid",
-    gridTemplateColumns: "minmax(0, 1fr) max-content",
-    alignItems: "baseline",
-    columnGap: "10px",
-    padding: "2px 6px 6px",
-  });
-  header.className = "history-search-group-header";
-  const title = createElement(doc, "div", {
-    minWidth: "0",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-    color: theme.textPrimary,
-    fontSize: "13px",
-    fontWeight: "600",
-    lineHeight: "18px",
-  });
-  title.textContent =
-    group.sessionTitle ||
-    getString("chat-history-title", {
-      args: { time: formatTimestamp(group.sessionUpdatedAt) },
-    });
-  const updatedAt = createElement(doc, "div", {
-    flexShrink: "0",
-    color: theme.textMuted,
-    fontSize: "10px",
-    lineHeight: "14px",
-    whiteSpace: "nowrap",
-    fontVariantNumeric: "tabular-nums",
-  });
+  const header = createElement(
+    doc,
+    "header",
+    {},
+    { class: "history-search-group-header" },
+  );
+  const title = createElement(
+    doc,
+    "h2",
+    {},
+    { class: "history-search-group-title" },
+  );
+  if (group.titleMatch) {
+    title.appendChild(
+      createTitleMatchRow(doc, group, callbacks, actionsDisabled),
+    );
+  } else {
+    title.textContent =
+      group.sessionTitle ||
+      getString("chat-history-title", {
+        args: { time: formatTimestamp(group.sessionUpdatedAt) },
+      });
+    title.setAttribute("title", title.textContent);
+  }
+  const updatedAt = createElement(
+    doc,
+    "span",
+    {},
+    { class: "history-search-group-date" },
+  );
   updatedAt.textContent = formatTimestamp(group.sessionUpdatedAt);
   header.appendChild(title);
   header.appendChild(updatedAt);
   wrapper.appendChild(header);
 
-  if (group.titleMatch) {
-    wrapper.appendChild(
-      createTitleMatchRow(doc, group, theme, callbacks, actionsDisabled),
-    );
-  }
   for (const match of group.matches) {
     wrapper.appendChild(
-      createMessageMatchRow(
-        doc,
-        group,
-        match,
-        theme,
-        callbacks,
-        actionsDisabled,
-      ),
+      createMessageMatchRow(doc, group, match, callbacks, actionsDisabled),
     );
   }
 
@@ -810,19 +736,14 @@ function renderSearchGroup(
     group.totalMessageMatches - group.matches.length,
   );
   if (remaining > 0 && group.nextMessageCursor) {
-    const expand = createSearchActionRow(doc, theme);
-    expand.className = "history-search-expand-matches";
+    const expand = createSearchActionRow(doc, "history-search-expand-matches");
     expand.style.color = theme.textSecondary;
-    expand.style.textAlign = "center";
-    expand.style.fontWeight = "500";
     expand.textContent = getString("chat-history-search-more-matches", {
       args: { count: remaining },
     });
     const pending =
       actionsDisabled || state.pendingExpansionSessionIds.has(group.sessionId);
     expand.disabled = pending;
-    expand.style.opacity = pending ? "0.55" : "1";
-    expand.style.cursor = pending ? "default" : "pointer";
     expand.addEventListener("click", (event) => {
       event.stopPropagation();
       if (!expand.disabled) onExpand(group.sessionId);
@@ -918,15 +839,10 @@ export function renderHistorySearchResults(
   const actionsDisabled =
     state.cache !== null &&
     state.cache.normalizedQuery !== normalizeSearchValue(state.query);
-  if (state.groups.length === 0 && state.searchPending) {
-    body.textContent = "";
-    body.scrollTop = preservedScrollTop;
-    return;
-  }
   body.textContent = "";
 
   if (state.groups.length === 0) {
-    renderSearchEmptyState(body, doc, theme);
+    renderSearchStatus(body, doc, state.searchPending);
     body.scrollTop = preservedScrollTop;
     return;
   }
@@ -945,16 +861,11 @@ export function renderHistorySearchResults(
   }
 
   if (state.sessionCursor && onNextSessions) {
-    const next = createSearchActionRow(doc, theme);
-    next.className = "history-search-next-sessions";
-    next.style.padding = "12px 14px";
+    const next = createSearchActionRow(doc, "history-search-next-sessions");
     next.style.color = theme.textSecondary;
-    next.style.textAlign = "center";
-    next.style.fontWeight = "500";
     next.textContent = getString("chat-history-search-more-sessions");
     const pending = state.searchPending || actionsDisabled;
     next.disabled = pending;
-    next.style.opacity = pending ? "0.55" : "1";
     next.addEventListener("click", (event) => {
       event.stopPropagation();
       if (!next.disabled) onNextSessions();

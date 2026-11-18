@@ -28,7 +28,7 @@ function findForkIndex(
   return forkIndex;
 }
 
-function isItemContextTransition(message: ChatMessage): boolean {
+export function isItemContextTransition(message: ChatMessage): boolean {
   return (
     message.role === "system" &&
     message.isSystemNotice === true &&

@@ -1,13 +1,17 @@
 .paperchat-prefs-root {
+  container: paperchat-prefs / inline-size;
   --prefs-surface: #ffffff;
-  --prefs-muted-surface: #f6f7f9;
-  --prefs-border: #e1e4e9;
-  --prefs-text: #252b36;
-  --prefs-muted: #737b88;
-  --prefs-accent: #2563eb;
-  --prefs-accent-soft: #eaf1ff;
+  --prefs-muted-surface: #f3f5f3;
+  --prefs-border: #dce2de;
+  --prefs-text: #252e2b;
+  --prefs-muted: #5e6964;
+  --prefs-accent: #2e6457;
+  --prefs-accent-soft: #e4eee8;
+  --prefs-danger: #a43035;
   margin: 0;
   padding: 0;
+  width: 100%;
+  box-sizing: border-box;
   min-width: 0;
   border: none;
   background: transparent;
@@ -15,10 +19,9 @@
 }
 
 .paperchat-prefs-shell {
-  container-type: inline-size;
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
   width: 100%;
   min-width: 0;
 }
@@ -26,56 +29,43 @@
 .paperchat-prefs-nav {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--prefs-border);
-  border-radius: 12px;
-  background: var(--prefs-muted-surface);
+  column-gap: 12px;
+  border-bottom: 1px solid var(--prefs-border);
 }
 
 .paperchat-prefs-nav-item {
   appearance: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 1 0 auto;
-  width: auto;
-  height: auto;
-  min-height: 36px;
-  max-height: none;
   box-sizing: border-box;
+  height: auto;
+  min-height: 34px;
+  max-height: none;
   margin: 0;
-  border: none;
+  padding: 6px 3px;
+  border: 0;
+  border-block-end: 2px solid transparent;
+  border-radius: 0;
   background: transparent;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font: inherit;
-  font-size: 14px;
-  line-height: 20px;
   color: var(--prefs-muted);
+  font: inherit;
+  font-size: 13px;
+  line-height: 18px;
+  text-align: start;
   cursor: pointer;
-  white-space: nowrap;
-  transition: background-color 160ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .paperchat-prefs-nav-item:hover {
-  background: var(--prefs-surface);
   color: var(--prefs-text);
-}
-
-.paperchat-prefs-nav-item::-moz-focus-inner {
-  border: 0;
-  padding: 0;
+  background: var(--prefs-muted-surface);
 }
 
 .paperchat-prefs-nav-item.is-active {
-  background: var(--prefs-surface);
+  border-block-end-color: var(--prefs-accent);
   color: var(--prefs-accent);
-  font-weight: 600;
-  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+  font-weight: 650;
 }
 
 .paperchat-prefs-panels {
+  container: paperchat-prefs-content / inline-size;
   min-width: 0;
   padding: 0 0 24px;
 }
@@ -85,17 +75,12 @@
 }
 
 .paperchat-prefs-panel-title {
-  margin: 0 0 24px;
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 28px;
+  margin: 0 0 16px;
+  font-size: 23px;
+  font-weight: 650;
+  line-height: 1.3;
 }
 
-.paperchat-prefs-block {
-  margin-top: 24px;
-}
-
-.paperchat-prefs-block > label > h3,
 .paperchat-prefs-provider-sidebar h3 {
   margin: 0 0 8px;
   font-size: 14px;
@@ -105,9 +90,9 @@
 
 .paperchat-prefs-model-layout {
   display: grid;
-  grid-template-columns: 144px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: 24px;
+  gap: 18px;
   min-width: 0;
 }
 
@@ -119,16 +104,15 @@
 
 .paperchat-prefs-provider-content {
   min-width: 0;
-  padding: 24px;
-  border: 1px solid var(--prefs-border);
-  border-radius: 12px;
-  background: var(--prefs-surface);
+  padding-block-start: 16px;
+  border-top: 1px solid var(--prefs-border);
 }
 
 #pref-provider-list {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -139,31 +123,37 @@
 }
 
 .provider-list-item {
-  padding: 8px 12px !important;
-  margin: 0 !important;
-  border-radius: 8px !important;
+  appearance: none;
+  margin: 0;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--prefs-text);
   cursor: pointer;
-  display: flex !important;
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
+  max-width: 100%;
   box-sizing: border-box;
-  font-size: 14px;
+  font: inherit;
+  font-size: 13px;
   line-height: 20px;
 }
 
 .provider-list-item[data-selected="true"] {
-  background: var(--prefs-accent-soft) !important;
-  color: var(--prefs-accent) !important;
+  background: var(--prefs-accent-soft);
+  color: var(--prefs-accent);
   font-weight: 600;
 }
 
 .provider-list-item:hover:not([data-selected="true"]) {
-  background: var(--prefs-muted-surface) !important;
+  background: var(--prefs-muted-surface);
 }
 
-.provider-list-item > div {
+.provider-list-status {
   flex-shrink: 0;
 }
 
@@ -219,7 +209,7 @@
   margin: 0;
   font-size: 12px;
   line-height: 16px;
-  font-weight: 500;
+  font-weight: 600;
   white-space: normal;
 }
 
@@ -236,8 +226,8 @@
   justify-content: space-between;
 }
 
-#pref-panel-apikey input,
-#pref-panel-apikey textarea {
+.paperchat-prefs-root input:not([type="range"]),
+.paperchat-prefs-root textarea {
   display: block;
   flex: 1 1 auto;
   width: 100%;
@@ -246,7 +236,7 @@
   margin: 0;
   padding: 8px 12px;
   border: 1px solid var(--prefs-border);
-  border-radius: 8px;
+  border-radius: 5px;
   background: var(--prefs-surface);
   color: var(--prefs-text);
   font: inherit;
@@ -254,8 +244,8 @@
   line-height: 20px;
 }
 
-#pref-panel-apikey input:focus,
-#pref-panel-apikey textarea:focus {
+.paperchat-prefs-root input:not([type="range"]):focus,
+.paperchat-prefs-root textarea:focus {
   outline: 2px solid var(--prefs-accent-soft);
   outline-offset: 1px;
   border-color: var(--prefs-accent);
@@ -281,6 +271,8 @@
 }
 
 .paperchat-prefs-root #pref-add-provider-btn,
+.paperchat-prefs-root .paperchat-prefs-actions button,
+.paperchat-prefs-root .paperchat-prefs-setting button,
 #pref-panel-apikey button {
   appearance: none;
   flex-shrink: 0;
@@ -290,7 +282,7 @@
   margin: 0;
   padding: 4px 12px;
   border: 1px solid var(--prefs-border);
-  border-radius: 8px;
+  border-radius: 5px;
   background: var(--prefs-surface);
   color: var(--prefs-text);
   font-size: 12px;
@@ -302,6 +294,8 @@
   margin-top: 12px;
 }
 
+.paperchat-prefs-root .paperchat-prefs-actions button:hover:not(:disabled),
+.paperchat-prefs-root .paperchat-prefs-setting button:hover:not(:disabled),
 #pref-panel-apikey button:hover:not(:disabled),
 .paperchat-prefs-root #pref-add-provider-btn:hover {
   background: var(--prefs-muted-surface);
@@ -325,14 +319,11 @@
 }
 
 #pref-model-list {
-  max-height: 180px;
+  max-height: 220px;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
-  padding: 4px;
-  border: 1px solid var(--prefs-border);
-  border-radius: 8px;
-  background: var(--prefs-muted-surface);
+  border-block: 1px solid var(--prefs-border);
 }
 
 .paperchat-prefs-model-row {
@@ -350,18 +341,18 @@
 }
 
 .paperchat-prefs-advanced {
-  padding: 12px;
-  border: 1px solid var(--prefs-border);
-  border-radius: 8px;
+  padding: 12px 0;
+  border-block: 1px solid var(--prefs-border);
 }
 
 .paperchat-prefs-advanced > summary {
   font-size: 12px;
   line-height: 20px;
-  font-weight: 500;
+  font-weight: 650;
   cursor: pointer;
 }
 
+.paperchat-prefs-advanced > .paperchat-prefs-description,
 .paperchat-prefs-advanced > .paperchat-prefs-field {
   margin-top: 16px;
 }
@@ -370,71 +361,195 @@
   flex-wrap: wrap;
 }
 
+.paperchat-prefs-root label[role="status"] {
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 #pref-panel-apikey #pref-test-connection {
   background: var(--prefs-accent);
   border-color: var(--prefs-accent);
-  color: var(--prefs-surface);
+  color: var(--prefs-on-accent, #fff);
 }
 
-.paperchat-prefs-active-provider {
+.paperchat-prefs-setting {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  padding-block: 12px;
+  border-bottom: 1px solid var(--prefs-border);
+}
+
+.paperchat-prefs-setting-copy {
+  flex: 1 1 215px;
+  min-width: 0;
+}
+
+.paperchat-prefs-setting-label {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.paperchat-prefs-description {
+  margin: 3px 0 0;
+  color: var(--prefs-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.paperchat-prefs-setting > .paperchat-prefs-description {
+  flex: 1 1 200px;
+}
+
+.paperchat-prefs-range {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 16px;
-  border: 1px solid var(--prefs-border);
-  border-radius: 12px;
-  background: var(--prefs-muted-surface);
+  gap: 8px;
+  max-width: 100%;
+  color: var(--prefs-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
-.paperchat-prefs-active-provider > label > h3 {
+.paperchat-prefs-range input {
+  width: 128px;
+  min-width: 0;
+  accent-color: var(--prefs-accent);
+}
+
+.paperchat-prefs-setting input[type="number"] {
+  flex: 0 1 90px;
+  width: 90px;
+}
+
+.paperchat-prefs-setting menulist {
   margin: 0;
+  width: 190px;
+  max-width: 100%;
+  min-width: 0;
 }
 
-@container (max-width: 640px) {
+.paperchat-prefs-active-provider {
+  align-items: center;
+  margin-bottom: 18px;
+  border-block: 1px solid var(--prefs-border);
+}
+
+.paperchat-prefs-path {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--prefs-border);
+  font:
+    12px / 1.55 ui-monospace,
+    monospace;
+  overflow-wrap: anywhere;
+  color: var(--prefs-muted);
+}
+
+.paperchat-prefs-root #pref-delete-provider {
+  color: var(--prefs-danger);
+}
+
+.paperchat-prefs-root .mineru-pref-page--embedded {
+  --mineru-text: var(--prefs-text);
+  --mineru-text-secondary: var(--prefs-muted);
+  --mineru-primary: var(--prefs-accent);
+  --mineru-primary-soft: var(--prefs-accent-soft);
+  --mineru-border: var(--prefs-border);
+  --mineru-bg: var(--prefs-surface);
+  --mineru-sidepane: var(--prefs-muted-surface);
+  margin-top: 14px;
+}
+
+.paperchat-prefs-root .mineru-pref-page--embedded .mineru-pref-config {
+  padding: 0 0 14px;
+  border: 0;
+  border-bottom: 1px solid var(--prefs-border);
+  border-radius: 0;
+  background: transparent;
+}
+
+@container paperchat-prefs-content (max-width: 560px) {
+  .paperchat-prefs-root .mineru-pref-page--embedded .mineru-pref-layout {
+    flex-direction: column;
+  }
+
+  .paperchat-prefs-root .mineru-pref-page--embedded .mineru-pref-sidebar {
+    width: auto;
+    max-height: 220px;
+    border-right: 0;
+    border-bottom: 1px solid var(--prefs-border);
+  }
+
+  .paperchat-prefs-root .mineru-pref-page--embedded .mineru-pref-main {
+    min-height: 0;
+  }
+}
+
+@container paperchat-prefs (min-width: 720px) {
+  .paperchat-prefs-shell {
+    grid-template-columns: 150px minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .paperchat-prefs-nav {
+    align-self: start;
+    flex-direction: column;
+    gap: 2px;
+    border-bottom: 0;
+  }
+
+  .paperchat-prefs-nav-item {
+    border-block-end: 0;
+    border-inline-start: 2px solid transparent;
+    padding-inline: 11px 6px;
+  }
+
+  .paperchat-prefs-nav-item.is-active {
+    border-inline-start-color: var(--prefs-accent);
+    background: var(--prefs-muted-surface);
+  }
+
+  .paperchat-prefs-panels {
+    padding-inline-start: 24px;
+    border-inline-start: 1px solid var(--prefs-border);
+  }
+}
+
+@container paperchat-prefs (min-width: 910px) {
   .paperchat-prefs-model-layout {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
+    grid-template-columns: 142px minmax(0, 1fr);
   }
-  .paperchat-prefs-provider-sidebar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: 8px;
-  }
-  .paperchat-prefs-provider-sidebar > label {
-    grid-column: 1 / -1;
-  }
-  .paperchat-prefs-provider-sidebar h3 {
-    margin: 0;
-  }
+
   #pref-provider-list {
-    flex-direction: row;
-    flex-wrap: wrap;
+    flex-direction: column;
+    flex-wrap: nowrap;
   }
-  .paperchat-prefs-root #pref-add-provider-btn {
-    margin-top: 0;
-  }
+
   .paperchat-prefs-provider-content {
-    padding: 16px;
+    padding-block-start: 0;
+    padding-inline-start: 18px;
+    border-top: 0;
+    border-inline-start: 1px solid var(--prefs-border);
   }
 }
 
 @media (prefers-color-scheme: dark) {
   .paperchat-prefs-root {
-    --prefs-surface: #1f1f1f;
-    --prefs-muted-surface: #272727;
-    --prefs-border: #3e4249;
-    --prefs-text: #e5e7eb;
-    --prefs-muted: #9ca3af;
-    --prefs-accent: #93b7ff;
-    --prefs-accent-soft: #293750;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .paperchat-prefs-nav-item {
-    transition: none;
+    --prefs-surface: #232622;
+    --prefs-muted-surface: #2d332e;
+    --prefs-border: #404a43;
+    --prefs-text: #e4ebe6;
+    --prefs-muted: #aebcb3;
+    --prefs-accent: #a6cfbd;
+    --prefs-accent-soft: #344b40;
+    --prefs-danger: #f1a3a3;
+    --prefs-on-accent: #182c23;
   }
 }

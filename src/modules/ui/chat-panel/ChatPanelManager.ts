@@ -44,6 +44,7 @@ import {
 import { executeAppendToNote } from "../../chat/pdf-tools";
 import { openBookmarkSaveDialog } from "./BookmarkSaveDialog";
 import { normalizeSourceItemKeys } from "../../chat/note-source-provenance";
+import { isItemContextTransition } from "../../chat/session-fork";
 import { isPathInsidePresentationRoot } from "../../presentation";
 import type { PresentationLaunchSettings } from "../../presentation/PresentationLaunchSettings";
 
@@ -95,7 +96,7 @@ import {
   formatMarkdownForMessageCopy,
   messageHasAgentActivityContent,
   assistantContentHasVisibleAnswer,
-  renderMarkdownToElement,
+  renderStreamingMarkdownToElement,
 } from "./MarkdownRenderer";
 import { getDataPath } from "../../../utils/common";
 import { markdownToNoteHtml } from "../../../utils/markdownToNoteHtml";
@@ -254,9 +255,7 @@ function renderStreamingTextNow(
       ? { suppressToolCallCards: true }
       : {}),
   };
-  // Always parse the current snapshot: a raw-text tail can remain on screen
-  // indefinitely when the provider switches from answer text back to reasoning.
-  renderMarkdownToElement(
+  renderStreamingMarkdownToElement(
     streamingEl,
     content,
     messageId,
@@ -926,15 +925,15 @@ async function toggleReaderBookmark(
       sessionId: record.sessionId,
       messageId: record.messageId,
       itemKey:
-        navigationItem?.key ??
         record.itemKey ??
+        navigationItem?.key ??
         session?.lastActiveItemKey ??
         null,
-      itemLibraryId:
-        navigationItem?.libraryID ??
-        record.itemLibraryId ??
-        session?.lastActiveItemLibraryID ??
-        null,
+      itemLibraryId: record.itemKey
+        ? (record.itemLibraryId ?? record.libraryId)
+        : (navigationItem?.libraryID ??
+          session?.lastActiveItemLibraryID ??
+          null),
     },
     { onPresent: () => readerHost?.present?.() },
   );
@@ -2756,32 +2755,83 @@ function clearPendingQuotedMessages(context: ChatPanelContext): void {
   context.updateAttachmentsPreview();
 }
 
+function resolveReaderPaper(
+  session: ChatSession,
+  message: ChatMessage,
+  canUseSessionPaper: boolean,
+): Zotero.Item | null {
+  const scope = session.scopeItemKeys ?? [];
+  const sourceKeys = collectNoteSummarySourceItemKeys([message]);
+  if (sourceKeys.length === 0) {
+    if (scope.length === 1) return getItemByLibraryKey(scope[0]);
+    return canUseSessionPaper && scope.length === 0
+      ? getItemByLibraryKey(
+          session.lastActiveItemKey,
+          session.lastActiveItemLibraryID,
+        )
+      : null;
+  }
+
+  let paper: Zotero.Item | null = null;
+  for (const key of sourceKeys) {
+    const evidenceLibraries = new Set(
+      message.evidence
+        ?.filter((record) => record.itemKey === key)
+        .flatMap((record) =>
+          record.libraryID === undefined ? [] : [record.libraryID],
+        ),
+    );
+    if (evidenceLibraries.size > 1) return null;
+    const libraryId =
+      evidenceLibraries.values().next().value ??
+      (scope.includes(key)
+        ? Zotero.Libraries.userLibraryID
+        : session.lastActiveItemLibraryID);
+    const item = getItemByLibraryKey(key, libraryId);
+    if (!item) return null;
+    const parent = item.parentItem ?? item;
+    if (paper && parent.id !== paper.id) return null;
+    paper = parent;
+  }
+  return paper;
+}
+
 function buildReaderBookmarksFromSession(
   session: ChatSession,
 ): BookmarkRecord[] {
-  return session.messages
-    .filter(
-      (message) => message.role === "assistant" && !message.isSystemNotice,
-    )
-    .map((message) => ({
-      id: message.id,
-      libraryId: 0,
-      folderId: null,
-      type: "message" as const,
-      title: deriveBookmarkTitleForAssistantReply(
-        session.messages,
-        message.id,
-        message.content,
-      ),
-      content: message.content,
-      sessionId: session.id,
-      messageId: message.id,
-      itemKey: null,
-      itemLibraryId: null,
-      pageUrl: null,
-      createdAt: message.timestamp,
-      updatedAt: message.timestamp,
-    }));
+  const lastPaperChange = session.messages.findLastIndex(
+    isItemContextTransition,
+  );
+  return session.messages.flatMap((message, index) => {
+    if (message.role !== "assistant" || message.isSystemNotice) return [];
+    let paper: Zotero.Item | null = null;
+    try {
+      paper = resolveReaderPaper(session, message, index > lastPaperChange);
+    } catch (error) {
+      ztoolkit.log("[BookmarkReader] Failed to resolve reply paper:", error);
+    }
+    return [
+      {
+        id: message.id,
+        libraryId: paper?.libraryID ?? 0,
+        folderId: null,
+        type: "message" as const,
+        title: deriveBookmarkTitleForAssistantReply(
+          session.messages,
+          message.id,
+          message.content,
+        ),
+        content: message.content,
+        sessionId: session.id,
+        messageId: message.id,
+        itemKey: paper?.key ?? null,
+        itemLibraryId: paper?.libraryID ?? null,
+        pageUrl: null,
+        createdAt: message.timestamp,
+        updatedAt: message.timestamp,
+      },
+    ];
+  });
 }
 
 export async function openBookmarkReaderForContext(

@@ -540,9 +540,7 @@ function getPaperSkillsFolderPath(): string {
 }
 
 function initPaperSkillSettings(doc: Document): void {
-  const pathLabel = doc.getElementById(
-    "pref-paper-skills-path",
-  ) as XUL.Label | null;
+  const pathLabel = doc.getElementById("pref-paper-skills-path");
   if (pathLabel) {
     pathLabel.textContent = getPaperSkillsFolderPath();
   }

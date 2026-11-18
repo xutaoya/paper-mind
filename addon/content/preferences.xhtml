@@ -24,42 +24,49 @@
         type="button"
         class="paperchat-prefs-nav-item is-active"
         data-pref-section="models"
+        aria-controls="pref-section-models"
         data-l10n-id="pref-nav-models"
       ></html:button>
       <html:button
         type="button"
         class="paperchat-prefs-nav-item"
         data-pref-section="pdf"
+        aria-controls="pref-section-pdf"
         data-l10n-id="pref-nav-pdf"
       ></html:button>
       <html:button
         type="button"
         class="paperchat-prefs-nav-item"
         data-pref-section="web-search"
+        aria-controls="pref-section-web-search"
         data-l10n-id="pref-nav-web-search"
       ></html:button>
       <html:button
         type="button"
         class="paperchat-prefs-nav-item"
         data-pref-section="ui"
+        aria-controls="pref-section-ui"
         data-l10n-id="pref-nav-ui"
       ></html:button>
       <html:button
         type="button"
         class="paperchat-prefs-nav-item"
         data-pref-section="ai-tools"
+        aria-controls="pref-section-ai-tools"
         data-l10n-id="pref-nav-ai-tools"
       ></html:button>
       <html:button
         type="button"
         class="paperchat-prefs-nav-item"
         data-pref-section="skills"
+        aria-controls="pref-section-skills"
         data-l10n-id="pref-nav-skills"
       ></html:button>
       <html:button
         type="button"
         class="paperchat-prefs-nav-item"
         data-pref-section="aisummary"
+        aria-controls="pref-section-aisummary"
         data-l10n-id="pref-nav-aisummary"
       ></html:button>
     </html:nav>
@@ -74,7 +81,19 @@
           class="paperchat-prefs-panel-title"
           data-l10n-id="pref-nav-models"
         ></html:h2>
-        <!-- Main layout: Sidebar + Content -->
+        <html:div
+          class="paperchat-prefs-setting paperchat-prefs-active-provider"
+        >
+          <html:label
+            for="pref-active-provider-select"
+            class="paperchat-prefs-setting-label"
+            data-l10n-id="pref-active-provider"
+          ></html:label>
+          <menulist id="pref-active-provider-select">
+            <menupopup id="pref-active-provider-popup"></menupopup>
+          </menulist>
+        </html:div>
+
         <hbox class="paperchat-prefs-model-layout">
           <!-- Provider Sidebar -->
           <vbox class="paperchat-prefs-provider-sidebar">
@@ -143,6 +162,14 @@
                   ></button>
                 </hbox>
               </vbox>
+
+              <hbox class="paperchat-prefs-actions">
+                <button
+                  id="pref-test-connection"
+                  data-l10n-id="pref-test-connection"
+                ></button>
+                <label id="pref-test-result" role="status"></label>
+              </hbox>
 
               <!-- Model List -->
               <vbox class="paperchat-prefs-models-group">
@@ -229,41 +256,16 @@
                 </vbox>
               </html:details>
 
-              <!-- Test Connection & Delete -->
               <hbox class="paperchat-prefs-actions">
-                <button
-                  id="pref-test-connection"
-                  data-l10n-id="pref-test-connection"
-                  style="text-align: center; cursor: pointer"
-                ></button>
-                <label id="pref-test-result" style="margin-left: 12px"></label>
-                <spacer flex="1" />
                 <button
                   id="pref-delete-provider"
                   data-l10n-id="pref-delete-provider"
                   hidden="true"
-                  style="color: #c00; cursor: pointer"
                 ></button>
               </hbox>
             </vbox>
           </vbox>
         </hbox>
-
-        <html:div class="paperchat-prefs-block paperchat-prefs-active-provider">
-          <label><html:h3 data-l10n-id="pref-active-provider"></html:h3></label>
-          <hbox class="paperchat-prefs-control-row">
-            <label
-              for="pref-active-provider-select"
-              data-l10n-id="pref-current-provider"
-              style="margin-right: 8px"
-            ></label>
-            <menulist id="pref-active-provider-select" style="width: 200px">
-              <menupopup id="pref-active-provider-popup">
-                <!-- Populated by JS -->
-              </menupopup>
-            </menulist>
-          </hbox>
-        </html:div>
       </html:section>
 
       <html:section
@@ -276,24 +278,25 @@
           class="paperchat-prefs-panel-title"
           data-l10n-id="pref-nav-pdf"
         ></html:h2>
-        <hbox align="center">
-          <label
-            data-l10n-id="pref-upload-raw-pdf"
-            style="margin-right: 8px"
-          ></label>
-          <checkbox id="pref-upload-raw-pdf-checkbox" native="true" />
-        </hbox>
-        <label
-          data-l10n-id="pref-upload-raw-pdf-desc"
-          style="
-            font-size: 11px;
-            color: #666;
-            margin-top: 4px;
-            margin-left: 2px;
-          "
-        ></label>
-
-        <separator class="thin" style="margin: 14px 0" />
+        <html:div class="paperchat-prefs-setting">
+          <html:div class="paperchat-prefs-setting-copy">
+            <html:label
+              id="pref-upload-raw-pdf-label"
+              for="pref-upload-raw-pdf-checkbox"
+              class="paperchat-prefs-setting-label"
+              data-l10n-id="pref-upload-raw-pdf"
+            ></html:label>
+            <html:p
+              class="paperchat-prefs-description"
+              data-l10n-id="pref-upload-raw-pdf-desc"
+            ></html:p>
+          </html:div>
+          <checkbox
+            id="pref-upload-raw-pdf-checkbox"
+            native="true"
+            aria-labelledby="pref-upload-raw-pdf-label"
+          />
+        </html:div>
 
         <html:div
           id="pref-mineru-cache-panel"
@@ -548,34 +551,31 @@
           class="paperchat-prefs-panel-title"
           data-l10n-id="pref-nav-ui"
         ></html:h2>
-        <hbox align="center" style="margin-top: 8px">
-          <label
-            for="pref-chat-ui-font-scale"
-            data-l10n-id="pref-chat-ui-font-scale"
-            style="width: 150px; margin-right: 8px"
-          ></label>
-          <html:input
-            type="range"
-            id="pref-chat-ui-font-scale"
-            style="width: 180px"
-            min="80"
-            max="180"
-            step="10"
-          ></html:input>
-          <label
-            id="pref-chat-ui-font-scale-value"
-            style="margin-left: 8px; min-width: 48px"
-          ></label>
-        </hbox>
-        <label
-          data-l10n-id="pref-chat-ui-font-scale-desc"
-          style="
-            font-size: 11px;
-            color: #666;
-            margin-top: 4px;
-            margin-left: 2px;
-          "
-        ></label>
+        <html:div class="paperchat-prefs-setting">
+          <html:div class="paperchat-prefs-setting-copy">
+            <html:label
+              for="pref-chat-ui-font-scale"
+              class="paperchat-prefs-setting-label"
+              data-l10n-id="pref-chat-ui-font-scale"
+            ></html:label>
+            <html:p
+              id="pref-chat-ui-font-scale-description"
+              class="paperchat-prefs-description"
+              data-l10n-id="pref-chat-ui-font-scale-desc"
+            ></html:p>
+          </html:div>
+          <html:div class="paperchat-prefs-range"
+            ><html:input
+              type="range"
+              id="pref-chat-ui-font-scale"
+              aria-describedby="pref-chat-ui-font-scale-description"
+              min="80"
+              max="180"
+              step="10"
+            ></html:input
+            ><label id="pref-chat-ui-font-scale-value"></label
+          ></html:div>
+        </html:div>
       </html:section>
 
       <html:section
@@ -588,127 +588,103 @@
           class="paperchat-prefs-panel-title"
           data-l10n-id="pref-nav-ai-tools"
         ></html:h2>
-        <hbox align="center">
-          <label
-            for="pref-agent-max-planning-iterations"
-            data-l10n-id="pref-agent-max-planning-iterations"
-            style="margin-right: 8px"
-          ></label>
+        <html:div class="paperchat-prefs-setting">
+          <html:div class="paperchat-prefs-setting-copy">
+            <html:label
+              for="pref-agent-max-planning-iterations"
+              class="paperchat-prefs-setting-label"
+              data-l10n-id="pref-agent-max-planning-iterations"
+            ></html:label>
+            <html:p
+              id="pref-agent-max-planning-iterations-description"
+              class="paperchat-prefs-description"
+              data-l10n-id="pref-agent-max-planning-iterations-desc"
+            ></html:p>
+          </html:div>
           <html:input
             type="number"
             id="pref-agent-max-planning-iterations"
-            style="width: 100px"
+            aria-describedby="pref-agent-max-planning-iterations-description"
             min="2"
             max="50"
             step="1"
           ></html:input>
-        </hbox>
-        <label
-          data-l10n-id="pref-agent-max-planning-iterations-desc"
-          style="
-            font-size: 11px;
-            color: #666;
-            margin-top: 4px;
-            margin-left: 2px;
-          "
-        ></label>
+        </html:div>
 
-        <hbox align="center" style="margin-top: 10px">
-          <label
-            for="pref-context-auto-compact-threshold"
-            data-l10n-id="pref-context-auto-compact-threshold"
-            style="width: 150px; margin-right: 8px"
-          ></label>
-          <html:input
-            type="range"
-            id="pref-context-auto-compact-threshold"
-            style="width: 180px"
-            min="0"
-            max="100"
-            step="1"
-          ></html:input>
-          <label
-            id="pref-context-auto-compact-threshold-value"
-            style="margin-left: 8px; min-width: 90px"
-          ></label>
-        </hbox>
-        <label
-          data-l10n-id="pref-context-auto-compact-threshold-desc"
-          style="
-            font-size: 11px;
-            color: #666;
-            margin-top: 4px;
-            margin-left: 2px;
-          "
-        ></label>
+        <html:div class="paperchat-prefs-setting">
+          <html:div class="paperchat-prefs-setting-copy">
+            <html:label
+              for="pref-context-auto-compact-threshold"
+              class="paperchat-prefs-setting-label"
+              data-l10n-id="pref-context-auto-compact-threshold"
+            ></html:label>
+            <html:p
+              id="pref-context-auto-compact-threshold-description"
+              class="paperchat-prefs-description"
+              data-l10n-id="pref-context-auto-compact-threshold-desc"
+            ></html:p>
+          </html:div>
+          <html:div class="paperchat-prefs-range"
+            ><html:input
+              type="range"
+              id="pref-context-auto-compact-threshold"
+              aria-describedby="pref-context-auto-compact-threshold-description"
+              min="0"
+              max="100"
+              step="1"
+            ></html:input
+            ><label id="pref-context-auto-compact-threshold-value"></label
+          ></html:div>
+        </html:div>
 
-        <separator class="thin" style="margin: 12px 0 8px 0" />
-
-        <html:details style="margin-top: 8px">
+        <html:details class="paperchat-prefs-advanced">
           <html:summary
             data-l10n-id="pref-tool-permission-defaults"
-            style="cursor: pointer; font-weight: bold; margin-bottom: 8px"
           ></html:summary>
-          <label
+          <html:p
+            class="paperchat-prefs-description"
             data-l10n-id="pref-tool-permission-defaults-desc"
-            style="
-              font-size: 11px;
-              color: #666;
-              margin-top: 4px;
-              margin-left: 12px;
-            "
-          ></label>
-
-          <vbox style="margin-left: 12px; margin-top: 8px">
-            <hbox align="center">
-              <label
-                for="pref-tool-permission-network"
-                data-l10n-id="pref-tool-permission-network"
-                style="width: 140px; margin-right: 8px"
-              ></label>
-              <menulist id="pref-tool-permission-network" style="width: 160px">
-                <menupopup id="pref-tool-permission-network-popup"></menupopup>
-              </menulist>
-            </hbox>
-
-            <hbox align="center" style="margin-top: 8px">
-              <label
-                for="pref-tool-permission-write"
-                data-l10n-id="pref-tool-permission-write"
-                style="width: 140px; margin-right: 8px"
-              ></label>
-              <menulist id="pref-tool-permission-write" style="width: 160px">
-                <menupopup id="pref-tool-permission-write-popup"></menupopup>
-              </menulist>
-            </hbox>
-
-            <hbox align="center" style="margin-top: 8px">
-              <label
-                for="pref-tool-permission-memory"
-                data-l10n-id="pref-tool-permission-memory"
-                style="width: 140px; margin-right: 8px"
-              ></label>
-              <menulist id="pref-tool-permission-memory" style="width: 160px">
-                <menupopup id="pref-tool-permission-memory-popup"></menupopup>
-              </menulist>
-            </hbox>
-
-            <hbox align="center" style="margin-top: 8px">
-              <label
-                for="pref-tool-permission-high-cost"
-                data-l10n-id="pref-tool-permission-high-cost"
-                style="width: 140px; margin-right: 8px"
-              ></label>
-              <menulist
-                id="pref-tool-permission-high-cost"
-                style="width: 160px"
-              >
-                <menupopup
-                  id="pref-tool-permission-high-cost-popup"
-                ></menupopup>
-              </menulist>
-            </hbox>
-          </vbox>
+          ></html:p>
+          <html:div class="paperchat-prefs-setting">
+            <html:label
+              class="paperchat-prefs-setting-label"
+              for="pref-tool-permission-network"
+              data-l10n-id="pref-tool-permission-network"
+            ></html:label>
+            <menulist id="pref-tool-permission-network">
+              <menupopup id="pref-tool-permission-network-popup"></menupopup>
+            </menulist>
+          </html:div>
+          <html:div class="paperchat-prefs-setting">
+            <html:label
+              class="paperchat-prefs-setting-label"
+              for="pref-tool-permission-write"
+              data-l10n-id="pref-tool-permission-write"
+            ></html:label>
+            <menulist id="pref-tool-permission-write">
+              <menupopup id="pref-tool-permission-write-popup"></menupopup>
+            </menulist>
+          </html:div>
+          <html:div class="paperchat-prefs-setting">
+            <html:label
+              class="paperchat-prefs-setting-label"
+              for="pref-tool-permission-memory"
+              data-l10n-id="pref-tool-permission-memory"
+            ></html:label>
+            <menulist id="pref-tool-permission-memory">
+              <menupopup id="pref-tool-permission-memory-popup"></menupopup>
+            </menulist>
+          </html:div>
+          <html:div class="paperchat-prefs-setting">
+            <html:label
+              class="paperchat-prefs-setting-label"
+              for="pref-tool-permission-high-cost"
+              data-l10n-id="pref-tool-permission-high-cost"
+            ></html:label>
+            <menulist id="pref-tool-permission-high-cost">
+              <menupopup id="pref-tool-permission-high-cost-popup"></menupopup>
+            </menulist>
+          </html:div>
         </html:details>
       </html:section>
 
@@ -723,28 +699,16 @@
           data-l10n-id="pref-nav-skills"
         ></html:h2>
 
-        <label
+        <html:p
+          class="paperchat-prefs-description"
           data-l10n-id="pref-paper-skills-desc"
-          style="
-            font-size: 11px;
-            color: #666;
-            margin-top: 4px;
-            margin-left: 2px;
-          "
-        ></label>
-
-        <label
+        ></html:p>
+        <html:p
           id="pref-paper-skills-path"
-          style="
-            margin-top: 8px;
-            margin-left: 2px;
-            font-family: monospace;
-            font-size: 11px;
-            opacity: 0.8;
-          "
-        ></label>
+          class="paperchat-prefs-path"
+        ></html:p>
 
-        <hbox align="center" style="margin-top: 10px">
+        <hbox class="paperchat-prefs-actions">
           <button
             id="pref-paper-skills-open-folder"
             data-l10n-id="pref-paper-skills-open-folder"
@@ -752,12 +716,8 @@
           <button
             id="pref-paper-skills-reload"
             data-l10n-id="pref-paper-skills-reload"
-            style="margin-left: 8px"
           ></button>
-          <label
-            id="pref-paper-skills-status"
-            style="margin-left: 10px; font-size: 11px; opacity: 0.8"
-          ></label>
+          <label id="pref-paper-skills-status" role="status"></label>
         </hbox>
       </html:section>
 
@@ -772,68 +732,44 @@
           data-l10n-id="pref-nav-aisummary"
         ></html:h2>
 
-        <!-- Automatically summarize newly added papers -->
-        <hbox align="center" style="margin-bottom: 8px">
-          <label style="width: 80px"></label>
+        <html:div class="paperchat-prefs-setting">
           <checkbox
             id="pref-aisummary-auto-generate-on-item-add"
             data-l10n-id="pref-aisummary-auto-generate-on-item-add"
             native="true"
-            style="margin-left: 8px"
           />
-        </hbox>
+        </html:div>
 
-        <!-- Template Selection -->
-        <hbox align="center" style="margin-bottom: 8px">
-          <label
+        <html:div class="paperchat-prefs-setting">
+          <html:label
             for="pref-aisummary-template"
+            class="paperchat-prefs-setting-label"
             data-l10n-id="pref-aisummary-template"
-            style="width: 80px; text-align: right"
-          ></label>
-          <menulist
-            id="pref-aisummary-template"
-            style="margin-left: 8px; width: 200px"
-          >
-            <menupopup id="pref-aisummary-template-popup">
-              <!-- Templates populated by JS -->
-            </menupopup>
+          ></html:label>
+          <menulist id="pref-aisummary-template">
+            <menupopup id="pref-aisummary-template-popup"></menupopup>
           </menulist>
-        </hbox>
+        </html:div>
 
-        <!-- Include Annotations -->
-        <hbox align="center" style="margin-bottom: 8px">
-          <label style="width: 80px"></label>
+        <html:div class="paperchat-prefs-setting">
           <checkbox
             id="pref-aisummary-include-annotations"
             data-l10n-id="pref-aisummary-include-annotations"
             native="true"
-            style="margin-left: 8px"
           />
-        </hbox>
+        </html:div>
 
-        <!-- Manual Run Button -->
-        <hbox align="center" style="margin-top: 12px">
-          <label style="width: 80px"></label>
+        <html:div class="paperchat-prefs-setting">
+          <html:p
+            class="paperchat-prefs-description"
+            data-l10n-id="pref-aisummary-desc"
+          ></html:p>
           <button
             id="pref-aisummary-run-now"
             data-l10n-id="pref-aisummary-run-now"
-            style="margin-left: 8px; cursor: pointer"
           ></button>
-          <label
-            id="pref-aisummary-status"
-            style="margin-left: 12px; font-size: 12px"
-          ></label>
-        </hbox>
-
-        <label
-          data-l10n-id="pref-aisummary-desc"
-          style="
-            font-size: 11px;
-            color: #666;
-            margin-top: 8px;
-            margin-left: 2px;
-          "
-        ></label>
+          <label id="pref-aisummary-status" role="status"></label>
+        </html:div>
       </html:section>
     </html:div>
   </html:div>

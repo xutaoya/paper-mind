@@ -5,6 +5,7 @@ import {
   formatMarkdownForMessageCopy,
   isLongFormSourceGroupBody,
   renderMarkdownToElement,
+  renderStreamingMarkdownToElement,
   shouldHoistSourceGroupBody,
   stripIncompleteTrailingToolCall,
   getAssistantVisibleAnswerMarkdown,
@@ -59,6 +60,10 @@ class FakeElement {
 
   get firstChild(): FakeElement | null {
     return this.children[0] || null;
+  }
+
+  get lastChild(): FakeElement | null {
+    return this.children[this.children.length - 1] || null;
   }
 
   get textContent(): string {
@@ -209,6 +214,34 @@ describe("Markdown rendering", function () {
         },
       },
     };
+  });
+
+  it("keeps stable streaming blocks and rebuilds a paragraph changed by a later link definition", function () {
+    const originalZotero = (globalThis as any).Zotero;
+    (globalThis as any).Zotero = { getMainWindow: () => null };
+    const doc = new FakeDocument();
+    const root = new FakeElement(doc, "div");
+    const render = (text: string) =>
+      renderStreamingMarkdownToElement(root as unknown as HTMLElement, text);
+    try {
+      render("# Heading\n\nRead the [paper][ref].\n\n- First");
+      const view = root.children[0];
+      const [heading, paragraph] = view.children;
+      render("# Heading\n\nRead the [paper][ref].\n\n- First\n- Second");
+      assert.strictEqual(view.children[0], heading);
+      assert.strictEqual(view.children[1], paragraph);
+      assert.include(collectRenderedText(view.children[2]), "Second");
+
+      render(
+        "# Heading\n\nRead the [paper][ref].\n\n[ref]: https://example.com",
+      );
+      assert.strictEqual(view.children[0], heading);
+      assert.notStrictEqual(view.children[1], paragraph);
+      assert.exists(findElementByTagName(view, "a"));
+      assert.lengthOf(view.children, 2);
+    } finally {
+      (globalThis as any).Zotero = originalZotero;
+    }
   });
 
   it("keeps semantic headings free of fixed sizes and preserves paragraph text", function () {
@@ -2893,6 +2926,48 @@ describe("markdown renderer math", function () {
     walk(root);
     return matches;
   };
+
+  it("reuses formula templates while mounting independent inline and display nodes", function () {
+    const globals = globalThis as { DOMParser?: unknown; Zotero?: unknown };
+    const { DOMParser: originalParser, Zotero: originalZotero } = globals;
+    const doc = new FakeDocument();
+    const root = new FakeElement(doc, "div");
+    const parsed: string[] = [];
+    globals.Zotero = { getMainWindow: () => null };
+    globals.DOMParser = class {
+      parseFromString(markup: string) {
+        parsed.push(markup);
+        return {
+          documentElement: Object.assign(new FakeElement(doc, "math"), {
+            localName: "math",
+            namespaceURI: "http://www.w3.org/1998/Math/MathML",
+          }),
+          querySelector: () => null,
+        };
+      }
+    };
+    Object.assign(doc, {
+      importNode: (node: FakeElement) => new FakeElement(doc, node.tagName),
+    });
+    try {
+      const content = "Inline $x_1$ and $x_1$.\n\n$$x_1$$";
+      renderMarkdownToElement(root as unknown as HTMLElement, content);
+      const firstNodes = collectByTag(root, "math");
+      renderMarkdownToElement(
+        root as unknown as HTMLElement,
+        content + "\n\nMore text",
+      );
+      const nextNodes = collectByTag(root, "math");
+      assert.lengthOf(parsed, 2);
+      assert.notInclude(parsed[0], 'display="block"');
+      assert.include(parsed[1], 'display="block"');
+      assert.lengthOf(nextNodes, 3);
+      assert.equal(new Set([...firstNodes, ...nextNodes]).size, 6);
+    } finally {
+      globals.DOMParser = originalParser;
+      globals.Zotero = originalZotero;
+    }
+  });
 
   it("keeps citations and following prose outside display math closing delimiters", function () {
     const originalZotero = (globalThis as any).Zotero;

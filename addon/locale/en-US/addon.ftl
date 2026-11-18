@@ -120,6 +120,12 @@ paperchat-chat-history-search-clear = Clear search
 
 paperchat-chat-history-search-no-results = No matching conversations
 
+paperchat-chat-history-search-pending = Searching…
+
+paperchat-chat-history-search-user = You
+
+paperchat-chat-history-search-assistant = Assistant
+
 paperchat-chat-history-search-title-match = Matching title
 
 paperchat-chat-history-search-more-matches = { $count } more matches
@@ -676,7 +682,7 @@ paperchat-chat-bookmark-title-required = Enter a bookmark title
 
 paperchat-chat-bookmark-folder-name-required = Enter a folder name
 
-paperchat-chat-bookmark-search-placeholder = Search titles, content, or folders
+paperchat-chat-bookmark-search-placeholder = Search bookmarks
 
 paperchat-chat-bookmark-search-no-results = No matching bookmarks
 
@@ -708,6 +714,10 @@ paperchat-chat-bookmark-type-page = Page
 
 paperchat-chat-bookmark-empty = No bookmarks yet
 
+paperchat-chat-bookmark-empty-hint = Use the bookmark icon below a reply to save it for later.
+
+paperchat-chat-bookmark-search-empty-hint = Try a shorter term or clear your search to see all bookmarks.
+
 paperchat-chat-bookmark-ungrouped = Ungrouped
 
 paperchat-chat-bookmark-no-group = Don't group
@@ -736,9 +746,9 @@ paperchat-chat-bookmark-import-invalid = Invalid bookmark file
 
 paperchat-chat-bookmark-reader-title = Reader
 
-paperchat-chat-bookmark-reader-user-message = User message
+paperchat-chat-bookmark-reader-user-message = Question
 
-paperchat-chat-bookmark-reader-assistant-message = AI reply
+paperchat-chat-bookmark-reader-assistant-message = Answer
 
 paperchat-chat-bookmark-reader-toggle-save = Save bookmark
 
@@ -753,6 +763,10 @@ paperchat-chat-bookmark-reader-open-hint = Open in reader
 paperchat-chat-bookmark-reader-empty-content = No content available
 
 paperchat-chat-bookmark-reader-outline = Section navigation
+
+paperchat-chat-bookmark-reader-previous = Previous bookmark
+
+paperchat-chat-bookmark-reader-next = Next bookmark
 
 paperchat-chat-bookmark-reader-outline-empty = No headings available in this content
 

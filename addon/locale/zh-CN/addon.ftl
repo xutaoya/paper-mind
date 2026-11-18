@@ -120,6 +120,12 @@ paperchat-chat-history-search-clear = 清空搜索
 
 paperchat-chat-history-search-no-results = 未找到相关对话
 
+paperchat-chat-history-search-pending = 正在搜索…
+
+paperchat-chat-history-search-user = 你
+
+paperchat-chat-history-search-assistant = 助手
+
 paperchat-chat-history-search-title-match = 标题匹配
 
 paperchat-chat-history-search-more-matches = 还有 { $count } 条匹配
@@ -676,7 +682,7 @@ paperchat-chat-bookmark-title-required = 请填写书签标题
 
 paperchat-chat-bookmark-folder-name-required = 请填写文件夹名称
 
-paperchat-chat-bookmark-search-placeholder = 搜索书签标题、内容或文件夹
+paperchat-chat-bookmark-search-placeholder = 搜索书签或文件夹
 
 paperchat-chat-bookmark-search-no-results = 没有匹配的书签
 
@@ -708,6 +714,10 @@ paperchat-chat-bookmark-type-page = 页面
 
 paperchat-chat-bookmark-empty = 还没有书签
 
+paperchat-chat-bookmark-empty-hint = 点击聊天回复下方的书签图标，留下想回看的内容。
+
+paperchat-chat-bookmark-search-empty-hint = 试试更短的关键词，或清除搜索查看全部书签。
+
 paperchat-chat-bookmark-ungrouped = 未分组
 
 paperchat-chat-bookmark-no-group = 不进行分组
@@ -736,9 +746,9 @@ paperchat-chat-bookmark-import-invalid = 书签文件无效
 
 paperchat-chat-bookmark-reader-title = 阅读器
 
-paperchat-chat-bookmark-reader-user-message = 用户消息
+paperchat-chat-bookmark-reader-user-message = 提问
 
-paperchat-chat-bookmark-reader-assistant-message = AI 回复
+paperchat-chat-bookmark-reader-assistant-message = 回答
 
 paperchat-chat-bookmark-reader-toggle-save = 收藏
 
@@ -753,6 +763,10 @@ paperchat-chat-bookmark-reader-open-hint = 在阅读器中查看
 paperchat-chat-bookmark-reader-empty-content = 暂无内容
 
 paperchat-chat-bookmark-reader-outline = 章节导航
+
+paperchat-chat-bookmark-reader-previous = 上一条书签
+
+paperchat-chat-bookmark-reader-next = 下一条书签
 
 paperchat-chat-bookmark-reader-outline-empty = 当前内容没有可导航的标题
 
