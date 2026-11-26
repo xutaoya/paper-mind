@@ -247,7 +247,10 @@ function getPresentationToolPromptMode(
   return "unavailable";
 }
 
-// 使用 common.ts 中的 getItemTitleSmart 获取 item 标题
+export type ConversationDeletionListener = (
+  sessionId: string,
+  deletedMessageIds?: ReadonlySet<string>,
+) => void;
 
 export class ChatManager {
   private sessionStorage: SessionStorageService;
@@ -258,6 +261,8 @@ export class ChatManager {
   private currentItemLibraryID: number | null = null;
   private initialized: boolean = false;
   private sessionNavigationQueue: Promise<void> = Promise.resolve();
+  private readonly conversationDeletionListeners =
+    new Set<ConversationDeletionListener>();
 
   // Sessions that currently have an in-flight send/stream operation.
   // switchSession() reuses these objects instead of loading from DB,
@@ -1196,6 +1201,32 @@ export class ChatManager {
     return this.sessionStorage.loadSession(sessionId);
   }
 
+  subscribeToConversationDeletion(
+    listener: ConversationDeletionListener,
+  ): () => void {
+    this.conversationDeletionListeners.add(listener);
+    return () => this.conversationDeletionListeners.delete(listener);
+  }
+
+  private notifyConversationDeletion(
+    sessionId: string,
+    messages?: ChatMessage[],
+  ): void {
+    if (!this.conversationDeletionListeners.size || messages?.length === 0)
+      return;
+    const ids = messages && new Set(messages.map(({ id }) => id));
+    for (const listener of this.conversationDeletionListeners) {
+      try {
+        listener(sessionId, ids);
+      } catch (error) {
+        ztoolkit.log(
+          "[ChatManager] Conversation deletion listener failed:",
+          error,
+        );
+      }
+    }
+  }
+
   private async switchSessionLocked(
     sessionId: string,
   ): Promise<ChatSession | null> {
@@ -1269,6 +1300,7 @@ export class ChatManager {
     if (deletingCurrentSession) {
       this.currentSession = null;
     }
+    this.notifyConversationDeletion(sessionId);
 
     // 清理 ContextManager 中的相关状态
     getContextManager().onSessionDeleted(sessionId);
@@ -3433,6 +3465,7 @@ export class ChatManager {
     if (messagesToDelete.length > 0) {
       refreshed.messages.splice(refreshedDeleteStartIndex);
     }
+    this.notifyConversationDeletion(refreshed.id, messagesToDelete);
 
     refreshed.executionPlan = undefined;
     refreshed.toolApprovalState = undefined;
@@ -3518,6 +3551,7 @@ export class ChatManager {
       refreshedSlice.start,
       refreshedSlice.end - refreshedSlice.start,
     );
+    this.notifyConversationDeletion(refreshed.id, messagesToDelete);
     refreshed.executionPlan =
       deletingActiveTail && refreshed.executionPlan
         ? undefined
@@ -3567,6 +3601,7 @@ export class ChatManager {
     this.applySessionItemContext(clearedSession);
 
     await this.sessionStorage.deleteAllMessages(clearedSession.id);
+    this.notifyConversationDeletion(clearedSession.id);
     await this.sessionStorage.updateSessionMeta(clearedSession);
     this.onExecutionPlanUpdate?.(clearedSession.executionPlan);
     this.onMessageUpdate?.(clearedSession.messages);

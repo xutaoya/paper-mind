@@ -6,8 +6,137 @@ import { HTML_NS } from "../types";
 import { createUiChevron, setUiChevronExpanded } from "../UiChevron";
 import type { ThemeColors } from "../types";
 
+const SVG_NS = "http://www.w3.org/2000/svg";
 const STATS_READING_FILE = "paperchat-reading-stats.json";
 const STATS_TOKEN_FILE = "paperchat-token-stats.json";
+
+export type StatsPanelView = "reading" | "chat" | "tokens";
+
+export type StatsIconKind =
+  | "chart"
+  | "refresh"
+  | "close"
+  | "help"
+  | "reading"
+  | "chat"
+  | "tokens";
+
+export function createStatsSvgIcon(
+  doc: Document,
+  kind: StatsIconKind,
+  size = 15,
+): SVGSVGElement {
+  const svg = doc.createElementNS(SVG_NS, "svg") as SVGSVGElement;
+  svg.setAttribute("width", String(size));
+  svg.setAttribute("height", String(size));
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("class", `paperchat-stats-svg-icon is-${kind}`);
+
+  const appendPath = (
+    d: string,
+    options: { strokeWidth?: string; fill?: string; opacity?: string } = {},
+  ): void => {
+    const path = doc.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", d);
+    if (options.fill) {
+      path.setAttribute("fill", options.fill);
+    } else {
+      path.setAttribute("stroke", "currentColor");
+      path.setAttribute("stroke-width", options.strokeWidth || "1.5");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("stroke-linejoin", "round");
+    }
+    if (options.opacity) {
+      path.setAttribute("opacity", options.opacity);
+    }
+    svg.appendChild(path);
+  };
+
+  if (kind === "chart") {
+    const bars: Array<[string, string, string, string, string]> = [
+      ["2", "8.5", "2.8", "5.5", "0.72"],
+      ["6.6", "5.2", "2.8", "8.8", "0.86"],
+      ["11.2", "2.2", "2.8", "11.8", "1"],
+    ];
+    for (const [x, y, width, height, opacity] of bars) {
+      const rect = doc.createElementNS(SVG_NS, "rect");
+      rect.setAttribute("x", x);
+      rect.setAttribute("y", y);
+      rect.setAttribute("width", width);
+      rect.setAttribute("height", height);
+      rect.setAttribute("rx", "1");
+      rect.setAttribute("fill", "currentColor");
+      rect.setAttribute("opacity", opacity);
+      svg.appendChild(rect);
+    }
+    return svg;
+  }
+
+  if (kind === "refresh") {
+    appendPath("M13.2 4.2v3.3H9.9", { strokeWidth: "1.55" });
+    appendPath("M2.8 11.8V8.5h3.3", { strokeWidth: "1.55" });
+    appendPath(
+      "M12.9 7.5A5.2 5.2 0 0 0 4.2 4.4L3.1 5.5M3.1 8.5a5.2 5.2 0 0 0 8.7 3.1l1.1-1.1",
+      { strokeWidth: "1.55" },
+    );
+    return svg;
+  }
+
+  if (kind === "close") {
+    appendPath("M4.2 4.2l7.6 7.6M11.8 4.2l-7.6 7.6", {
+      strokeWidth: "1.6",
+    });
+    return svg;
+  }
+
+  if (kind === "help") {
+    const circle = doc.createElementNS(SVG_NS, "circle");
+    circle.setAttribute("cx", "8");
+    circle.setAttribute("cy", "8");
+    circle.setAttribute("r", "6");
+    circle.setAttribute("stroke", "currentColor");
+    circle.setAttribute("stroke-width", "1.45");
+    svg.appendChild(circle);
+    appendPath("M6.4 6.3a1.7 1.7 0 1 1 2.4 1.55c-.55.3-.8.65-.8 1.25", {
+      strokeWidth: "1.45",
+    });
+    const dot = doc.createElementNS(SVG_NS, "circle");
+    dot.setAttribute("cx", "8");
+    dot.setAttribute("cy", "11.35");
+    dot.setAttribute("r", "0.8");
+    dot.setAttribute("fill", "currentColor");
+    svg.appendChild(dot);
+    return svg;
+  }
+
+  if (kind === "reading") {
+    appendPath(
+      "M2.3 3.6c1.8-.4 3.6-.1 5.7 1.1 2.1-1.2 3.9-1.5 5.7-1.1v8.7c-1.8-.35-3.6-.05-5.7 1.05-2.1-1.1-3.9-1.4-5.7-1.05V3.6Z",
+      { strokeWidth: "1.4" },
+    );
+    appendPath("M8 4.7v8.6", { strokeWidth: "1.35" });
+    return svg;
+  }
+
+  if (kind === "chat") {
+    appendPath(
+      "M3 3.4h10a1.4 1.4 0 0 1 1.4 1.4v5.4a1.4 1.4 0 0 1-1.4 1.4H6.6L3.4 13.8v-2.2H3a1.4 1.4 0 0 1-1.4-1.4V4.8A1.4 1.4 0 0 1 3 3.4Z",
+      { strokeWidth: "1.4" },
+    );
+    return svg;
+  }
+
+  // tokens
+  appendPath("M8 2.1 13.6 5.3 8 8.5 2.4 5.3 8 2.1Z", { strokeWidth: "1.4" });
+  appendPath("M2.4 8.2 8 11.4l5.6-3.2", { strokeWidth: "1.4" });
+  appendPath("M2.4 10.9 8 14.1l5.6-3.2", {
+    strokeWidth: "1.4",
+    opacity: "0.75",
+  });
+  return svg;
+}
 
 export function getLocalizedWeekdayLabels(): string[] {
   const base = new Date(2024, 0, 7);
@@ -81,30 +210,19 @@ export function appendStatsPanelToolbar(
 ): void {
   toolsHost.textContent = "";
 
-  const updated = createElement(doc, "span", {
-    fontSize: "11px",
-    color: theme.textMuted,
-    fontVariantNumeric: "tabular-nums",
-    whiteSpace: "nowrap",
-    marginRight: "auto",
-    flex: "1 1 auto",
-    minWidth: "0",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-  });
+  const updated = createElement(doc, "span", {});
   updated.className = "paperchat-stats-updated-at";
   updated.textContent = formatUpdatedAt(options.updatedAt);
   toolsHost.appendChild(updated);
 
   toolsHost.appendChild(
-    createIconToolButton(doc, theme, getString("chat-stats-refresh"), () => {
+    createIconToolButton(doc, getString("chat-stats-refresh"), () => {
       options.onRefresh();
     }),
   );
   toolsHost.appendChild(
     createIconToolButton(
       doc,
-      theme,
       getString("chat-stats-export-reading-short"),
       () => {
         options.onExportReading();
@@ -115,7 +233,6 @@ export function appendStatsPanelToolbar(
   toolsHost.appendChild(
     createIconToolButton(
       doc,
-      theme,
       getString("chat-stats-export-token-short"),
       () => {
         options.onExportToken();
@@ -124,7 +241,7 @@ export function appendStatsPanelToolbar(
     ),
   );
   toolsHost.appendChild(
-    createIconToolButton(doc, theme, getString("chat-stats-help"), () => {
+    createIconToolButton(doc, getString("chat-stats-help"), () => {
       toggleStatsHelpPopover(
         header,
         doc,
@@ -152,7 +269,6 @@ function formatUpdatedAt(date: Date): string {
 
 function createIconToolButton(
   doc: Document,
-  theme: ThemeColors,
   label: string,
   onClick: () => void,
   tooltip?: string,
@@ -161,20 +277,13 @@ function createIconToolButton(
   const button = createElement(
     doc,
     "button",
+    {},
     {
-      height: "28px",
-      padding: "0 8px",
-      border: `1px solid ${theme.borderColor}`,
-      borderRadius: "6px",
-      background: "transparent",
-      color: theme.textSecondary,
-      fontSize: "11px",
-      fontWeight: "550",
-      cursor: "pointer",
-      whiteSpace: "nowrap",
-      flexShrink: "0",
+      type: "button",
+      class: "paperchat-stats-pill-action-btn",
+      title: hint,
+      "aria-label": hint,
     },
-    { type: "button", title: hint, "aria-label": hint },
   ) as HTMLButtonElement;
   button.textContent = label;
   button.addEventListener("click", (event) => {
@@ -189,7 +298,7 @@ const STATS_HELP_ID = "paperchat-stats-help-popover";
 export function toggleStatsHelpPopover(
   anchor: HTMLElement,
   doc: Document,
-  theme: ThemeColors,
+  _theme: ThemeColors,
   text: string,
 ): void {
   const existing = anchor.querySelector(`#${STATS_HELP_ID}`);
@@ -197,23 +306,19 @@ export function toggleStatsHelpPopover(
     existing.remove();
     return;
   }
-  const pop = createElement(doc, "div", {
-    position: "absolute",
-    top: "calc(100% + 6px)",
-    right: "0",
-    zIndex: "8",
-    maxWidth: "min(320px, calc(100% - 24px))",
-    padding: "10px 12px",
-    borderRadius: "10px",
-    border: `1px solid ${theme.borderColor}`,
-    background: theme.dropdownBg || theme.inputBg,
-    boxShadow: "0 8px 24px rgba(15, 23, 42, 0.12)",
-    fontSize: "11px",
-    lineHeight: "1.5",
-    color: theme.textSecondary,
-    whiteSpace: "pre-wrap",
-  });
-  pop.id = STATS_HELP_ID;
+  if (!text.trim()) {
+    return;
+  }
+  const pop = createElement(
+    doc,
+    "div",
+    {},
+    {
+      id: STATS_HELP_ID,
+      class: "paperchat-stats-help-popover",
+      role: "dialog",
+    },
+  );
   pop.textContent = text;
   const mount =
     (anchor.querySelector(".paperchat-stats-header-actions") as HTMLElement) ||
@@ -222,7 +327,10 @@ export function toggleStatsHelpPopover(
   mount.appendChild(pop);
   const dismiss = (event: MouseEvent): void => {
     const target = event.target as HTMLElement | null;
-    if (target?.closest(`#${STATS_HELP_ID}`) || target?.closest("button")) {
+    if (
+      target?.closest(`#${STATS_HELP_ID}`) ||
+      target?.closest("[data-stats-help-trigger]")
+    ) {
       return;
     }
     pop.remove();
@@ -233,70 +341,85 @@ export function toggleStatsHelpPopover(
 
 export function createCollapsibleSection(
   doc: Document,
-  theme: ThemeColors,
+  _theme: ThemeColors,
   title: string,
   content: HTMLElement,
-  options: { defaultCollapsed?: boolean; storageKey?: string } = {},
+  options: {
+    defaultCollapsed?: boolean;
+    storageKey?: string;
+    badge?: string;
+  } = {},
 ): HTMLElement {
-  const wrap = createElement(doc, "div", {
-    marginTop: "4px",
-    marginBottom: "8px",
-  });
-  wrap.className = "paperchat-stats-collapsible";
+  const wrap = createElement(doc, "section", {});
+  wrap.className = "paperchat-stats-card paperchat-stats-collapsible";
 
   const head = createElement(
     doc,
     "button",
+    {},
     {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      width: "100%",
-      padding: "8px 0",
-      border: "none",
-      background: "transparent",
-      cursor: "pointer",
-      color: theme.textPrimary,
-      fontSize: "13px",
-      fontWeight: "600",
-      textAlign: "left",
+      type: "button",
+      class: "paperchat-stats-collapsible-trigger",
     },
-    { type: "button" },
   ) as HTMLButtonElement;
 
-  const titleEl = createElement(doc, "span", {});
+  const titleGroup = createElement(
+    doc,
+    "span",
+    {},
+    { class: "paperchat-stats-collapsible-heading" },
+  );
+  const titleEl = createElement(
+    doc,
+    "span",
+    {},
+    { class: "paperchat-stats-section-title" },
+  );
   titleEl.textContent = title;
+  titleGroup.appendChild(titleEl);
+
+  if (options.badge) {
+    const badgeEl = createElement(
+      doc,
+      "span",
+      {},
+      { class: "paperchat-stats-card-badge" },
+    );
+    badgeEl.textContent = options.badge;
+    titleGroup.appendChild(badgeEl);
+  }
+
   const chevron = createUiChevron(doc, {
     className: "paperchat-stats-collapsible-chevron",
     kind: "right",
-    size: 16,
-    color: theme.textMuted,
-    opacity: 0.55,
+    size: 15,
+    color: "currentColor",
+    opacity: 0.65,
   });
-  head.appendChild(titleEl);
+  head.appendChild(titleGroup);
   head.appendChild(chevron);
 
-  const body = createElement(doc, "div", {
-    display: "block",
-    overflow: "hidden",
-  });
+  const body = createElement(doc, "div", {});
   body.className = "paperchat-stats-collapsible-body";
   body.appendChild(content);
 
   let collapsed = Boolean(options.defaultCollapsed);
   if (options.storageKey) {
     try {
-      collapsed =
-        (Zotero.Prefs.get(
-          `extensions.${config.addonRef}.stats.${options.storageKey}`,
-          true,
-        ) as string) === "1";
+      const stored = Zotero.Prefs.get(
+        `extensions.${config.addonRef}.stats.${options.storageKey}`,
+        true,
+      ) as string | undefined;
+      if (stored === "1" || stored === "0") {
+        collapsed = stored === "1";
+      }
     } catch {
       // ignore
     }
   }
 
   const apply = (): void => {
+    wrap.dataset.collapsed = collapsed ? "true" : "false";
     body.style.display = collapsed ? "none" : "block";
     head.setAttribute("aria-expanded", String(!collapsed));
     setUiChevronExpanded(chevron, !collapsed);
@@ -353,16 +476,7 @@ export function createReadingTrackerStatus(
   theme: ThemeColors,
   active: boolean,
 ): HTMLElement {
-  const row = createElement(doc, "div", {
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    marginBottom: "8px",
-    padding: "0 2px",
-    fontSize: "11px",
-    lineHeight: "1.35",
-    color: active ? theme.sendButtonBg || "#16a34a" : theme.textMuted,
-  });
+  const row = createElement(doc, "div", {});
   row.className = "paperchat-stats-tracker-status";
   fillReadingTrackerStatus(row, doc, theme, active);
   return row;
@@ -371,21 +485,27 @@ export function createReadingTrackerStatus(
 export function fillReadingTrackerStatus(
   host: HTMLElement,
   doc: Document,
-  theme: ThemeColors,
+  _theme: ThemeColors,
   active: boolean,
 ): void {
   host.textContent = "";
-  host.style.color = active ? theme.sendButtonBg || "#16a34a" : theme.textMuted;
-  const dot = createElement(doc, "span", {
-    width: "6px",
-    height: "6px",
-    borderRadius: "999px",
-    flexShrink: "0",
-    background: active ? "#22c55e" : theme.textMuted,
-    opacity: active ? "1" : "0.55",
-  });
+  host.dataset.tracking = active ? "active" : "paused";
+  const dot = createElement(
+    doc,
+    "span",
+    {},
+    {
+      class: "paperchat-stats-status-dot",
+      "data-active": active ? "true" : "false",
+    },
+  );
   host.appendChild(dot);
-  const text = createElement(doc, "span", {});
+  const text = createElement(
+    doc,
+    "span",
+    {},
+    { class: "paperchat-stats-status-text" },
+  );
   text.textContent = active
     ? getString("chat-stats-tracking-active")
     : getString("chat-stats-tracking-paused");
@@ -395,8 +515,6 @@ export function fillReadingTrackerStatus(
   host.appendChild(text);
 }
 
-export type StatsPanelView = "reading" | "tokens";
-
 export function updateStatsPanelSubtitle(
   subtitle: HTMLElement,
   doc: Document,
@@ -404,25 +522,31 @@ export function updateStatsPanelSubtitle(
   view: StatsPanelView,
   trackingActive: boolean,
 ): void {
-  subtitle.className = "paperchat-stats-panel-subtitle";
   if (view === "tokens") {
+    subtitle.className = "paperchat-stats-panel-subtitle";
+    delete subtitle.dataset.tracking;
     subtitle.textContent = getString("chat-stats-header-subtitle-tokens");
-    subtitle.removeAttribute("title");
-    subtitle.style.color = theme.textMuted;
-    subtitle.style.display = "block";
+    subtitle.removeAttribute?.("title");
     return;
   }
-  Object.assign(subtitle.style, {
-    display: "flex",
-    alignItems: "center",
-    gap: "6px",
-    fontSize: "12px",
-    lineHeight: "1.35",
-    minWidth: "0",
-    overflow: "hidden",
-    textOverflow: "ellipsis",
-  });
+  if (view === "chat") {
+    subtitle.className = "paperchat-stats-panel-subtitle";
+    delete subtitle.dataset.tracking;
+    subtitle.textContent = getString("chat-stats-header-subtitle-chat");
+    subtitle.removeAttribute?.("title");
+    return;
+  }
+  subtitle.className =
+    "paperchat-stats-panel-subtitle paperchat-stats-panel-subtitle--status";
   fillReadingTrackerStatus(subtitle, doc, theme, trackingActive);
+}
+
+function resolveIconKind(iconFile: string): StatsIconKind | null {
+  if (iconFile === "refresh.svg") return "refresh";
+  if (iconFile === "close.svg") return "close";
+  if (iconFile === "help.svg") return "help";
+  if (iconFile === "chart.svg") return "chart";
+  return null;
 }
 
 export function createStatsToolbarIconButton(
@@ -435,53 +559,52 @@ export function createStatsToolbarIconButton(
   const button = createElement(
     doc,
     "button",
+    {},
     {
-      width: "32px",
-      height: "32px",
-      minWidth: "32px",
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      border: "none",
-      borderRadius: "8px",
-      background: "transparent",
-      cursor: "pointer",
-      padding: "0",
-      appearance: "none",
-      color: theme.textMuted,
-      flexShrink: "0",
+      type: "button",
+      class: "paperchat-stats-icon-btn",
+      title: label,
+      "aria-label": label,
     },
-    { type: "button", title: label, "aria-label": label },
   ) as HTMLButtonElement;
-  const icon = doc.createElementNS(HTML_NS, "img") as HTMLImageElement;
-  icon.src = `chrome://${config.addonRef}/content/icons/${iconFile}`;
-  icon.alt = "";
-  icon.setAttribute("aria-hidden", "true");
-  Object.assign(icon.style, {
-    width: "15px",
-    height: "15px",
-    display: "block",
-    opacity: "0.82",
-    filter: overlayPanelIconFilter(theme),
-  });
-  button.appendChild(icon);
+
+  const knownKind = resolveIconKind(iconFile);
+  if (knownKind) {
+    button.appendChild(
+      createStatsSvgIcon(doc, knownKind, knownKind === "close" ? 14 : 15),
+    );
+  } else {
+    const icon = doc.createElementNS(HTML_NS, "img") as HTMLImageElement;
+    icon.src = `chrome://${config.addonRef}/content/icons/${iconFile}`;
+    icon.alt = "";
+    icon.setAttribute("aria-hidden", "true");
+    Object.assign(icon.style, {
+      width: "15px",
+      height: "15px",
+      display: "block",
+      opacity: "0.82",
+      filter: overlayPanelIconFilter(theme),
+    });
+    button.appendChild(icon);
+  }
+
   button.addEventListener("click", (event) => {
     event.stopPropagation();
+    if (knownKind === "refresh") {
+      button.classList.remove("is-spinning");
+      void button.offsetWidth;
+      button.classList.add("is-spinning");
+      doc.defaultView?.setTimeout(() => {
+        button.classList.remove("is-spinning");
+      }, 520);
+    }
     onClick();
-  });
-  button.addEventListener("mouseenter", () => {
-    button.style.background = theme.buttonHoverBg;
-    button.style.color = theme.textPrimary;
-  });
-  button.addEventListener("mouseleave", () => {
-    button.style.background = "transparent";
-    button.style.color = theme.textMuted;
   });
   return button;
 }
 
-const STATS_LAYOUT_MEDIUM_MAX = 340;
-const STATS_LAYOUT_NARROW_MAX = 260;
+const STATS_LAYOUT_MEDIUM_MAX = 350;
+const STATS_LAYOUT_NARROW_MAX = 270;
 
 export type StatsPanelLayout = "wide" | "medium" | "narrow";
 

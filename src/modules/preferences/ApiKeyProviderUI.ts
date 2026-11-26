@@ -3,7 +3,6 @@
  */
 
 import { getString } from "../../utils/locale";
-import { prefColors } from "../../utils/colors";
 import { getProviderManager } from "../providers";
 import type { ApiKeyProviderConfig } from "../../types/provider";
 import { clearElement, showTestResult } from "./utils";
@@ -203,13 +202,6 @@ export function populateModelList(
       "div",
     ) as HTMLDivElement;
     item.className = "paperchat-prefs-model-row";
-    item.style.cssText = `
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 4px 8px;
-      border-bottom: 1px solid var(--color-border, #eee);
-    `;
 
     // Model info container
     const infoContainer = doc.createElementNS(
@@ -217,15 +209,13 @@ export function populateModelList(
       "div",
     ) as HTMLDivElement;
     infoContainer.className = "paperchat-prefs-model-info";
-    infoContainer.style.cssText =
-      "display: flex; flex-direction: column; flex: 1;";
 
     // Model ID with custom badge
     const nameRow = doc.createElementNS(
       "http://www.w3.org/1999/xhtml",
       "div",
     ) as HTMLDivElement;
-    nameRow.style.cssText = "display: flex; align-items: center; gap: 6px;";
+    nameRow.className = "paperchat-prefs-model-name-row";
 
     const nameSpan = doc.createElementNS(
       "http://www.w3.org/1999/xhtml",
@@ -233,7 +223,6 @@ export function populateModelList(
     ) as HTMLSpanElement;
     nameSpan.className = "paperchat-prefs-model-name";
     nameSpan.textContent = modelId;
-    nameSpan.style.cssText = "font-size: 12px;";
     nameRow.appendChild(nameSpan);
 
     if (isCustom) {
@@ -241,8 +230,8 @@ export function populateModelList(
         "http://www.w3.org/1999/xhtml",
         "span",
       ) as HTMLSpanElement;
+      badge.className = "paperchat-prefs-model-badge";
       badge.textContent = getString("pref-model-custom" as any);
-      badge.style.cssText = `font-size: 10px; padding: 1px 4px; background: ${prefColors.customBadgeBg}; color: ${prefColors.customBadgeText}; border-radius: 3px;`;
       nameRow.appendChild(badge);
     }
 
@@ -261,8 +250,8 @@ export function populateModelList(
       if (modelInfo.capabilities?.length) {
         metaParts.push(modelInfo.capabilities.join(", "));
       }
-      metaSpan.textContent = metaParts.join(" | ");
-      metaSpan.style.cssText = "font-size: 10px; color: #888;";
+      metaSpan.className = "paperchat-prefs-model-meta";
+      metaSpan.textContent = metaParts.join(" · ");
       infoContainer.appendChild(metaSpan);
     }
 
@@ -272,22 +261,20 @@ export function populateModelList(
       "http://www.w3.org/1999/xhtml",
       "div",
     ) as HTMLDivElement;
-    actions.style.cssText =
-      "display: flex; align-items: center; gap: 8px; flex-shrink: 0;";
+    actions.className = "paperchat-prefs-model-actions";
 
     const speedResult = doc.createElementNS(
       "http://www.w3.org/1999/xhtml",
       "span",
     ) as HTMLSpanElement;
     speedResult.className = "pref-model-speed-result";
-    speedResult.style.cssText =
-      "font-size: 11px; color: #666; min-width: 48px;";
 
     const speedBtn = doc.createElementNS(
       "http://www.w3.org/1999/xhtml",
       "button",
     ) as HTMLButtonElement;
     speedBtn.type = "button";
+    speedBtn.className = "paperchat-prefs-model-speed-btn";
     speedBtn.textContent = getString("pref-model-speed-test");
     speedBtn.addEventListener("click", async () => {
       saveCurrentProviderConfig(doc, config.id);
@@ -299,22 +286,22 @@ export function populateModelList(
       }
 
       speedBtn.disabled = true;
-      speedResult.style.color = "#666";
+      speedResult.dataset.state = "testing";
       speedResult.textContent = getString("pref-model-speed-testing");
       try {
         const result = await testModelSpeed(latestConfig, modelId);
         if (result.success) {
-          speedResult.style.color = "#2e7d32";
+          speedResult.dataset.state = "ok";
           speedResult.textContent = getString("pref-model-speed-result", {
             args: { latency: result.latencyMs },
           });
         } else {
-          speedResult.style.color = "#c62828";
+          speedResult.dataset.state = "error";
           speedResult.title = result.error || "";
           speedResult.textContent = getString("pref-model-speed-failed");
         }
       } catch (error) {
-        speedResult.style.color = "#c62828";
+        speedResult.dataset.state = "error";
         speedResult.title =
           error instanceof Error ? error.message : String(error);
         speedResult.textContent = getString("pref-model-speed-failed");
@@ -331,16 +318,9 @@ export function populateModelList(
         "http://www.w3.org/1999/xhtml",
         "button",
       ) as HTMLButtonElement;
+      deleteBtn.type = "button";
+      deleteBtn.className = "paperchat-prefs-model-delete-btn";
       deleteBtn.textContent = "×";
-      deleteBtn.style.cssText = `
-        border: none;
-        background: none;
-        color: #c00;
-        cursor: pointer;
-        font-size: 16px;
-        padding: 0 4px;
-        line-height: 1;
-      `;
       deleteBtn.addEventListener("click", () => {
         if (providerManager.removeCustomModel(config.id, modelId)) {
           const updatedConfig = providerManager.getProviderConfig(
@@ -365,9 +345,8 @@ export function populateModelList(
       "http://www.w3.org/1999/xhtml",
       "div",
     ) as HTMLDivElement;
+    emptyItem.className = "paperchat-prefs-model-empty";
     emptyItem.textContent = "—";
-    emptyItem.style.cssText =
-      "padding: 8px; text-align: center; color: #888; font-size: 12px;";
     listContainer.appendChild(emptyItem);
   }
 }

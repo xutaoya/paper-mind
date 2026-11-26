@@ -48,6 +48,7 @@ import {
   type ChatMessagePresentation,
 } from "../../chat/message-presentation";
 import { canBookmarkAssistantReply } from "../../bookmarks";
+import { canReadAssistantReply } from "../../bookmarks/bookmarkTurnContent";
 import { canSummarizeAssistantReply } from "./NoteSummaryActions";
 import {
   createMessageTimeSeparatorElement,
@@ -1798,10 +1799,9 @@ function createMessageActions(
   }
 
   if (
-    msg.role === "assistant" &&
+    onOpenMessageReader &&
     msg.streamingState === undefined &&
-    Boolean(msg.content.trim()) &&
-    onOpenMessageReader
+    canReadAssistantReply(msg)
   ) {
     actions.appendChild(
       createOpenMessageReaderButton(doc, theme, msg.id, onOpenMessageReader),

@@ -1,35 +1,67 @@
 .mineru-pref-page {
-  --mineru-border: var(--color-border, #d7d7d7);
-  --mineru-bg: var(--material-background, #ffffff);
-  --mineru-sidepane: var(--material-sidepane, #f9fafb);
-  --mineru-text: var(--fill-primary, #1f2937);
-  --mineru-text-secondary: var(--fill-secondary, #6b7280);
-  --mineru-primary: #0a84ff;
-  --mineru-primary-soft: #dbeafe;
-  --mineru-danger: #c62828;
-  --mineru-row-hover: rgba(10, 132, 255, 0.06);
-  --mineru-row-alt: rgba(0, 0, 0, 0.02);
+  --mineru-font-mono: "SF Mono", ui-monospace, "Menlo", "Consolas", monospace;
+  --mineru-border: #dfd8ca;
+  --mineru-border-strong: #cabfa9;
+  --mineru-bg: #fdfcf8;
+  --mineru-sidepane: #f4f1e8;
+  --mineru-hover: #ece7db;
+  --mineru-text: #1f201b;
+  --mineru-text-secondary: #726d61;
+  --mineru-primary: #963f2a;
+  --mineru-primary-hover: #7f3422;
+  --mineru-primary-soft: rgba(150, 63, 42, 0.09);
+  --mineru-on-primary: #fdfcf8;
+  --mineru-plot: #355e49;
+  --mineru-warning: #a3621a;
+  --mineru-danger: #b23a32;
+  --mineru-danger-border: rgba(178, 58, 50, 0.34);
+  --mineru-danger-soft: rgba(178, 58, 50, 0.08);
+  --mineru-row-hover: #f4f1e8;
+  --mineru-row-alt: transparent;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   padding: 4px 2px 8px;
   color: var(--mineru-text);
+}
+
+@media (prefers-color-scheme: dark) {
+  .mineru-pref-page {
+    --mineru-border: #3d3f37;
+    --mineru-border-strong: #52544a;
+    --mineru-bg: #252621;
+    --mineru-sidepane: #2d2e28;
+    --mineru-hover: #35362f;
+    --mineru-text: #ede9dd;
+    --mineru-text-secondary: #938f82;
+    --mineru-primary: #e89b7d;
+    --mineru-primary-hover: #f0ab90;
+    --mineru-primary-soft: rgba(232, 155, 125, 0.14);
+    --mineru-on-primary: #221712;
+    --mineru-plot: #7eb394;
+    --mineru-warning: #e5b567;
+    --mineru-danger: #ef9a94;
+    --mineru-danger-border: rgba(239, 154, 148, 0.35);
+    --mineru-danger-soft: rgba(239, 154, 148, 0.12);
+    --mineru-row-hover: #2d2e28;
+  }
 }
 
 .mineru-pref-config {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   padding: 14px 16px;
   border: 1px solid var(--mineru-border);
-  border-radius: 10px;
+  border-radius: 6px;
   background: var(--mineru-sidepane);
 }
 
 .mineru-pref-config-title {
   margin: 0;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 640;
+  color: var(--mineru-text);
 }
 
 .mineru-pref-config-desc {
@@ -48,8 +80,10 @@
 
 .mineru-pref-apply-link {
   font-size: 12px;
-  color: var(--link-color, #1a73e8);
+  color: var(--mineru-primary);
   text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -60,9 +94,9 @@
 
 .mineru-pref-inline-desc {
   display: block;
-  margin: 4px 0 0 2px;
-  font-size: 11px;
-  color: var(--mineru-text-secondary, #666);
+  margin: -2px 0 4px;
+  font-size: 11.5px;
+  color: var(--mineru-text-secondary);
   line-height: 1.45;
 }
 
@@ -73,19 +107,38 @@
   flex-wrap: wrap;
 }
 
+.mineru-pref-config-row--toggle {
+  justify-content: space-between;
+  padding: 10px 0 2px;
+  border-top: 1px solid var(--mineru-border);
+  font-size: 13px;
+  font-weight: 560;
+  color: var(--mineru-text);
+}
+
+.mineru-pref-config-row--field {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--mineru-border);
+}
+
 .mineru-pref-config-label {
   min-width: 96px;
   font-size: 12px;
+  font-weight: 600;
   color: var(--mineru-text-secondary);
 }
 
 .mineru-pref-token-input {
   flex: 1;
   min-width: 220px;
-  padding: 7px 10px;
+  padding: 7px 11px;
   border: 1px solid var(--mineru-border);
-  border-radius: 8px;
+  border-radius: 5px;
   background: var(--mineru-bg);
+  color: var(--mineru-text);
+  font-family: var(--mineru-font-mono);
+  font-size: 12px;
 }
 
 .mineru-pref-test-result {
@@ -108,8 +161,8 @@
 
 .mineru-pref-cache-title {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 640;
   white-space: nowrap;
 }
 
@@ -120,13 +173,14 @@
 
 .mineru-pref-progress-wrap progress {
   width: 100%;
-  height: 6px;
+  height: 5px;
   accent-color: var(--mineru-primary);
 }
 
 .mineru-pref-summary {
   color: var(--mineru-text-secondary);
-  font-size: 13px;
+  font-family: var(--mineru-font-mono);
+  font-size: 12px;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
@@ -145,20 +199,28 @@
   align-items: center !important;
   justify-content: center !important;
   box-sizing: border-box !important;
-  height: 32px !important;
+  height: 30px !important;
   margin: 0 !important;
-  padding: 0 14px !important;
-  border-radius: 8px !important;
-  border: 1px solid transparent !important;
-  background: transparent !important;
+  padding: 0 12px !important;
+  border-radius: 5px !important;
+  border: 1px solid var(--mineru-border-strong) !important;
+  background: var(--mineru-bg) !important;
   box-shadow: none !important;
   color: var(--mineru-text) !important;
   font: inherit !important;
   font-size: 12px !important;
-  font-weight: 500 !important;
+  font-weight: 520 !important;
   line-height: 1 !important;
   vertical-align: middle !important;
   cursor: pointer !important;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease !important;
+}
+
+.mineru-pref-btn:hover:not(:disabled) {
+  background: var(--mineru-sidepane) !important;
 }
 
 .mineru-pref-btn:disabled {
@@ -169,51 +231,67 @@
 .mineru-pref-btn-primary {
   background: var(--mineru-primary) !important;
   border-color: var(--mineru-primary) !important;
-  color: #fff !important;
+  color: var(--mineru-on-primary) !important;
+  font-weight: 560 !important;
+}
+
+.mineru-pref-btn-primary:hover:not(:disabled) {
+  background: var(--mineru-primary-hover) !important;
+  border-color: var(--mineru-primary-hover) !important;
 }
 
 .mineru-pref-btn-secondary {
   background: var(--mineru-bg) !important;
-  border-color: var(--mineru-border) !important;
+  border-color: var(--mineru-border-strong) !important;
   color: var(--mineru-text) !important;
 }
 
 .mineru-pref-btn-danger {
   background: var(--mineru-bg) !important;
-  border-color: #f3b4b4 !important;
+  border-color: var(--mineru-danger-border) !important;
   color: var(--mineru-danger) !important;
+}
+
+.mineru-pref-btn-danger:hover:not(:disabled) {
+  background: var(--mineru-danger-soft) !important;
 }
 
 .mineru-pref-btn-ghost {
   margin-left: auto !important;
   color: var(--mineru-text-secondary) !important;
   border-color: var(--mineru-border) !important;
-  background: var(--mineru-bg) !important;
+  background: transparent !important;
+}
+
+.mineru-pref-btn-ghost:hover:not(:disabled) {
+  background: var(--mineru-sidepane) !important;
+  color: var(--mineru-text) !important;
 }
 
 .mineru-pref-status-line {
   display: block;
   font-size: 12px;
+  color: var(--mineru-text-secondary);
 }
 
 .mineru-pref-layout {
   display: flex;
   min-height: 420px;
   border: 1px solid var(--mineru-border);
-  border-radius: 10px;
+  border-radius: 6px;
   overflow: hidden;
   background: var(--mineru-bg);
 }
 
 .mineru-pref-sidebar {
-  width: 236px;
+  width: 196px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 0;
   padding: 8px 0 0;
   border-right: 1px solid var(--mineru-border);
-  background: #f3f4f6;
+  background: var(--mineru-sidepane);
   min-height: 0;
 }
 
@@ -247,15 +325,15 @@
   width: 100% !important;
   min-height: 28px !important;
   margin: 0 !important;
-  padding: 6px 10px !important;
+  padding: 5px 10px !important;
   border: none !important;
-  border-radius: 6px !important;
+  border-radius: 4px !important;
   background: transparent !important;
   box-shadow: none !important;
   color: var(--mineru-text) !important;
   font: inherit !important;
   font-size: 12px !important;
-  font-weight: 400 !important;
+  font-weight: 450 !important;
   line-height: 1.3 !important;
   text-align: left !important;
   cursor: pointer !important;
@@ -263,18 +341,21 @@
 
 .mineru-pref-sidebar button.mineru-pref-tree-item:hover,
 .mineru-pref-sidebar button.mineru-pref-tag-item:hover {
-  background: rgba(0, 0, 0, 0.045) !important;
+  background: var(--mineru-hover) !important;
 }
 
 .mineru-pref-sidebar button.mineru-pref-tree-item.is-active {
-  background: #dbeafe !important;
-  color: #075dcc !important;
-  font-weight: 600 !important;
+  background: var(--mineru-primary-soft) !important;
+  color: var(--mineru-primary) !important;
+  box-shadow: inset 2px 0 0 var(--mineru-primary) !important;
+  border-radius: 0 4px 4px 0 !important;
+  font-weight: 620 !important;
 }
 
 .mineru-pref-sidebar button.mineru-pref-tag-item.is-active {
-  background: rgba(10, 132, 255, 0.08) !important;
-  color: #075dcc !important;
+  background: var(--mineru-primary-soft) !important;
+  color: var(--mineru-primary) !important;
+  font-weight: 560 !important;
 }
 
 .mineru-pref-tree-main {
@@ -289,13 +370,13 @@
   flex-shrink: 0;
   width: 12px;
   height: 12px;
-  opacity: 0.55;
-  color: #6b7280;
+  opacity: 0.6;
+  color: var(--mineru-text-secondary);
 }
 
 .mineru-pref-tree-item.is-active .mineru-pref-tree-icon {
-  opacity: 0.85;
-  color: #075dcc;
+  opacity: 0.9;
+  color: var(--mineru-primary);
 }
 
 .mineru-pref-tree-label,
@@ -312,13 +393,14 @@
 .mineru-pref-tag-count,
 .mineru-pref-tags-total {
   flex-shrink: 0;
-  color: #9ca3af;
-  font-size: 12px;
+  color: var(--mineru-text-secondary);
+  font-family: var(--mineru-font-mono);
+  font-size: 11px;
   font-variant-numeric: tabular-nums;
 }
 
 .mineru-pref-tree-item.is-active .mineru-pref-tree-count {
-  color: #075dcc;
+  color: var(--mineru-primary);
 }
 
 .mineru-pref-tags-section {
@@ -327,7 +409,7 @@
   min-height: 0;
   flex-direction: column;
   gap: 4px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--mineru-border);
   padding-top: 10px;
 }
 
@@ -341,17 +423,17 @@
 
 .mineru-pref-sidebar-title {
   padding: 0;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--mineru-text-secondary);
   text-transform: none;
-  letter-spacing: 0;
+  letter-spacing: 0.03em;
 }
 
 .mineru-pref-tags-summary {
   padding: 0 10px 4px;
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--mineru-text-secondary);
 }
 
 .mineru-pref-tags {
@@ -379,32 +461,33 @@
 .mineru-pref-tag-marker {
   width: 3px;
   height: 14px;
-  border-radius: 999px;
+  border-radius: 1px;
   flex-shrink: 0;
 }
 
 .mineru-pref-tag-filter-wrap {
   flex-shrink: 0;
   padding: 8px 10px;
-  border-top: 1px solid #e5e7eb;
-  background: #f3f4f6;
+  border-top: 1px solid var(--mineru-border);
+  background: var(--mineru-sidepane);
 }
 
 .mineru-pref-tag-filter {
   width: 100%;
   box-sizing: border-box;
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 999px;
-  background: #fff;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--mineru-border);
+  border-radius: 5px;
+  background: var(--mineru-bg);
   font-size: 12px;
   color: var(--mineru-text);
 }
 
 .mineru-pref-tag-filter:focus {
-  outline: 2px solid rgba(10, 132, 255, 0.2);
+  outline: none;
   border-color: var(--mineru-primary);
+  box-shadow: 0 0 0 3px var(--mineru-primary-soft);
 }
 
 .mineru-pref-main {
@@ -431,26 +514,28 @@
   width: 100%;
   border-collapse: collapse;
   font-size: 12px;
+  color: var(--mineru-text);
 }
 
 .mineru-pref-table thead th {
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 10px 12px;
+  padding: 9px 10px;
   text-align: left;
+  font-size: 11px;
   font-weight: 600;
   color: var(--mineru-text-secondary);
-  background: #f3f4f6;
+  background: var(--mineru-sidepane);
   border-bottom: 1px solid var(--mineru-border);
 }
 
 .mineru-pref-table tbody tr {
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 1px solid var(--mineru-border);
 }
 
-.mineru-pref-table tbody tr:nth-child(even) {
-  background: var(--mineru-row-alt);
+.mineru-pref-table tbody tr:last-child {
+  border-bottom: 0;
 }
 
 .mineru-pref-table tbody tr:hover {
@@ -458,16 +543,16 @@
 }
 
 .mineru-pref-table td {
-  padding: 10px 12px;
+  padding: 9px 10px;
   vertical-align: middle;
 }
 
 .mineru-pref-col-select {
-  width: 36px;
+  width: 34px;
 }
 
 .mineru-pref-col-status {
-  width: 28px;
+  width: 24px;
 }
 
 .mineru-pref-col-author {
@@ -477,19 +562,23 @@
 }
 
 .mineru-pref-col-year {
-  width: 56px;
+  width: 52px;
   color: var(--mineru-text-secondary);
+  font-family: var(--mineru-font-mono);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .mineru-pref-col-date {
-  width: 108px;
+  width: 104px;
   color: var(--mineru-text-secondary);
+  font-family: var(--mineru-font-mono);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .mineru-pref-col-action {
-  width: 64px;
+  width: 60px;
   text-align: right;
 }
 
@@ -498,6 +587,7 @@
 }
 
 .mineru-pref-title-main {
+  color: var(--mineru-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -523,30 +613,31 @@
 
 .mineru-pref-status-dot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  background: #9e9e9e;
+  background: var(--mineru-border-strong);
 }
 
 .mineru-pref-status-dot.is-ready {
-  background: #2e7d32;
+  background: var(--mineru-plot);
 }
 
 .mineru-pref-status-dot.is-failed {
-  background: #c62828;
+  background: var(--mineru-danger);
 }
 
 .mineru-pref-status-dot.is-stale {
-  background: #ef6c00;
+  background: var(--mineru-warning);
 }
 
 .mineru-pref-status-dot.is-missing {
-  background: #bdbdbd;
+  background: var(--mineru-text-secondary);
+  opacity: 0.65;
 }
 
 .mineru-pref-status-dot.is-uncached {
-  background: #cfd8dc;
+  background: var(--mineru-border-strong);
 }
 
 .mineru-pref-link-danger {
@@ -565,25 +656,27 @@
 
 .mineru-pref-search-wrap {
   flex-shrink: 0;
-  padding: 8px 12px;
+  padding: 8px 10px;
   border-top: 1px solid var(--mineru-border);
-  background: #f3f4f6;
+  background: var(--mineru-sidepane);
 }
 
 .mineru-pref-search {
   width: 100%;
   box-sizing: border-box;
-  height: 32px;
-  padding: 0 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: 999px;
-  background: #fff;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--mineru-border);
+  border-radius: 5px;
+  background: var(--mineru-bg);
+  color: var(--mineru-text);
   font-size: 12px;
 }
 
 .mineru-pref-search:focus {
-  outline: 2px solid rgba(10, 132, 255, 0.25);
+  outline: none;
   border-color: var(--mineru-primary);
+  box-shadow: 0 0 0 3px var(--mineru-primary-soft);
 }
 
 .mineru-pref-page--embedded {
@@ -613,22 +706,29 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 32px;
+  min-height: 30px;
 }
 
 .mineru-pref-cache-details {
-  margin-top: 4px;
+  margin-top: 2px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--mineru-border);
 }
 
 .mineru-pref-cache-details-summary {
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 12.5px;
+  font-weight: 620;
   color: var(--mineru-text);
-  margin: 4px 0 10px;
+  margin: 0 0 10px;
+  transition: color 140ms ease;
+}
+
+.mineru-pref-cache-details-summary:hover {
+  color: var(--mineru-primary);
 }
 
 .mineru-pref-page--embedded .mineru-pref-layout {
-  min-height: 600px;
-  max-height: 780px;
+  min-height: 520px;
+  max-height: 760px;
 }

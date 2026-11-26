@@ -26,8 +26,8 @@ export function showTestResult(
   if (resultEl) {
     resultEl.textContent = message;
     resultEl.style.color = isError
-      ? prefColors.testError
-      : prefColors.testSuccess;
+      ? "var(--prefs-danger, #b23a32)"
+      : "var(--prefs-plot, #355e49)";
   }
 }
 

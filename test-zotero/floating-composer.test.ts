@@ -312,44 +312,41 @@ describe("floating composer styles in Zotero", function () {
     }
   });
 
-  it("uses unique SVG gradients and the border's shared rainbow palette", function () {
-    const doc = win.document;
-    const second = createChatContainer(doc, lightTheme);
-    doc.getElementById("chat-window-root")!.appendChild(second);
-    try {
-      const gradients = [container, second].flatMap((panel) =>
-        Array.from(
-          panel.querySelectorAll(".chat-composer-focus-fx linearGradient"),
-        ),
-      );
-      assert.lengthOf(gradients, 4);
-      assert.equal(new Set(gradients.map((gradient) => gradient.id)).size, 4);
-      for (const gradient of gradients) {
-        assert.equal(gradient.getAttribute("gradientUnits"), "userSpaceOnUse");
-        const stops = [...gradient.querySelectorAll("stop")];
-        assert.lengthOf(stops, 7);
-        assert.equal(
-          new Set(stops.map((stop) => win.getComputedStyle(stop).stopColor))
-            .size,
-          7,
-        );
-      }
-      const stroke = container
-        .querySelector(".chat-composer-focus-glint path")!
-        .getAttribute("stroke")!;
-      const fill = container
-        .querySelector(".chat-composer-focus-sparks")!
-        .getAttribute("fill")!;
-      for (const paint of [stroke, fill]) {
-        assert.match(paint, /^url\(#paperchat-composer-spectrum-\d+\)$/);
-        assert.isNotNull(doc.getElementById(paint.slice(5, -1)));
-      }
-    } finally {
-      unmonitorChatPanelRoot(
-        second.querySelector(".chat-panel-root") as HTMLElement,
-      );
-      second.remove();
-    }
+  it("renders a clipped optical focus rim without rainbow SVGs and preserves editing state", function () {
+    const wrapper = container.querySelector<HTMLElement>(
+      "#chat-input-wrapper",
+    )!;
+    const input = container.querySelector<HTMLTextAreaElement>(
+      "#chat-message-input",
+    )!;
+    const effect = container.querySelector<HTMLElement>(
+      ".chat-composer-focus-fx",
+    )!;
+    const view = win.document.defaultView!;
+
+    assert.equal(win.getComputedStyle(effect).overflow, "hidden");
+    assert.isNotNull(effect.querySelector(".chat-composer-focus-glint"));
+    assert.lengthOf(
+      container.querySelectorAll(".chat-composer-focus-fx linearGradient"),
+      0,
+    );
+    assert.isNull(effect.querySelector(".chat-composer-focus-sparks"));
+
+    input.dispatchEvent(new view.FocusEvent("focus"));
+    const focusedBorder = win.getComputedStyle(wrapper).borderTopColor;
+    wrapper.classList.add("chat-composer--editing");
+    assert.notEqual(
+      win.getComputedStyle(wrapper).borderTopColor,
+      focusedBorder,
+    );
+
+    wrapper.classList.remove("chat-composer--editing");
+    input.dispatchEvent(new view.FocusEvent("blur"));
+    assert.isFalse(wrapper.classList.contains("is-focused"));
+    assert.isFalse(effect.classList.contains("is-playing"));
+    input.dispatchEvent(new view.FocusEvent("focus"));
+    assert.isTrue(wrapper.classList.contains("is-focused"));
+    assert.isTrue(effect.classList.contains("is-playing"));
   });
 
   it("fades focus in and out without cycling in either theme", async function () {
@@ -360,7 +357,7 @@ describe("floating composer styles in Zotero", function () {
       "#chat-input-wrapper",
     )!;
     const effect = container.querySelector(".chat-composer-focus-fx")!;
-    const glint = effect.querySelector(".chat-composer-focus-glint path")!;
+    const glint = effect.querySelector(".chat-composer-focus-glint")!;
     const reduced = win.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const view = win.document.defaultView!;
     const settle = () =>

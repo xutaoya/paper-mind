@@ -3,7 +3,6 @@
  */
 
 import { getString } from "../../utils/locale";
-import { prefColors } from "../../utils/colors";
 import { getProviderManager } from "../providers";
 import type {
   ProviderConfig,
@@ -58,27 +57,8 @@ function createProviderListItem(
     "span",
   ) as HTMLSpanElement;
   statusContainer.className = "provider-list-status";
-  statusContainer.style.cssText =
-    "display: flex; align-items: center; gap: 4px;";
 
   const isConfigured = isProviderConfigured(config);
-  if (isConfigured) {
-    const statusDot = doc.createElementNS(
-      "http://www.w3.org/1999/xhtml",
-      "span",
-    ) as HTMLSpanElement;
-    statusDot.className = "provider-status-dot";
-    statusDot.style.cssText = `
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background-color: ${prefColors.statusDot};
-      flex-shrink: 0;
-    `;
-    statusDot.title = getString("pref-provider-configured");
-    statusContainer.appendChild(statusDot);
-  }
-
   if (config.id === activeProviderId) {
     const activeCheck = doc.createElementNS(
       "http://www.w3.org/1999/xhtml",
@@ -86,8 +66,8 @@ function createProviderListItem(
     ) as HTMLSpanElement;
     activeCheck.className = "provider-active-check";
     const icon = doc.createElementNS("http://www.w3.org/2000/svg", "svg");
-    icon.setAttribute("width", "16");
-    icon.setAttribute("height", "16");
+    icon.setAttribute("width", "14");
+    icon.setAttribute("height", "14");
     icon.setAttribute("viewBox", "0 0 16 16");
     icon.setAttribute("aria-hidden", "true");
     const path = doc.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -99,9 +79,16 @@ function createProviderListItem(
     path.setAttribute("stroke-linejoin", "round");
     icon.appendChild(path);
     activeCheck.appendChild(icon);
-    activeCheck.style.cssText = "font-size: 12px; flex-shrink: 0;";
     activeCheck.title = getString("pref-provider-active");
     statusContainer.appendChild(activeCheck);
+  } else if (isConfigured) {
+    const statusDot = doc.createElementNS(
+      "http://www.w3.org/1999/xhtml",
+      "span",
+    ) as HTMLSpanElement;
+    statusDot.className = "provider-status-dot";
+    statusDot.title = getString("pref-provider-configured");
+    statusContainer.appendChild(statusDot);
   }
 
   if (statusContainer.childNodes.length) item.appendChild(statusContainer);

@@ -544,10 +544,17 @@ paperchat-chat-stats-tracking-active = 正在记录阅读时间
 paperchat-chat-stats-tracking-idle = 未在记录（请打开 PDF，并聚焦阅读器或 PaperMind 浮窗）
 paperchat-chat-stats-tracking-paused = 阅读计时已暂停
 paperchat-chat-stats-header-subtitle-tokens = 模型接口返回的输入与输出 Token
+paperchat-chat-stats-header-subtitle-chat = 对话互动与书签摘录
 
 paperchat-chat-stats-view-reading = 阅读
 
+paperchat-chat-stats-view-chat = 对话
+
 paperchat-chat-stats-view-tokens = Token
+
+paperchat-chat-stats-active-days-badge = { $count } 天活跃
+paperchat-chat-stats-six-months-total = 近 6 个月 { $total }
+paperchat-chat-stats-read-coverage = 已读覆盖 { $percent }%
 
 paperchat-chat-stats-token-total = 累计 Token
 
@@ -630,12 +637,16 @@ paperchat-chat-stats-item-last-read = 最近阅读 { $date }
 paperchat-chat-stats-item-added = 加入于 { $date }
 
 paperchat-chat-stats-chat-activity-title = 对话活跃
-paperchat-chat-stats-chat-user-total = 用户消息
+paperchat-chat-stats-chat-total = 累计消息
+paperchat-chat-stats-chat-user-total = 用户提问
 paperchat-chat-stats-chat-assistant-total = 助手回复
 paperchat-chat-stats-chat-this-week = 本周消息
 paperchat-chat-stats-chat-week-messages = 本周 { $count } 条
 paperchat-chat-stats-chat-active-days = 本周 { $count } 天有对话
-paperchat-chat-stats-chat-heatmap-hint = 与上方阅读热力图对照，可看「读」与「聊」是否同步。点击格子查看当日用户/助手消息数。
+paperchat-chat-stats-chat-ratio-title = 提问 / 回复占比
+paperchat-chat-stats-chat-day-empty = 这一天没有对话记录
+paperchat-chat-stats-chat-heatmap-hint = 点击热力图格子可查看当日用户提问与助手回复明细。
+paperchat-chat-stats-chat-footnote = 统计单篇文献与文库会话中的用户提问及助手回复（不含系统提示）。
 paperchat-chat-stats-chat-day-tooltip = { $date } · 共 { $total } 条（用户 { $user } · 助手 { $assistant }）
 paperchat-chat-stats-chat-day-tooltip-short = { $date } · { $total } 条消息
 paperchat-chat-stats-chat-day-detail = 共 { $total } 条 · 用户 { $user } · 助手 { $assistant }
@@ -761,6 +772,8 @@ paperchat-chat-bookmark-reader-jump-to-chat = 跳转到对话
 paperchat-chat-bookmark-reader-open-hint = 在阅读器中查看
 
 paperchat-chat-bookmark-reader-empty-content = 暂无内容
+
+paperchat-chat-bookmark-reader-saved-copy = 原消息已删除 · 已保存的书签
 
 paperchat-chat-bookmark-reader-outline = 章节导航
 

@@ -16,46 +16,6 @@ import { monitorChatPanelRoot } from "./chatUIFontScale";
 import { createUiChevron } from "./UiChevron";
 import { createWindowPinIcon } from "./FloatingWindowPin";
 
-let composerFocusGradientSequence = 0;
-
-function addComposerFocusGradient(
-  doc: Document,
-  svg: SVGSVGElement,
-  width: number,
-  height: number,
-): string {
-  const ns = "http://www.w3.org/2000/svg";
-  const defs = doc.createElementNS(ns, "defs");
-  const gradient = doc.createElementNS(ns, "linearGradient");
-  const id = `${config.addonRef}-composer-spectrum-${++composerFocusGradientSequence}`;
-  gradient.setAttribute("id", id);
-  // A horizontal stroke has a zero-height bounding box, so use SVG coordinates
-  // rather than objectBoundingBox for a reliable gradient in Gecko as well.
-  gradient.setAttribute("gradientUnits", "userSpaceOnUse");
-  gradient.setAttribute("x1", "0");
-  gradient.setAttribute("y1", "0");
-  gradient.setAttribute("x2", String(width));
-  gradient.setAttribute("y2", String(height));
-  const colors = [
-    "rose",
-    "apricot",
-    "gold",
-    "mint",
-    "cyan",
-    "periwinkle",
-    "lilac",
-  ];
-  colors.forEach((color, index) => {
-    const stop = doc.createElementNS(ns, "stop");
-    stop.setAttribute("offset", `${(index / (colors.length - 1)) * 100}%`);
-    stop.style.stopColor = `var(--composer-focus-${color})`;
-    gradient.appendChild(stop);
-  });
-  defs.appendChild(gradient);
-  svg.appendChild(defs);
-  return `url(#${id})`;
-}
-
 /**
  * Helper to create an element with styles (using proper HTML namespace for XHTML)
  */
@@ -878,68 +838,13 @@ export function createChatContainer(
     { position: "absolute", inset: "0", pointerEvents: "none", zIndex: "3" },
     { class: "chat-composer-focus-fx", "aria-hidden": "true" },
   );
-  const focusAura = createElement(
+  const focusGlint = createElement(
     doc,
     "div",
     {},
-    {
-      class: "chat-composer-focus-aura",
-    },
+    { class: "chat-composer-focus-glint" },
   );
-  focusFx.appendChild(focusAura);
-  const svgNamespace = "http://www.w3.org/2000/svg";
-  const focusGlint = doc.createElementNS(svgNamespace, "svg");
-  focusGlint.setAttribute("class", "chat-composer-focus-glint");
-  focusGlint.setAttribute("viewBox", "0 0 100 2");
-  focusGlint.setAttribute("preserveAspectRatio", "none");
-  focusGlint.setAttribute("height", "2");
-  focusGlint.setAttribute("focusable", "false");
-  const glintPath = doc.createElementNS(svgNamespace, "path");
-  glintPath.setAttribute("d", "M0 1H26");
-  glintPath.setAttribute("fill", "none");
-  glintPath.setAttribute(
-    "stroke",
-    addComposerFocusGradient(doc, focusGlint, 26, 0),
-  );
-  glintPath.setAttribute("stroke-width", "2");
-  glintPath.setAttribute("stroke-linecap", "round");
-  glintPath.setAttribute("vector-effect", "non-scaling-stroke");
-  focusGlint.appendChild(glintPath);
   focusFx.appendChild(focusGlint);
-
-  const focusSparks = doc.createElementNS(svgNamespace, "svg");
-  focusSparks.setAttribute("class", "chat-composer-focus-sparks");
-  focusSparks.setAttribute("viewBox", "0 0 36 28");
-  focusSparks.setAttribute("width", "36");
-  focusSparks.setAttribute("height", "28");
-  focusSparks.setAttribute("focusable", "false");
-  focusSparks.setAttribute(
-    "fill",
-    addComposerFocusGradient(doc, focusSparks, 36, 28),
-  );
-  const focusSpark = doc.createElementNS(svgNamespace, "g");
-  focusSpark.setAttribute("class", "chat-composer-focus-spark");
-  const sparkPath = doc.createElementNS(svgNamespace, "path");
-  sparkPath.setAttribute(
-    "d",
-    "M12 2C13.2 11.3 14.7 12.8 24 14C14.7 15.2 13.2 16.7 12 26C10.8 16.7 9.3 15.2 0 14C9.3 12.8 10.8 11.3 12 2Z",
-  );
-  const sparkCore = doc.createElementNS(svgNamespace, "circle");
-  sparkCore.setAttribute("cx", "12");
-  sparkCore.setAttribute("cy", "14");
-  sparkCore.setAttribute("r", "1.5");
-  sparkCore.setAttribute("fill", "#ffffff");
-  focusSpark.appendChild(sparkPath);
-  focusSpark.appendChild(sparkCore);
-  const satellite = doc.createElementNS(svgNamespace, "path");
-  satellite.setAttribute("class", "chat-composer-focus-satellite");
-  satellite.setAttribute(
-    "d",
-    "M29 2C29.5 5 30 5.5 33 6C30 6.5 29.5 7 29 10C28.5 7 28 6.5 25 6C28 5.5 28.5 5 29 2Z",
-  );
-  focusSparks.appendChild(focusSpark);
-  focusSparks.appendChild(satellite);
-  focusFx.appendChild(focusSparks);
 
   focusFx.addEventListener("animationend", (event) => {
     if (event.animationName === "chat-composer-glint") {
@@ -1031,10 +936,13 @@ export function createChatContainer(
   const applyComposerFocus = () => {
     if (inputWrapper.classList.contains("is-focused")) return;
     inputWrapper.classList.add("is-focused");
+    focusFx.classList.remove("is-playing");
+    void focusFx.offsetWidth;
     focusFx.classList.add("is-playing");
   };
   const clearComposerFocus = () => {
     inputWrapper.classList.remove("is-focused");
+    focusFx.classList.remove("is-playing");
   };
   messageInput.addEventListener("focus", applyComposerFocus);
   messageInput.addEventListener("blur", clearComposerFocus);

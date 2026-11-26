@@ -713,22 +713,22 @@ function updateAISummaryStatus(doc: Document): void {
     statusLabel.textContent = getString("aisummary-progress-running", {
       args: { processed: progress.processedItems, total: progress.totalItems },
     });
-    statusLabel.style.color = "#0078d4";
+    statusLabel.style.color = "var(--prefs-accent, #963f2a)";
   } else if (progress.status === "paused") {
     statusLabel.textContent = getString("aisummary-progress-paused", {
       args: { processed: progress.processedItems, total: progress.totalItems },
     });
-    statusLabel.style.color = "#ffa500";
+    statusLabel.style.color = "var(--prefs-warning, #a3621a)";
   } else if (progress.status === "completed") {
     statusLabel.textContent = getString("aisummary-progress-completed", {
       args: { success: progress.successfulItems, failed: progress.failedItems },
     });
-    statusLabel.style.color = "#008000";
+    statusLabel.style.color = "var(--prefs-plot, #355e49)";
   } else if (progress.status === "error") {
     statusLabel.textContent = getString("aisummary-progress-error", {
       args: { error: progress.errors[0]?.error || getString("unknown") },
     });
-    statusLabel.style.color = "#c00";
+    statusLabel.style.color = "var(--prefs-danger, #b23a32)";
   } else {
     statusLabel.textContent = "";
   }

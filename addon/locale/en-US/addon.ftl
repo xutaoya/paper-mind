@@ -544,10 +544,17 @@ paperchat-chat-stats-tracking-active = Recording reading time
 paperchat-chat-stats-tracking-paused = Reading timer paused
 paperchat-chat-stats-tracking-idle = Not recording (open a PDF and focus its reader or PaperMind window)
 paperchat-chat-stats-header-subtitle-tokens = Input and output tokens from the model API
+paperchat-chat-stats-header-subtitle-chat = Conversations and saved bookmarks
 
 paperchat-chat-stats-view-reading = Reading
 
+paperchat-chat-stats-view-chat = Chat
+
 paperchat-chat-stats-view-tokens = Tokens
+
+paperchat-chat-stats-active-days-badge = { $count } active days
+paperchat-chat-stats-six-months-total = { $total } in 6 mo
+paperchat-chat-stats-read-coverage = { $percent }% read
 
 paperchat-chat-stats-token-total = Total tokens
 
@@ -630,12 +637,16 @@ paperchat-chat-stats-item-last-read = Last read { $date }
 paperchat-chat-stats-item-added = Added { $date }
 
 paperchat-chat-stats-chat-activity-title = Chat activity
-paperchat-chat-stats-chat-user-total = User messages
+paperchat-chat-stats-chat-total = Total messages
+paperchat-chat-stats-chat-user-total = User prompts
 paperchat-chat-stats-chat-assistant-total = Assistant replies
 paperchat-chat-stats-chat-this-week = Messages this week
 paperchat-chat-stats-chat-week-messages = { $count } this week
 paperchat-chat-stats-chat-active-days = Active { $count } days this week
-paperchat-chat-stats-chat-heatmap-hint = Compare with the reading heatmap above to see whether you read and chat on the same days. Click a cell for user vs assistant counts.
+paperchat-chat-stats-chat-ratio-title = Prompts vs replies
+paperchat-chat-stats-chat-day-empty = No messages on this day
+paperchat-chat-stats-chat-heatmap-hint = Click any cell to inspect user prompts vs assistant replies for that day.
+paperchat-chat-stats-chat-footnote = Counts user prompts and assistant replies across paper and library chats (excluding system notices).
 paperchat-chat-stats-chat-day-tooltip = { $date } · { $total } total (user { $user } · assistant { $assistant })
 paperchat-chat-stats-chat-day-tooltip-short = { $date } · { $total } messages
 paperchat-chat-stats-chat-day-detail = { $total } total · user { $user } · assistant { $assistant }
@@ -761,6 +772,8 @@ paperchat-chat-bookmark-reader-jump-to-chat = Jump to chat
 paperchat-chat-bookmark-reader-open-hint = Open in reader
 
 paperchat-chat-bookmark-reader-empty-content = No content available
+
+paperchat-chat-bookmark-reader-saved-copy = Original message deleted · Saved bookmark
 
 paperchat-chat-bookmark-reader-outline = Section navigation
 

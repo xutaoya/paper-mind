@@ -2,13 +2,18 @@ import type { BookmarkRecord } from "../../types/bookmark";
 import type { ChatMessage, ChatSession } from "../../types/chat";
 import type { EvidenceRecord } from "../../types/evidence";
 import { extractEditableUserMessageContent } from "../chat/user-message-edit";
-import { extractSourceGroupFragments } from "../ui/chat-panel/MarkdownRenderer";
+import {
+  extractSourceGroupFragments,
+  stripToolCallMarkupFromContent,
+} from "../ui/chat-panel/MarkdownRenderer";
 
 export interface BookmarkTurnContent {
   userContent: string | null;
   assistantContent: string;
   evidenceRecords?: EvidenceRecord[];
   assistantMessageId?: string;
+  sourceMissing?: boolean;
+  sourceUnreadable?: boolean;
 }
 
 type SourceGroupFragment = ReturnType<
@@ -155,6 +160,20 @@ export function prepareReaderAssistantContent(rawContent: string): string {
   return mergeDuplicateMarkdownHeadings(stripped);
 }
 
+export function canReadAssistantReply(message: ChatMessage): boolean {
+  return (
+    message.role === "assistant" &&
+    !message.apiOnly &&
+    !message.isSystemNotice &&
+    message.streamingState !== "in_progress" &&
+    Boolean(
+      stripToolCallMarkupFromContent(
+        stripReaderThinkingSection(message.content),
+      ).trim(),
+    )
+  );
+}
+
 /** Resolve the chat message to focus when jumping from a bookmarked assistant reply. */
 export function resolveBookmarkJumpMessageId(
   messages: readonly ChatMessage[],
@@ -194,28 +213,41 @@ export function resolveTurnContentFromSession(
   bookmark: BookmarkRecord,
 ): BookmarkTurnContent {
   const fallbackAssistant = prepareReaderAssistantContent(bookmark.content);
-  if (!session || !bookmark.messageId) {
+  if (!bookmark.messageId) {
     return {
       userContent: null,
       assistantContent: fallbackAssistant,
     };
   }
 
-  const assistant = session.messages.find(
-    (message) => message.id === bookmark.messageId,
+  const assistant = session?.messages.find(
+    (message) =>
+      message.id === bookmark.messageId && message.role === "assistant",
   );
+  if (!assistant || !session) {
+    return {
+      userContent: null,
+      assistantContent: fallbackAssistant,
+      sourceMissing: true,
+    };
+  }
+  if (!canReadAssistantReply(assistant)) {
+    return {
+      userContent: null,
+      assistantContent: fallbackAssistant,
+      sourceUnreadable: true,
+    };
+  }
   const user = findPrecedingUserMessage(session.messages, bookmark.messageId);
-  const assistantContent = assistant
-    ? prepareReaderAssistantContent(assistant.content)
-    : fallbackAssistant;
+  const assistantContent = prepareReaderAssistantContent(assistant.content);
   const userContent = user
     ? extractEditableUserMessageContent(user) || user.content
     : null;
   return {
     userContent,
     assistantContent: assistantContent || fallbackAssistant,
-    evidenceRecords: assistant?.evidence,
-    assistantMessageId: assistant?.id,
+    evidenceRecords: assistant.evidence,
+    assistantMessageId: assistant.id,
   };
 }
 

@@ -7,6 +7,7 @@ import {
 import type { BookmarkRecord } from "../../../types/bookmark";
 import type { ChatSession } from "../../../types/chat";
 import type { QuotedMessageRef } from "../../../types/chat";
+import type { ConversationDeletionListener } from "../../chat/ChatManager";
 import {
   deriveBookmarkTitle,
   isPersistedBookmarkRecord,
@@ -66,6 +67,9 @@ export interface BookmarkReaderActions {
   onClose: () => void;
   onCopySuccess?: (message: string) => void;
   loadSession?: (sessionId: string) => Promise<ChatSession | null>;
+  subscribeToConversationDeletion?: (
+    listener: ConversationDeletionListener,
+  ) => () => void;
   isBookmarkSaved?: (bookmark: BookmarkRecord) => Promise<boolean>;
   onToggleBookmark?: (
     bookmark: BookmarkRecord,
@@ -83,6 +87,7 @@ interface ReaderOpenState {
 let readerWindow: Window | null = null;
 let activeOpenState: ReaderOpenState | null = null;
 let renderGeneration = 0;
+let unsubscribeFromConversationDeletion: (() => void) | undefined;
 const readerHosts = new WeakMap<HTMLElement, Window>();
 
 function toQuotedMessageRef(bookmark: BookmarkRecord): QuotedMessageRef | null {
@@ -320,6 +325,9 @@ function setupReaderOutline(
     items[active]?.removeAttribute("aria-current");
     items[next]?.setAttribute("aria-current", "location");
     active = next;
+    if (!panel.hidden) {
+      items[next]?.scrollIntoView?.({ block: "nearest" });
+    }
   };
   const onScroll = () =>
     setActive(resolveActiveHeadingIndex(scrollContainer, headings));
@@ -419,6 +427,25 @@ function getReaderAnswerTitle(host: HTMLElement): string {
   return summary ? deriveBookmarkTitle(summary) : "";
 }
 
+function updateReaderProgress(
+  host: HTMLElement,
+  scrollContainer: HTMLElement,
+): void {
+  const maxScrollTop =
+    scrollContainer.scrollHeight - scrollContainer.clientHeight;
+  if (maxScrollTop <= 4) {
+    host.style.setProperty("--reader-progress", "0");
+    host.dataset.scrollable = "false";
+    return;
+  }
+  const progress = Math.min(
+    1,
+    Math.max(0, scrollContainer.scrollTop / maxScrollTop),
+  );
+  host.style.setProperty("--reader-progress", progress.toFixed(4));
+  host.dataset.scrollable = "true";
+}
+
 function paintReaderBody(
   host: HTMLElement,
   turn: BookmarkTurnContent,
@@ -476,7 +503,14 @@ function paintReaderBody(
       class: "paperchat-reader-section-label",
     },
   );
-  label.textContent = getString("chat-bookmark-reader-assistant-message");
+  if (turn.sourceMissing) {
+    label.dataset.state = "archived";
+  }
+  label.textContent = getString(
+    turn.sourceMissing
+      ? "chat-bookmark-reader-saved-copy"
+      : "chat-bookmark-reader-assistant-message",
+  );
   const markdown = createElement(
     doc,
     "div",
@@ -504,6 +538,7 @@ function paintReaderBody(
   contentWrap.appendChild(answer);
   body.appendChild(contentWrap);
   setupReaderOutline(host, body);
+  updateReaderProgress(host, body);
 }
 
 function updateReaderPosition(
@@ -612,6 +647,12 @@ function buildReaderShell(
       getString("chat-copy"),
       "copy",
     ),
+    createElement(
+      doc,
+      "span",
+      {},
+      { class: "paperchat-reader-divider", "aria-hidden": "true" },
+    ),
     pinBtn,
     createIconButton(
       doc,
@@ -620,7 +661,13 @@ function buildReaderShell(
       "close",
     ),
   );
-  header.append(title, actions);
+  const progressBar = createElement(
+    doc,
+    "div",
+    {},
+    { class: "paperchat-reader-progress", "aria-hidden": "true" },
+  );
+  header.append(title, actions, progressBar);
 
   const bodyWrap = createElement(
     doc,
@@ -693,14 +740,30 @@ function buildReaderShell(
 }
 
 function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
-  const bookmarks = state.bookmarks;
+  let { bookmarks } = state;
   let currentIndex = state.startIndex;
   const generation = renderGeneration;
+  let pageRequest = 0;
+  let currentTurn: BookmarkTurnContent | undefined;
+  let bookmarkPending = false;
   const bookmarkBtn = host.querySelector(
     `#${READER_BOOKMARK_BTN_ID}`,
   ) as HTMLButtonElement | null;
+  const copyBtn = host.querySelector<HTMLButtonElement>(
+    "#chat-bookmark-reader-copy",
+  )!;
+  const jumpBtn = host.querySelector<HTMLButtonElement>(
+    "#chat-bookmark-reader-jump",
+  )!;
+  const readerBody = host.querySelector<HTMLElement>(
+    "#chat-bookmark-reader-body",
+  )!;
+  const loadSession = state.actions.loadSession;
 
-  const syncBookmarkButton = async (bookmark: BookmarkRecord) => {
+  const syncBookmarkButton = async (
+    bookmark: BookmarkRecord,
+    request: number,
+  ) => {
     if (!bookmarkBtn) return;
     if (
       !state.actions.isBookmarkSaved ||
@@ -714,7 +777,7 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
     bookmarkBtn.hidden = false;
     try {
       const isSaved = await state.actions.isBookmarkSaved(bookmark);
-      if (generation !== renderGeneration) {
+      if (generation !== renderGeneration || request !== pageRequest) {
         return;
       }
       setReaderBookmarkButtonState(bookmarkBtn, isSaved);
@@ -733,40 +796,79 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
       return;
     }
 
+    const request = ++pageRequest;
     currentIndex = index;
+    currentTurn = undefined;
     const bookmark = bookmarks[currentIndex];
     updateReaderPosition(host, bookmarks, currentIndex);
     updateReaderTitle(host, bookmark);
-
-    const readerBody = host.querySelector(
-      "#chat-bookmark-reader-body",
-    ) as HTMLElement;
+    copyBtn.disabled = true;
+    jumpBtn.disabled = true;
+    if (bookmarkBtn) bookmarkBtn.disabled = true;
+    readerBody.replaceChildren();
     readerBody.scrollTop = 0;
-    paintReaderBody(
-      host,
-      {
-        userContent: null,
-        assistantContent: prepareReaderAssistantContent(bookmark.content),
-        assistantMessageId: bookmark.messageId ?? undefined,
-      },
-      state.actions,
-    );
-
-    const loadSession =
-      state.actions.loadSession ?? (async () => null as ChatSession | null);
-    try {
-      const turn = await resolveBookmarkTurnContent(bookmark, loadSession);
-      if (generation !== renderGeneration || currentIndex !== index) {
-        return;
-      }
-      paintReaderBody(host, turn, state.actions);
-      updateReaderTitle(host, bookmark, turn.userContent);
-    } catch (error) {
-      ztoolkit.log("[BookmarkReader] Failed to resolve turn content:", error);
+    host.style.setProperty("--reader-progress", "0");
+    host.dataset.scrollable = "false";
+    setupReaderOutline(host, readerBody);
+    const turn = loadSession
+      ? await resolveBookmarkTurnContent(bookmark, loadSession)
+      : {
+          userContent: null,
+          assistantContent: prepareReaderAssistantContent(bookmark.content),
+          assistantMessageId: bookmark.messageId ?? undefined,
+        };
+    if (generation !== renderGeneration || request !== pageRequest) return;
+    if (
+      (turn.sourceMissing || turn.sourceUnreadable) &&
+      !isPersistedBookmarkRecord(bookmark)
+    ) {
+      removeDeletedReplies((entry) => entry === bookmark);
+      return;
     }
-
-    void syncBookmarkButton(bookmark);
+    currentTurn = turn;
+    paintReaderBody(host, turn, state.actions);
+    updateReaderTitle(host, bookmark, turn.userContent);
+    copyBtn.disabled = !turn.assistantContent;
+    jumpBtn.disabled = Boolean(
+      turn.sourceMissing || !toQuotedMessageRef(bookmark),
+    );
+    if (bookmarkBtn) {
+      bookmarkBtn.disabled = bookmarkPending;
+      setReaderBookmarkButtonState(
+        bookmarkBtn,
+        isPersistedBookmarkRecord(bookmark),
+      );
+    }
+    void syncBookmarkButton(bookmark, request);
   };
+
+  const removeDeletedReplies = (
+    wasDeleted: (entry: BookmarkRecord) => boolean,
+  ) => {
+    const current = bookmarks[currentIndex];
+    if (!bookmarks.some(wasDeleted)) return;
+    const keep = (entry: BookmarkRecord) =>
+      isPersistedBookmarkRecord(entry) || !wasDeleted(entry);
+    const nextIndex = bookmarks.slice(0, currentIndex).filter(keep).length;
+    bookmarks = bookmarks.filter(keep);
+    if (!bookmarks.length) {
+      closeBookmarkReader(readerHosts.get(host));
+    } else if (wasDeleted(current)) {
+      void showBookmarkAt(Math.min(nextIndex, bookmarks.length - 1));
+    } else {
+      currentIndex = nextIndex;
+      updateReaderPosition(host, bookmarks, currentIndex);
+    }
+  };
+
+  unsubscribeFromConversationDeletion =
+    state.actions.subscribeToConversationDeletion?.((sessionId, ids) =>
+      removeDeletedReplies(
+        (entry) =>
+          entry.sessionId === sessionId &&
+          (!ids || Boolean(entry.messageId && ids.has(entry.messageId))),
+      ),
+    );
 
   host
     .querySelector(`#${READER_BOOKMARK_BTN_ID}`)
@@ -774,11 +876,13 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
       if (
         !bookmarkBtn ||
         !state.actions.onToggleBookmark ||
-        bookmarkBtn.disabled
+        bookmarkBtn.disabled ||
+        !currentTurn
       ) {
         return;
       }
       const bookmark = bookmarks[currentIndex];
+      bookmarkPending = true;
       bookmarkBtn.disabled = true;
       bookmarkBtn.style.cursor = "wait";
       bookmarkBtn.style.opacity = "0.6";
@@ -792,30 +896,38 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
           if (result.status === "cancelled") {
             return;
           }
+          const index = bookmarks.indexOf(bookmark);
+          if (index < 0) return;
           if (result.status === "saved") {
-            bookmarks[currentIndex] = result.bookmark;
+            bookmarks[index] = result.bookmark;
             state.actions.onCopySuccess?.(
               getString("chat-bookmark-saved", {
                 args: { title: result.bookmark.title },
               }),
             );
-            setReaderBookmarkButtonState(bookmarkBtn, true);
+            if (index === currentIndex)
+              setReaderBookmarkButtonState(bookmarkBtn, true);
             return;
           }
           state.actions.onCopySuccess?.(getString("chat-bookmark-removed"));
           if (isPersistedBookmarkRecord(bookmark)) {
-            bookmarks.splice(currentIndex, 1);
+            bookmarks.splice(index, 1);
             if (!bookmarks.length) {
               const win =
                 readerHosts.get(host) ?? host.ownerDocument.defaultView;
               closeBookmarkReader(win);
               return;
             }
-            const nextIndex = Math.min(currentIndex, bookmarks.length - 1);
-            await showBookmarkAt(nextIndex);
+            if (index === currentIndex) {
+              await showBookmarkAt(Math.min(index, bookmarks.length - 1));
+            } else {
+              if (index < currentIndex) currentIndex -= 1;
+              updateReaderPosition(host, bookmarks, currentIndex);
+            }
             return;
           }
-          setReaderBookmarkButtonState(bookmarkBtn, false);
+          if (index === currentIndex)
+            setReaderBookmarkButtonState(bookmarkBtn, false);
         })
         .catch((error: unknown) => {
           ztoolkit.log("[BookmarkReader] Toggle bookmark failed:", error);
@@ -826,10 +938,11 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
           );
         })
         .finally(() => {
+          bookmarkPending = false;
           if (generation !== renderGeneration || !bookmarkBtn) {
             return;
           }
-          bookmarkBtn.disabled = false;
+          bookmarkBtn.disabled = !currentTurn;
           bookmarkBtn.style.cursor = "pointer";
           bookmarkBtn.style.opacity = "1";
         });
@@ -849,25 +962,28 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
         void showBookmarkAt(currentIndex + 1);
       }
     });
-  host
-    .querySelector("#chat-bookmark-reader-jump")
-    ?.addEventListener("click", () => {
-      const quote = toQuotedMessageRef(bookmarks[currentIndex]);
-      if (!quote) return;
-      void Promise.resolve(state.actions.onJumpToChat(quote));
-    });
-  host
-    .querySelector("#chat-bookmark-reader-copy")
-    ?.addEventListener("click", async () => {
-      const loadSession =
-        state.actions.loadSession ?? (async () => null as ChatSession | null);
-      const turn = await resolveBookmarkTurnContent(
-        bookmarks[currentIndex],
-        loadSession,
-      );
-      copyToClipboard(turn.assistantContent || bookmarks[currentIndex].content);
-      state.actions.onCopySuccess?.(getString("chat-bookmark-copied"));
-    });
+  jumpBtn.addEventListener("click", () => {
+    const quote = toQuotedMessageRef(bookmarks[currentIndex]);
+    if (!quote) return;
+    void Promise.resolve(state.actions.onJumpToChat(quote));
+  });
+  readerBody.addEventListener(
+    "scroll",
+    () => updateReaderProgress(host, readerBody),
+    { passive: true },
+  );
+  let copyTimer: number | undefined;
+  copyBtn.addEventListener("click", () => {
+    if (!currentTurn?.assistantContent) return;
+    copyToClipboard(currentTurn.assistantContent);
+    state.actions.onCopySuccess?.(getString("chat-bookmark-copied"));
+    copyBtn.dataset.copied = "true";
+    const win = host.ownerDocument.defaultView;
+    if (copyTimer !== undefined) win?.clearTimeout(copyTimer);
+    copyTimer = win?.setTimeout(() => {
+      delete copyBtn.dataset.copied;
+    }, 900);
+  });
   host
     .querySelector("#chat-bookmark-reader-close")
     ?.addEventListener("click", (event) => {
@@ -877,10 +993,7 @@ function bindReaderEvents(host: HTMLElement, state: ReaderOpenState): void {
       closeBookmarkReader(win);
     });
 
-  const readerBody = host.querySelector(
-    "#chat-bookmark-reader-body",
-  ) as HTMLElement | null;
-  if (readerBody && state.actions.onQuoteAssistantExcerpt) {
+  if (state.actions.onQuoteAssistantExcerpt) {
     setupChatHistorySelectionQuote(readerBody, (quote) => {
       void Promise.resolve(
         state.actions.onQuoteAssistantExcerpt?.(quote.messageId, quote.excerpt),
@@ -903,6 +1016,8 @@ function mountReaderWindow(win: Window, state: ReaderOpenState): void {
   }
 
   renderGeneration += 1;
+  unsubscribeFromConversationDeletion?.();
+  unsubscribeFromConversationDeletion = undefined;
   activeOpenState = state;
   readerHosts.set(host, win);
   win.document.documentElement.style.display = "";
@@ -996,6 +1111,8 @@ function hideReaderWindow(win: Window): void {
 }
 
 function finalizeBookmarkReaderClose(actions?: BookmarkReaderActions): void {
+  unsubscribeFromConversationDeletion?.();
+  unsubscribeFromConversationDeletion = undefined;
   if (readerWindow && !readerWindow.closed) {
     const host = readerWindow.document.getElementById(READER_HOST_ID);
     if (host) {

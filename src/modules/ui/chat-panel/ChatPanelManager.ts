@@ -32,6 +32,7 @@ import {
   getBookmarkService,
   resolveBookmarkJumpMessageId,
 } from "../../bookmarks";
+import { canReadAssistantReply } from "../../bookmarks/bookmarkTurnContent";
 import type {
   BookmarkReaderDialogHost,
   BookmarkReaderToggleResult,
@@ -2803,7 +2804,7 @@ function buildReaderBookmarksFromSession(
     isItemContextTransition,
   );
   return session.messages.flatMap((message, index) => {
-    if (message.role !== "assistant" || message.isSystemNotice) return [];
+    if (!canReadAssistantReply(message)) return [];
     let paper: Zotero.Item | null = null;
     try {
       paper = resolveReaderPaper(session, message, index > lastPaperChange);
@@ -2839,8 +2840,11 @@ export async function openBookmarkReaderForContext(
   bookmarks: BookmarkRecord[],
   startIndex: number,
 ): Promise<void> {
+  const manager = getChatManager();
   await openBookmarkReader(bookmarks, startIndex, {
-    loadSession: (sessionId) => getChatManager().getSessionById(sessionId),
+    loadSession: (sessionId) => manager.getSessionById(sessionId),
+    subscribeToConversationDeletion: (listener) =>
+      manager.subscribeToConversationDeletion(listener),
     onQuoteAssistantExcerpt: (messageId, excerpt) => {
       quoteAssistantReplySelection(context, messageId, excerpt);
     },
