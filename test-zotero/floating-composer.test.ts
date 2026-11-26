@@ -332,6 +332,8 @@ describe("floating composer styles in Zotero", function () {
     );
     assert.isNull(effect.querySelector(".chat-composer-focus-sparks"));
 
+    // Read the final border colors; the following test covers animation.
+    wrapper.style.transition = "none";
     input.dispatchEvent(new view.FocusEvent("focus"));
     const focusedBorder = win.getComputedStyle(wrapper).borderTopColor;
     wrapper.classList.add("chat-composer--editing");
